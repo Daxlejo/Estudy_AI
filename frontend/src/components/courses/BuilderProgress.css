@@ -1,0 +1,67 @@
+/* BuilderProgress.css - Transiciones y efectos de construcción */
+
+@keyframes builder-node-bounce {
+  0% {
+    transform: scale(0.8);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  75% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Efecto de rebote/escala al cambiar de vacío a construido */
+.builder-node-built-pop {
+  animation: builder-node-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Micro-animación de flotación del personaje */
+@keyframes builder-character-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.builder-character-animated {
+  animation: builder-character-float 2.2s ease-in-out infinite;
+}
+
+/* Sincronización idéntica de duración y aceleración para pista y personaje */
+.builder-track-filled {
+  transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.builder-character-playhead {
+  z-index: 50;
+  transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Textura diagonal animada para el tramo construido */
+@keyframes builder-stripe-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 32px 0;
+  }
+}
+
+.builder-track-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.18) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+  background-size: 32px 32px;
+  animation: builder-stripe-flow 2s linear infinite;
+}

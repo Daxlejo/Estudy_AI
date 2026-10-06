@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/*
+ * Sistema de temas (Claro por defecto, Oscuro opcional).
+ * - Los valores reales viven en variables CSS por tema (:root y [data-theme="dark"]).
+ * - @theme inline mapea esas variables a utilidades Tailwind (bg-background, text-primary, ...),
+ *   de modo que los componentes usan las mismas clases en ambos temas.
+ * - El tema se aplica con el atributo data-theme en <html> (ver src/theme).
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Animación de relleno de barras de progreso (el ancho final lo define el elemento) */
+@keyframes progress-grow {
+  from {
+    width: 0;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-high: var(--surface-high);
+
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-danger: var(--danger);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+
+  --color-border: var(--border);
+  --color-divider: var(--divider);
+  --color-on-primary: var(--on-primary);
+
+  /* Navegación (coverflow) */
+  --color-nav-active-bg: var(--nav-active-bg);
+  --color-nav-active-border: var(--nav-active-border);
+  --color-nav-active-text: var(--nav-active-text);
+  --color-nav-idle-bg: var(--nav-idle-bg);
+  --color-nav-idle-border: var(--nav-idle-border);
+  --color-nav-idle-text: var(--nav-idle-text);
+  --color-brand-dot: var(--brand-dot);
+
+  /* XP */
+  --color-xp-bg: var(--xp-bg);
+  --color-xp-border: var(--xp-border);
+  --color-xp-text: var(--xp-text);
+  --color-xp-track: var(--xp-track);
+
+  /* Racha */
+  --color-streak-bg: var(--streak-bg);
+  --color-streak-border: var(--streak-border);
+  --color-streak-text: var(--streak-text);
+
+  /* Perfil / nivel */
+  --color-avatar-border: var(--avatar-border);
+  --color-avatar-text: var(--avatar-text);
+  --color-level-badge: var(--level-badge);
+  --color-level-badge-text: var(--level-badge-text);
+}
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+}
+
+/* Tema claro (por defecto) */
+:root {
+  color-scheme: light;
+
+  --background: #f3f2f7;
+  --surface: #ffffff;
+  --surface-high: #e9e7f0;
+
+  --primary: #6f63e8;
+  --accent: #7b6ff0;
+  --secondary: #22aaa2;
+  --tertiary: #e49a00;
+  --danger: #d95c50;
+
+  --text-primary: #24232a;
+  --text-secondary: #62606c;
+
+  --border: #d9d7e2;
+  --divider: #d9d7e2;
+  --on-primary: #ffffff;
+
+  --nav-active-bg: #ecebfd;
+  --nav-active-border: #b9b2f5;
+  --nav-active-text: #4b40c9;
+  --nav-idle-bg: #e9e7f0;
+  --nav-idle-border: #d9d7e2;
+  --nav-idle-text: #6f6c7c;
+  --nav-active-shadow: 0 0 18px rgba(111, 99, 232, 0.2), 0 4px 14px rgba(36, 35, 42, 0.1);
+  --brand-dot: #6f63e8;
+  --accent-line-a: #6f63e859;
+  --accent-line-b: #22aaa259;
+
+  --xp-bg: #efedfd;
+  --xp-border: #cfc9f7;
+  --xp-text: #5b4fd0;
+  --xp-track: #d9d5f5;
+  --xp-fill-from: #6f63e8;
+  --xp-fill-to: #22aaa2;
+
+  --streak-bg: #fff4db;
+  --streak-border: #f2d58e;
+  --streak-text: #a86a00;
+
+  --avatar-from: #efedfd;
+  --avatar-to: #dcd7fa;
+  --avatar-border: #a79ff0;
+  --avatar-text: #4b40c9;
+  --level-badge: #6f63e8;
+  --level-badge-text: #ffffff;
+}
+
+/* Tema oscuro (opcional) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #131317;
+  --surface: #1f1f23;
+  --surface-high: #2a292e;
+
+  --primary: #c6bfff;
+  --accent: #8c80ff;
+  --secondary: #5dd9d0;
+  --tertiary: #fcbb36;
+  --danger: #ffb4ab;
+
+  --text-primary: #e4e1e7;
+  --text-secondary: #c8c4d7;
+
+  --border: #474554;
+  --divider: rgba(255, 255, 255, 0.05);
+  --on-primary: #131317;
+
+  --nav-active-bg: #1e1c38;
+  --nav-active-border: #4a44a0;
+  --nav-active-text: #ffffff;
+  --nav-idle-bg: #13131e;
+  --nav-idle-border: #1e1e2e;
+  --nav-idle-text: #3a3a5a;
+  --nav-active-shadow: 0 0 20px rgba(124, 109, 250, 0.13), 0 4px 16px rgba(0, 0, 0, 0.33);
+  --brand-dot: #7c6dfa;
+  --accent-line-a: #7c6dfa55;
+  --accent-line-b: #4ecdc455;
+
+  --xp-bg: #1a1030;
+  --xp-border: #3d2a60;
+  --xp-text: #a78bfa;
+  --xp-track: #2a1a45;
+  --xp-fill-from: #7c6dfa;
+  --xp-fill-to: #4ecdc4;
+
+  --streak-bg: #1e1800;
+  --streak-border: #4a3500;
+  --streak-text: #fcbb36;
+
+  --avatar-from: #2a2040;
+  --avatar-to: #1a1030;
+  --avatar-border: #5b4fa0;
+  --avatar-text: #c4bfff;
+  --level-badge: #7c6dfa;
+  --level-badge-text: #ffffff;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/inter-v20-latin-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/inter-v20-latin-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/inter-v20-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./assets/fonts/plus-jakarta-sans-v12-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./assets/fonts/plus-jakarta-sans-v12-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  font-family: "Inter", sans-serif;
+  color: var(--text-primary);
+  background: var(--background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+}
