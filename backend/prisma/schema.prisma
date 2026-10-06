@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Minimal placeholder model to ensure Prisma Client can be generated and migrations work.
+// To be replaced with actual domain models in the next step.
+model Placeholder {
+  id Int @id @default(autoincrement())
+}
