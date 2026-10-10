@@ -1,3 +1,6 @@
 # Scripts de desarrollo
 scripts-dev/.venv/
 scripts-dev/.env
+scripts-dev/contexto_actual.txt
+scripts-dev/contexto_log.json
+scripts-dev/indice_proyecto.json
