@@ -6,6 +6,7 @@ export interface Session {
   learningObjective: string;
   durationMinutes: number;
   xpReward: number;
+  isUnlocked: boolean;
   introTitle: string;
   introContent: string;
   introKeyTakeaway: string;

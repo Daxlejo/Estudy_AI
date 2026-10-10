@@ -1,6 +1,13 @@
+/**
+ * Represents an option in a quiz question.
+ * Note: `isCorrect` is stored inside the `optionsPayload` JSON string column in the QuizQuestion database table.
+ * When AI content generation creates quiz questions, it MUST set `isCorrect: true` on exactly one option
+ * and `isCorrect: false` on all other options.
+ */
 export interface ExamOption {
   id: string;
   text: string;
+  isCorrect?: boolean;
 }
 
 export interface Quiz {

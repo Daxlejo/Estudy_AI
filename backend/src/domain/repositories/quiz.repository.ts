@@ -25,4 +25,5 @@ export interface QuizRepository {
     answers: Omit<QuizAttemptAnswer, 'id' | 'attemptId' | 'createdAt'>[],
   ): Promise<QuizAttempt>;
   getAttemptsByCourseId(courseId: string): Promise<QuizAttempt[]>;
+  getAttemptsByQuizId(quizId: string): Promise<QuizAttempt[]>;
 }

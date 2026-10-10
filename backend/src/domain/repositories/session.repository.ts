@@ -12,4 +12,5 @@ export interface SessionRepository {
 
   addConcept(concept: Omit<Concept, 'id' | 'createdAt'>): Promise<Concept>;
   getConceptsBySessionId(sessionId: string): Promise<Concept[]>;
+  unlockNextSession(currentSessionId: string): Promise<Session | null>;
 }
