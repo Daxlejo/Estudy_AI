@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      String   @default("CREATED")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  materials         Material[]
+  generationJobs    GenerationJob[]
+  sessions          Session[]
+  finalExam         FinalExam?
+  quizAttempts      QuizAttempt[]
+  finalExamAttempts FinalExamAttempt[]
+}
+
+model Material {
+  id          String   @id @default(uuid())
+  courseId    String
+  name        String
+  storagePath String
+  type        String
+  sizeBytes   Int
+  uploadedAt  DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
+model GenerationJob {
+  id            String   @id @default(uuid())
+  courseId      String
+  status        String   @default("PENDING")
+  progress      Int      @default(0)
+  currentStepIndex Int?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, createdAt])
+}
+
+model Session {
+  id                String   @id @default(uuid())
+  courseId          String
+  sequenceOrder     Int
+  title             String
+  learningObjective String
+  durationMinutes   Int
+  xpReward          Int      @default(50)
+  introTitle        String
+  introContent      String
+  introKeyTakeaway  String
+  introCodeSnippet  String?
+  guidedPractice    String
+  challenge         String
+  createdAt         DateTime @default(now())
+
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  concepts Concept[]
+  quiz     Quiz?
+
+  @@unique([courseId, sequenceOrder])
+}
+
+model Concept {
+  id        String   @id @default(uuid())
+  sessionId String
+  name      String
+  summary   String
+  detail    String
+  example   String?
+  createdAt DateTime @default(now())
+
+  session            Session             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  quizQuestions      QuizQuestion[]
+  finalExamQuestions FinalExamQuestion[]
+
+  @@index([sessionId])
+}
+
+model Quiz {
+  id               String   @id @default(uuid())
+  sessionId        String   @unique
+  passingThreshold Int
+  xpReward         Int      @default(100)
+  createdAt        DateTime @default(now())
+
+  session      Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questions    QuizQuestion[]
+  quizAttempts QuizAttempt[]
+}
+
+model QuizQuestion {
+  id             String   @id @default(uuid())
+  quizId         String
+  conceptId      String
+  prompt         String
+  context        String?
+  optionsPayload String
+  explanation    String
+  createdAt      DateTime @default(now())
+
+  quiz           Quiz                @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  concept        Concept             @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+  attemptAnswers QuizAttemptAnswer[]
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id               String   @id @default(uuid())
+  courseId         String
+  quizId           String?
+  attemptNumber    Int
+  totalQuestions   Int
+  correctAnswers   Int
+  incorrectAnswers Int
+  scorePercent     Int
+  isPassed         Boolean
+  submittedAt      DateTime @default(now())
+
+  course  Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  quiz    Quiz?               @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  answers QuizAttemptAnswer[]
+
+  @@index([courseId, submittedAt])
+  @@index([quizId, submittedAt])
+}
+
+model QuizAttemptAnswer {
+  id                  String   @id @default(uuid())
+  attemptId           String
+  questionId          String?
+  questionSnapshot    String
+  conceptSnapshot     String
+  selectedOptionId    String?
+  selectedOptionText  String?
+  isCorrect           Boolean
+  correctOptionId     String
+  correctOptionText   String
+  explanationSnapshot String
+  createdAt           DateTime @default(now())
+
+  attempt  QuizAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([attemptId])
+}
+
+model FinalExam {
+  id               String   @id @default(uuid())
+  courseId         String   @unique
+  passingScorePct  Int       @default(70)
+  estimatedMinutes Int
+  cooldownUntil    DateTime?
+  createdAt        DateTime  @default(now())
+
+  course    Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions FinalExamQuestion[]
+  attempts  FinalExamAttempt[]
+}
+
+model FinalExamQuestion {
+  id          String   @id @default(uuid())
+  examId      String
+  conceptId   String
+  type        String
+  prompt      String
+  context     String?
+  payload     String
+  explanation String
+  createdAt   DateTime @default(now())
+
+  exam           FinalExam                @relation(fields: [examId], references: [id], onDelete: Cascade)
+  concept        Concept                  @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+  attemptAnswers FinalExamAttemptAnswer[]
+
+  @@index([examId])
+}
+
+model FinalExamAttempt {
+  id               String   @id @default(uuid())
+  courseId         String
+  examId           String?
+  attemptNumber    Int
+  totalQuestions   Int
+  correctAnswers   Int
+  incorrectAnswers Int
+  scorePercent     Int
+  isPassed         Boolean
+  submittedAt      DateTime @default(now())
+
+  course  Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  exam    FinalExam?               @relation(fields: [examId], references: [id], onDelete: SetNull)
+  answers FinalExamAttemptAnswer[]
+
+  @@index([courseId, submittedAt])
+  @@index([examId, submittedAt])
+}
+
+model FinalExamAttemptAnswer {
+  id                  String   @id @default(uuid())
+  attemptId           String
+  questionId          String?
+  type                String
+  questionSnapshot    String
+  studentPayload      String?
+  evalPayload         String
+  isCorrect           Boolean
+  explanationSnapshot String
+  createdAt           DateTime @default(now())
+
+  attempt  FinalExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question FinalExamQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([attemptId])
+}
