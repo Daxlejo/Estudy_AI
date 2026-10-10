@@ -60,6 +60,7 @@ model Session {
   learningObjective String
   durationMinutes   Int
   xpReward          Int      @default(50)
+  isUnlocked        Boolean  @default(false)
   introTitle        String
   introContent      String
   introKeyTakeaway  String

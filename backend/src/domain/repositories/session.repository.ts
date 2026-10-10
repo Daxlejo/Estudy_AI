@@ -10,6 +10,7 @@ export interface SessionRepository {
   ): Promise<Session>;
   delete(id: string): Promise<void>;
 
-  addConcept(concept: Omit<Concept, 'id' | 'createdAt'>): Promise<Concept>;
+  addConcept(conceptId: string, sessionId: string): Promise<Concept>;
   getConceptsBySessionId(sessionId: string): Promise<Concept[]>;
+  unlockNextSession(currentSessionId: string): Promise<Session | null>;
 }

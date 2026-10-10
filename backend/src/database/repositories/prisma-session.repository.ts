@@ -33,16 +33,42 @@ export class PrismaSessionRepository implements SessionRepository {
     await this.prisma.session.delete({ where: { id } });
   }
 
-  async addConcept(
-    concept: Omit<Concept, 'id' | 'createdAt'>,
-  ): Promise<Concept> {
-    return this.prisma.concept.create({ data: concept });
+  async addConcept(conceptId: string, sessionId: string): Promise<Concept> {
+    return this.prisma.concept.update({
+      where: { id: conceptId },
+      data: { sessionId },
+    });
   }
 
   async getConceptsBySessionId(sessionId: string): Promise<Concept[]> {
     return this.prisma.concept.findMany({
       where: { sessionId },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async unlockNextSession(currentSessionId: string): Promise<Session | null> {
+    const currentSession = await this.prisma.session.findUnique({
+      where: { id: currentSessionId },
+    });
+
+    if (!currentSession) return null;
+
+    const nextSession = await this.prisma.session.findFirst({
+      where: {
+        courseId: currentSession.courseId,
+        sequenceOrder: {
+          gt: currentSession.sequenceOrder,
+        },
+      },
+      orderBy: { sequenceOrder: 'asc' },
+    });
+
+    if (!nextSession) return null;
+
+    return this.prisma.session.update({
+      where: { id: nextSession.id },
+      data: { isUnlocked: true },
     });
   }
 }
