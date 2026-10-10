@@ -59,7 +59,7 @@ def generar_contexto(terminos: list, max_lineas_por_archivo: int = 80):
         else:
             contenido_recortado = contenido
 
-        bloques.append(f"// === {ruta} ({archivo['lineas']} lineas) ===\n{contenido_recortado}")
+        bloques.append(f"// === {ruta} ({len(lineas)} lineas) ===\n{contenido_recortado}")
 
     salida = "\n\n".join(bloques)
 
@@ -71,7 +71,7 @@ def generar_contexto(terminos: list, max_lineas_por_archivo: int = 80):
     print(f"Guardado en: contexto_actual.txt")
     print(f"\nArchivos incluidos:")
     for a in archivos:
-        print(f"  {a['ruta']} ({a['lineas']} lineas)")
+        print(f"  {a['ruta']} ({a.get('lineas', '?')} lineas)")
 
     # Guardar log de terminos usados
     log = {

@@ -42,8 +42,8 @@ scripts-dev/contexto_actual.txt
 ### PASO 4 — Verificar
 - Despues de cada cambio ejecuta:
 
-cd scripts-dev
-python auditor.py
+  cd scripts-dev
+  python auditor.py <ruta del archivo modificado, relativa a la raiz del proyecto>
 
 - Si el auditor detecta hallazgos, corrigelos antes de continuar
 
