@@ -201,5 +201,5 @@ export interface InternalFinalExam extends Omit<FinalExam, 'questions'> {
  */
 export function getMinimumExamPassingScore(totalQuestions: number): number {
   if (totalQuestions <= 0) return 0
-  return Math.floor(totalQuestions * 0.7) + 1
+  return Math.ceil(totalQuestions * 0.7)
 }
