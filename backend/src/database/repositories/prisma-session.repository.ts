@@ -33,10 +33,11 @@ export class PrismaSessionRepository implements SessionRepository {
     await this.prisma.session.delete({ where: { id } });
   }
 
-  async addConcept(conceptId: string, sessionId: string): Promise<Concept> {
-    return this.prisma.concept.update({
-      where: { id: conceptId },
-      data: { sessionId },
+  async addConcept(
+    concept: Omit<Concept, 'id' | 'createdAt'>,
+  ): Promise<Concept> {
+    return this.prisma.concept.create({
+      data: concept,
     });
   }
 
