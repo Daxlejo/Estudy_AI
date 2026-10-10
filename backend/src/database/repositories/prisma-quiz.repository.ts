@@ -98,4 +98,11 @@ export class PrismaQuizRepository implements QuizRepository {
       orderBy: { submittedAt: 'desc' },
     });
   }
+
+  async getAttemptsByQuizId(quizId: string): Promise<QuizAttempt[]> {
+    return this.prisma.quizAttempt.findMany({
+      where: { quizId },
+      orderBy: { submittedAt: 'desc' },
+    });
+  }
 }
