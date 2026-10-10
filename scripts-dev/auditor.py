@@ -45,19 +45,31 @@ def nodo_analisis_estatico(state: EstadoAuditoria):
 
 def nodo_auditar_pipeline(state: EstadoAuditoria):
     paso = state["paso_pipeline"]
-    nombre_paso = NOMBRES_PASOS.get(paso, f"Paso {paso}")
-    print(f"[2/3] Auditando paso {paso} - {nombre_paso}...")
-
-    prompt = (
-        "Eres un auditor de codigo TypeScript especializado en NestJS y Prisma.\n"
-        f"Analiza UNICAMENTE este fragmento del paso '{nombre_paso}' de un pipeline de procesamiento de material educativo.\n\n"
-        "El pipeline completo tiene 6 pasos: Extraccion -> Conceptos -> Dependencias -> Agrupacion -> Ruta -> Contenido.\n"
-        f"Este es el paso {paso}: {nombre_paso}.\n\n"
-        f"CODIGO A AUDITAR:\n{state['codigo_fuente']}\n\n"
-        "Reporta SOLO problemas reales y concretos. Se breve y directo.\n"
-        "Si no hay problemas, responde exactamente: SIN_HALLAZGOS\n"
-        "Si hay problemas, listalos numerados en maximo 3 lineas cada uno."
-    )
+    
+    if paso is not None:
+        nombre_paso = NOMBRES_PASOS.get(paso, f"Paso {paso}")
+        print(f"[2/3] Auditando paso {paso} - {nombre_paso}...")
+        prompt = (
+            "Eres un auditor de codigo TypeScript especializado en NestJS y Prisma.\n"
+            f"Analiza UNICAMENTE este fragmento del paso '{nombre_paso}' de un pipeline de procesamiento de material educativo.\n\n"
+            "El pipeline completo tiene 6 pasos: Extraccion -> Conceptos -> Dependencias -> Agrupacion -> Ruta -> Contenido.\n"
+            f"Este es el paso {paso}: {nombre_paso}.\n\n"
+            f"CODIGO A AUDITAR:\n{state['codigo_fuente']}\n\n"
+            "Reporta SOLO problemas reales y concretos. Se breve y directo.\n"
+            "Si no hay problemas, responde exactamente: SIN_HALLAZGOS\n"
+            "Si hay problemas, listalos numerados en maximo 3 lineas cada uno."
+        )
+    else:
+        print("[2/3] Auditando codigo (general)...")
+        prompt = (
+            "Eres un auditor de codigo TypeScript especializado en NestJS y Prisma.\n"
+            "Analiza UNICAMENTE este fragmento de codigo.\n\n"
+            f"CODIGO A AUDITAR:\n{state['codigo_fuente']}\n\n"
+            "Reporta SOLO problemas reales y concretos (bugs, violaciones graves de NestJS/Prisma, fallos de tipado estricto).\n"
+            "Ignora problemas de estilo (como comillas, imports sin usar, formateo) o sugerencias subjetivas. Se breve y directo.\n"
+            "Si no hay problemas graves, responde exactamente: SIN_HALLAZGOS\n"
+            "Si hay problemas, listalos numerados en maximo 3 lineas cada uno."
+        )
 
     respuesta = llm.invoke(prompt)
     contenido = respuesta.content if isinstance(respuesta.content, str) else respuesta.content[0].get("text", "")
@@ -111,13 +123,24 @@ workflow.add_edge("parches", END)
 app = workflow.compile()
 
 if __name__ == "__main__":
-    with open("../backend/src/database/repositories/prisma-session.repository.ts", "r", encoding="utf-8") as f:
+    import argparse
+    import os
+    
+    parser = argparse.ArgumentParser(description="Auditor de codigo")
+    parser.add_argument("path", help="Ruta relativa a la raiz del proyecto")
+    parser.add_argument("--step", type=int, default=None, help="Paso del pipeline")
+    args = parser.parse_args()
+
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(project_root, args.path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
         codigo = f.read()
 
     estado_inicial = {
-        "modulo_path": "backend/src/database/repositories/prisma-session.repository.ts",
+        "modulo_path": args.path,
         "codigo_fuente": codigo,
-        "paso_pipeline": 5,
+        "paso_pipeline": args.step,
         "hallazgos": [],
         "parche_sugerido": "",
         "intentos": 0
