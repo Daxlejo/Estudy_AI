@@ -1,0 +1,1078 @@
+{
+  "archivos": [
+    {
+      "ruta": "backend/src/app.controller.spec.ts",
+      "tipo": ".ts",
+      "lineas": 23,
+      "imports": [
+        "import { Test, TestingModule } from '@nestjs/testing';",
+        "import { AppController } from './app.controller';",
+        "import { AppService } from './app.service';"
+      ],
+      "preview": "import { Test, TestingModule } from '@nestjs/testing';\nimport { AppController } from './app.controller';\nimport { AppService } from './app.service';\n\ndescribe('AppController', () => {"
+    },
+    {
+      "ruta": "backend/src/app.controller.ts",
+      "tipo": ".ts",
+      "lineas": 13,
+      "imports": [
+        "import { Controller, Get } from '@nestjs/common';",
+        "import { AppService } from './app.service';"
+      ],
+      "preview": "import { Controller, Get } from '@nestjs/common';\nimport { AppService } from './app.service';\n\n@Controller()\nexport class AppController {"
+    },
+    {
+      "ruta": "backend/src/app.module.ts",
+      "tipo": ".ts",
+      "lineas": 12,
+      "imports": [
+        "import { Module } from '@nestjs/common';",
+        "import { AppController } from './app.controller';",
+        "import { AppService } from './app.service';",
+        "import { DatabaseModule } from './database/database.module';"
+      ],
+      "preview": "import { Module } from '@nestjs/common';\nimport { AppController } from './app.controller';\nimport { AppService } from './app.service';\nimport { DatabaseModule } from './database/database.module';"
+    },
+    {
+      "ruta": "backend/src/app.service.ts",
+      "tipo": ".ts",
+      "lineas": 9,
+      "imports": [
+        "import { Injectable } from '@nestjs/common';"
+      ],
+      "preview": "import { Injectable } from '@nestjs/common';\n\n@Injectable()\nexport class AppService {\n  getHello(): string {"
+    },
+    {
+      "ruta": "backend/src/main.ts",
+      "tipo": ".ts",
+      "lineas": 26,
+      "imports": [
+        "import { NestFactory } from '@nestjs/core';",
+        "import { AppModule } from './app.module';"
+      ],
+      "preview": "import { NestFactory } from '@nestjs/core';\nimport { AppModule } from './app.module';\n\nasync function bootstrap() {\n  const app = await NestFactory.create(AppModule);"
+    },
+    {
+      "ruta": "backend/src/database/database.module.ts",
+      "tipo": ".ts",
+      "lineas": 37,
+      "imports": [
+        "import { Module } from '@nestjs/common';",
+        "import { PrismaService } from './prisma.service';",
+        "import { PrismaCourseRepository } from './repositories/prisma-course.repository';",
+        "import { PrismaSessionRepository } from './repositories/prisma-session.repository';",
+        "import { PrismaQuizRepository } from './repositories/prisma-quiz.repository';",
+        "import { PrismaFinalExamRepository } from './repositories/prisma-final-exam.repository';"
+      ],
+      "preview": "import { Module } from '@nestjs/common';\nimport { PrismaService } from './prisma.service';\nimport { PrismaCourseRepository } from './repositories/prisma-course.repository';\nimport { PrismaSessionRepository } from './repositories/prisma-session.repository';\nimport { PrismaQuizRepository } from './repositories/prisma-quiz.repository';"
+    },
+    {
+      "ruta": "backend/src/database/prisma.service.spec.ts",
+      "tipo": ".ts",
+      "lineas": 29,
+      "imports": [
+        "import { Test, TestingModule } from '@nestjs/testing';",
+        "import { PrismaService } from './prisma.service';"
+      ],
+      "preview": "import { Test, TestingModule } from '@nestjs/testing';\nimport { PrismaService } from './prisma.service';\n\ndescribe('PrismaService Connection', () => {\n  let service: PrismaService;"
+    },
+    {
+      "ruta": "backend/src/database/prisma.service.ts",
+      "tipo": ".ts",
+      "lineas": 17,
+      "imports": [
+        "import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';",
+        "import { PrismaClient } from '@prisma/client';"
+      ],
+      "preview": "import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';\nimport { PrismaClient } from '@prisma/client';\n\n@Injectable()\nexport class PrismaService"
+    },
+    {
+      "ruta": "backend/src/domain/models/course.ts",
+      "tipo": ".ts",
+      "lineas": 30,
+      "imports": [],
+      "preview": "export interface Course {\n  id: string;\n  name: string;\n  description: string | null;\n  status: string;"
+    },
+    {
+      "ruta": "backend/src/domain/models/final-exam.ts",
+      "tipo": ".ts",
+      "lineas": 68,
+      "imports": [],
+      "preview": "export interface FinalExam {\n  id: string;\n  courseId: string;\n  passingScorePct: number;\n  estimatedMinutes: number;"
+    },
+    {
+      "ruta": "backend/src/domain/models/quiz.ts",
+      "tipo": ".ts",
+      "lineas": 52,
+      "imports": [],
+      "preview": "export interface ExamOption {\n  id: string;\n  text: string;\n}"
+    },
+    {
+      "ruta": "backend/src/domain/models/session.ts",
+      "tipo": ".ts",
+      "lineas": 28,
+      "imports": [],
+      "preview": "export interface Session {\n  id: string;\n  courseId: string;\n  sequenceOrder: number;\n  title: string;"
+    },
+    {
+      "ruta": "backend/src/domain/repositories/course.repository.ts",
+      "tipo": ".ts",
+      "lineas": 25,
+      "imports": [
+        "import { Course, Material, GenerationJob } from '../models/course';"
+      ],
+      "preview": "import { Course, Material, GenerationJob } from '../models/course';\n\nexport interface CourseRepository {\n  findById(id: string): Promise<Course | null>;\n  findAll(): Promise<Course[]>;"
+    },
+    {
+      "ruta": "backend/src/domain/repositories/final-exam.repository.ts",
+      "tipo": ".ts",
+      "lineas": 29,
+      "imports": [],
+      "preview": "import {\n  FinalExam,\n  FinalExamQuestion,\n  FinalExamAttempt,\n  FinalExamAttemptAnswer,"
+    },
+    {
+      "ruta": "backend/src/domain/repositories/quiz.repository.ts",
+      "tipo": ".ts",
+      "lineas": 29,
+      "imports": [],
+      "preview": "import {\n  Quiz,\n  QuizQuestion,\n  QuizAttempt,\n  QuizAttemptAnswer,"
+    },
+    {
+      "ruta": "backend/src/domain/repositories/session.repository.ts",
+      "tipo": ".ts",
+      "lineas": 17,
+      "imports": [
+        "import { Session, Concept } from '../models/session';"
+      ],
+      "preview": "import { Session, Concept } from '../models/session';\n\nexport interface SessionRepository {\n  findById(id: string): Promise<Session | null>;\n  findByCourseId(courseId: string): Promise<Session[]>;"
+    },
+    {
+      "ruta": "backend/src/database/errors/database-error.ts",
+      "tipo": ".ts",
+      "lineas": 18,
+      "imports": [],
+      "preview": "export class DatabaseError extends Error {\n  constructor(\n    message: string,\n    public readonly cause?: unknown,\n  ) {"
+    },
+    {
+      "ruta": "backend/src/database/mappers/final-exam-attempt-answer.mapper.ts",
+      "tipo": ".ts",
+      "lineas": 46,
+      "imports": [
+        "import { MapperError } from '../errors/database-error';"
+      ],
+      "preview": "import { MapperError } from '../errors/database-error';\n\nexport class FinalExamAttemptAnswerMapper {\n  static serializePayload(payload: any): string | null {\n    if (payload === null || payload === undefined) return null;"
+    },
+    {
+      "ruta": "backend/src/database/mappers/final-exam-question.mapper.ts",
+      "tipo": ".ts",
+      "lineas": 56,
+      "imports": [
+        "import { z } from 'zod';",
+        "import { FinalExamQuestionPayload } from '../../domain/models/final-exam';",
+        "import { MapperError } from '../errors/database-error';"
+      ],
+      "preview": "import { z } from 'zod';\nimport { FinalExamQuestionPayload } from '../../domain/models/final-exam';\nimport { MapperError } from '../errors/database-error';\n\nconst multipleChoicePayloadSchema = z.object({"
+    },
+    {
+      "ruta": "backend/src/database/mappers/index.ts",
+      "tipo": ".ts",
+      "lineas": 5,
+      "imports": [],
+      "preview": "export * from './quiz-question.mapper';\nexport * from './quiz-attempt-answer.mapper';\nexport * from './final-exam-question.mapper';\nexport * from './final-exam-attempt-answer.mapper';"
+    },
+    {
+      "ruta": "backend/src/database/mappers/mappers.spec.ts",
+      "tipo": ".ts",
+      "lineas": 105,
+      "imports": [
+        "import { QuizQuestionMapper } from './quiz-question.mapper';",
+        "import { FinalExamQuestionMapper } from './final-exam-question.mapper';",
+        "import { MapperError } from '../errors/database-error';",
+        "import { ExamOption } from '../../domain/models/quiz';"
+      ],
+      "preview": "import { QuizQuestionMapper } from './quiz-question.mapper';\nimport { FinalExamQuestionMapper } from './final-exam-question.mapper';\nimport { MapperError } from '../errors/database-error';\nimport { ExamOption } from '../../domain/models/quiz';"
+    },
+    {
+      "ruta": "backend/src/database/mappers/quiz-attempt-answer.mapper.ts",
+      "tipo": ".ts",
+      "lineas": 16,
+      "imports": [
+        "import { MapperError } from '../errors/database-error';"
+      ],
+      "preview": "import { MapperError } from '../errors/database-error';\n\nexport class QuizAttemptAnswerMapper {\n  static serializeSnapshot(snapshot: any): string {\n    return JSON.stringify(snapshot);"
+    },
+    {
+      "ruta": "backend/src/database/mappers/quiz-question.mapper.ts",
+      "tipo": ".ts",
+      "lineas": 27,
+      "imports": [
+        "import { z } from 'zod';",
+        "import { ExamOption } from '../../domain/models/quiz';",
+        "import { MapperError } from '../errors/database-error';"
+      ],
+      "preview": "import { z } from 'zod';\nimport { ExamOption } from '../../domain/models/quiz';\nimport { MapperError } from '../errors/database-error';\n\nexport const examOptionSchema = z.object({"
+    },
+    {
+      "ruta": "backend/src/database/repositories/prisma-course.repository.ts",
+      "tipo": ".ts",
+      "lineas": 70,
+      "imports": [
+        "import { Injectable } from '@nestjs/common';",
+        "import { PrismaService } from '../prisma.service';",
+        "import { CourseRepository } from '../../domain/repositories/course.repository';",
+        "import { Course, Material, GenerationJob } from '../../domain/models/course';"
+      ],
+      "preview": "import { Injectable } from '@nestjs/common';\nimport { PrismaService } from '../prisma.service';\nimport { CourseRepository } from '../../domain/repositories/course.repository';\nimport { Course, Material, GenerationJob } from '../../domain/models/course';"
+    },
+    {
+      "ruta": "backend/src/database/repositories/prisma-final-exam.repository.ts",
+      "tipo": ".ts",
+      "lineas": 116,
+      "imports": [
+        "import { Injectable } from '@nestjs/common';",
+        "import { PrismaService } from '../prisma.service';",
+        "import { FinalExamRepository } from '../../domain/repositories/final-exam.repository';"
+      ],
+      "preview": "import { Injectable } from '@nestjs/common';\nimport { PrismaService } from '../prisma.service';\nimport { FinalExamRepository } from '../../domain/repositories/final-exam.repository';\nimport {\n  FinalExam,"
+    },
+    {
+      "ruta": "backend/src/database/repositories/prisma-quiz.repository.ts",
+      "tipo": ".ts",
+      "lineas": 102,
+      "imports": [
+        "import { Injectable } from '@nestjs/common';",
+        "import { PrismaService } from '../prisma.service';",
+        "import { QuizRepository } from '../../domain/repositories/quiz.repository';",
+        "import { QuizQuestionMapper, QuizAttemptAnswerMapper } from '../mappers';"
+      ],
+      "preview": "import { Injectable } from '@nestjs/common';\nimport { PrismaService } from '../prisma.service';\nimport { QuizRepository } from '../../domain/repositories/quiz.repository';\nimport {\n  Quiz,"
+    },
+    {
+      "ruta": "backend/src/database/repositories/prisma-session.repository.ts",
+      "tipo": ".ts",
+      "lineas": 75,
+      "imports": [
+        "import { Injectable } from '@nestjs/common';",
+        "import { PrismaService } from '../prisma.service';",
+        "import { SessionRepository } from '../../domain/repositories/session.repository';",
+        "import { Session, Concept } from '../../domain/models/session';"
+      ],
+      "preview": "import { Injectable } from '@nestjs/common';\nimport { PrismaService } from '../prisma.service';\nimport { SessionRepository } from '../../domain/repositories/session.repository';\nimport { Session, Concept } from '../../domain/models/session';"
+    },
+    {
+      "ruta": "backend/src/database/repositories/repositories.spec.ts",
+      "tipo": ".ts",
+      "lineas": 51,
+      "imports": [
+        "import { Test, TestingModule } from '@nestjs/testing';",
+        "import { PrismaService } from '../prisma.service';",
+        "import { PrismaCourseRepository } from './prisma-course.repository';"
+      ],
+      "preview": "import { Test, TestingModule } from '@nestjs/testing';\nimport { PrismaService } from '../prisma.service';\nimport { PrismaCourseRepository } from './prisma-course.repository';\n\ndescribe('PrismaCourseRepository', () => {"
+    },
+    {
+      "ruta": "backend/prisma/schema.prisma",
+      "tipo": ".prisma",
+      "lineas": 231,
+      "imports": [
+        "model Course {",
+        "model Material {",
+        "model GenerationJob {",
+        "model Session {",
+        "model Concept {",
+        "model Quiz {",
+        "model QuizQuestion {",
+        "model QuizAttempt {",
+        "model QuizAttemptAnswer {",
+        "model FinalExam {"
+      ],
+      "preview": "generator client {\n  provider = \"prisma-client-js\"\n}\n\ndatasource db {",
+      "contenido_completo": "generator client {\n  provider = \"prisma-client-js\"\n}\n\ndatasource db {\n  provider = \"sqlite\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel Course {\n  id          String   @id @default(uuid())\n  name        String\n  description String?\n  status      String   @default(\"CREATED\")\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n\n  materials         Material[]\n  generationJobs    GenerationJob[]\n  sessions          Session[]\n  finalExam         FinalExam?\n  quizAttempts      QuizAttempt[]\n  finalExamAttempts FinalExamAttempt[]\n}\n\nmodel Material {\n  id          String   @id @default(uuid())\n  courseId    String\n  name        String\n  storagePath String\n  type        String\n  sizeBytes   Int\n  uploadedAt  DateTime @default(now())\n\n  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)\n\n  @@index([courseId])\n}\n\nmodel GenerationJob {\n  id            String   @id @default(uuid())\n  courseId      String\n  status        String   @default(\"PENDING\")\n  progress      Int      @default(0)\n  currentStepIndex Int?\n  errorMessage  String?\n  createdAt     DateTime @default(now())\n  updatedAt     DateTime @updatedAt\n\n  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)\n\n  @@index([courseId, createdAt])\n}\n\nmodel Session {\n  id                String   @id @default(uuid())\n  courseId          String\n  sequenceOrder     Int\n  title             String\n  learningObjective String\n  durationMinutes   Int\n  xpReward          Int      @default(50)\n  isUnlocked        Boolean  @default(false)\n  introTitle        String\n  introContent      String\n  introKeyTakeaway  String\n  introCodeSnippet  String?\n  guidedPractice    String\n  challenge         String\n  createdAt         DateTime @default(now())\n\n  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)\n  concepts Concept[]\n  quiz     Quiz?\n\n  @@unique([courseId, sequenceOrder])\n}\n\nmodel Concept {\n  id        String   @id @default(uuid())\n  sessionId String\n  name      String\n  summary   String\n  detail    String\n  example   String?\n  createdAt DateTime @default(now())\n\n  session            Session             @relation(fields: [sessionId], references: [id], onDelete: Cascade)\n  quizQuestions      QuizQuestion[]\n  finalExamQuestions FinalExamQuestion[]\n\n  @@index([sessionId])\n}\n\nmodel Quiz {\n  id               String   @id @default(uuid())\n  sessionId        String   @unique\n  passingThreshold Int\n  xpReward         Int      @default(100)\n  createdAt        DateTime @default(now())\n\n  session      Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)\n  questions    QuizQuestion[]\n  quizAttempts QuizAttempt[]\n}\n\nmodel QuizQuestion {\n  id             String   @id @default(uuid())\n  quizId         String\n  conceptId      String\n  prompt         String\n  context        String?\n  optionsPayload String\n  explanation    String\n  createdAt      DateTime @default(now())\n\n  quiz           Quiz                @relation(fields: [quizId], references: [id], onDelete: Cascade)\n  concept        Concept             @relation(fields: [conceptId], references: [id], onDelete: Restrict)\n  attemptAnswers QuizAttemptAnswer[]\n\n  @@index([quizId])\n}\n\nmodel QuizAttempt {\n  id               String   @id @default(uuid())\n  courseId         String\n  quizId           String?\n  attemptNumber    Int\n  totalQuestions   Int\n  correctAnswers   Int\n  incorrectAnswers Int\n  scorePercent     Int\n  isPassed         Boolean\n  submittedAt      DateTime @default(now())\n\n  course  Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)\n  quiz    Quiz?               @relation(fields: [quizId], references: [id], onDelete: SetNull)\n  answers QuizAttemptAnswer[]\n\n  @@index([courseId, submittedAt])\n  @@index([quizId, submittedAt])\n}\n\nmodel QuizAttemptAnswer {\n  id                  String   @id @default(uuid())\n  attemptId           String\n  questionId          String?\n  questionSnapshot    String\n  conceptSnapshot     String\n  selectedOptionId    String?\n  selectedOptionText  String?\n  isCorrect           Boolean\n  correctOptionId     String\n  correctOptionText   String\n  explanationSnapshot String\n  createdAt           DateTime @default(now())\n\n  attempt  QuizAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)\n  question QuizQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)\n\n  @@index([attemptId])\n}\n\nmodel FinalExam {\n  id               String   @id @default(uuid())\n  courseId         String   @unique\n  passingScorePct  Int       @default(70)\n  estimatedMinutes Int\n  cooldownUntil    DateTime?\n  createdAt        DateTime  @default(now())\n\n  course    Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)\n  questions FinalExamQuestion[]\n  attempts  FinalExamAttempt[]\n}\n\nmodel FinalExamQuestion {\n  id          String   @id @default(uuid())\n  examId      String\n  conceptId   String\n  type        String\n  prompt      String\n  context     String?\n  payload     String\n  explanation String\n  createdAt   DateTime @default(now())\n\n  exam           FinalExam                @relation(fields: [examId], references: [id], onDelete: Cascade)\n  concept        Concept                  @relation(fields: [conceptId], references: [id], onDelete: Restrict)\n  attemptAnswers FinalExamAttemptAnswer[]\n\n  @@index([examId])\n}\n\nmodel FinalExamAttempt {\n  id               String   @id @default(uuid())\n  courseId         String\n  examId           String?\n  attemptNumber    Int\n  totalQuestions   Int\n  correctAnswers   Int\n  incorrectAnswers Int\n  scorePercent     Int\n  isPassed         Boolean\n  submittedAt      DateTime @default(now())\n\n  course  Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)\n  exam    FinalExam?               @relation(fields: [examId], references: [id], onDelete: SetNull)\n  answers FinalExamAttemptAnswer[]\n\n  @@index([courseId, submittedAt])\n  @@index([examId, submittedAt])\n}\n\nmodel FinalExamAttemptAnswer {\n  id                  String   @id @default(uuid())\n  attemptId           String\n  questionId          String?\n  type                String\n  questionSnapshot    String\n  studentPayload      String?\n  evalPayload         String\n  isCorrect           Boolean\n  explanationSnapshot String\n  createdAt           DateTime @default(now())\n\n  attempt  FinalExamAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)\n  question FinalExamQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)\n\n  @@index([attemptId])\n}"
+    },
+    {
+      "ruta": "frontend/src/App.tsx",
+      "tipo": ".tsx",
+      "lineas": 36,
+      "imports": [
+        "import { BrowserRouter, Routes, Route } from 'react-router-dom'",
+        "import Home from './pages/Home'",
+        "import Courses from './pages/Courses'",
+        "import CourseDetail from './pages/CourseDetail'",
+        "import CreateCourse from './pages/CreateCourse'",
+        "import CourseProcessing from './pages/CourseProcessing'",
+        "import LearningPath from './pages/LearningPath'",
+        "import StudySession from './pages/StudySession'",
+        "import Quiz from './pages/Quiz'",
+        "import FinalExam from './pages/FinalExam'"
+      ],
+      "preview": "import { BrowserRouter, Routes, Route } from 'react-router-dom'\nimport Home from './pages/Home'\nimport Courses from './pages/Courses'\nimport CourseDetail from './pages/CourseDetail'\nimport CreateCourse from './pages/CreateCourse'"
+    },
+    {
+      "ruta": "frontend/src/main.tsx",
+      "tipo": ".tsx",
+      "lineas": 14,
+      "imports": [
+        "import { StrictMode } from 'react'",
+        "import { createRoot } from 'react-dom/client'",
+        "import App from './App.tsx'",
+        "import ThemeProvider from './theme/ThemeProvider.tsx'"
+      ],
+      "preview": "import { StrictMode } from 'react'\nimport { createRoot } from 'react-dom/client'\nimport './index.css'\nimport App from './App.tsx'\nimport ThemeProvider from './theme/ThemeProvider.tsx'"
+    },
+    {
+      "ruta": "frontend/src/mocks/course.mock.ts",
+      "tipo": ".ts",
+      "lineas": 1536,
+      "imports": [],
+      "preview": "import type {\n  Course,\n  CourseProcessingState,\n  CurrentSession,\n  InternalQuiz,"
+    },
+    {
+      "ruta": "frontend/src/mocks/exam.mock.ts",
+      "tipo": ".ts",
+      "lineas": 1329,
+      "imports": [
+        "import { getMinimumExamPassingScore } from '../types/exam'",
+        "import { memoryCourseStore, memoryLearningPathStore } from './course.mock'"
+      ],
+      "preview": "import type {\n  FinalExam,\n  FinalExamAnswer,\n  FinalExamAnswerEvaluation,\n  FinalExamQuestion,"
+    },
+    {
+      "ruta": "frontend/src/services/course.service.ts",
+      "tipo": ".ts",
+      "lineas": 542,
+      "imports": [
+        "import { examService } from './exam.service'",
+        "import type { FinalExamAnswer } from '../types/exam'"
+      ],
+      "preview": "import {\n  INITIAL_PROCESSING_STEPS,\n  generateMockLearningPath,\n  getMinimumCorrectAnswers,\n  getInternalMockQuiz,"
+    },
+    {
+      "ruta": "frontend/src/services/exam.service.ts",
+      "tipo": ".ts",
+      "lineas": 83,
+      "imports": [],
+      "preview": "import type {\n  FinalExam,\n  FinalExamAnswer,\n  FinalExamResult,\n} from '../types/exam'"
+    },
+    {
+      "ruta": "frontend/src/theme/theme.ts",
+      "tipo": ".ts",
+      "lineas": 21,
+      "imports": [],
+      "preview": "export type Theme = 'light' | 'dark'\n\nexport const THEMES: readonly Theme[] = ['light', 'dark']\n\n/** El tema claro es el predeterminado. */"
+    },
+    {
+      "ruta": "frontend/src/theme/themeContext.ts",
+      "tipo": ".ts",
+      "lineas": 19,
+      "imports": [
+        "import { createContext, useContext } from 'react'",
+        "import type { Theme } from './theme'"
+      ],
+      "preview": "import { createContext, useContext } from 'react'\nimport type { Theme } from './theme'\n\nexport interface ThemeContextValue {\n  theme: Theme"
+    },
+    {
+      "ruta": "frontend/src/theme/ThemeProvider.tsx",
+      "tipo": ".tsx",
+      "lineas": 40,
+      "imports": [
+        "import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'",
+        "import { applyTheme, getInitialTheme, type Theme } from './theme'",
+        "import { ThemeContext } from './themeContext'"
+      ],
+      "preview": "import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'\nimport { applyTheme, getInitialTheme, type Theme } from './theme'\nimport { ThemeContext } from './themeContext'\n\nfunction ThemeProvider({ children }: { children: ReactNode }) {"
+    },
+    {
+      "ruta": "frontend/src/types/course.ts",
+      "tipo": ".ts",
+      "lineas": 263,
+      "imports": [],
+      "preview": "export type CourseStatus =\n  | 'CREATED'\n  | 'PROCESSING'\n  | 'READY'\n  | 'IN_PROGRESS'"
+    },
+    {
+      "ruta": "frontend/src/types/exam.ts",
+      "tipo": ".ts",
+      "lineas": 206,
+      "imports": [],
+      "preview": "// ============================================================\n// FINAL EXAM DOMAIN TYPES\n// These types model the entire Final Exam feature:\n//   - Question types (discriminated union)\n//   - Student answers per question type"
+    },
+    {
+      "ruta": "frontend/src/pages/CourseDetail/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 184,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { useParams, Link, useNavigate } from 'react-router-dom'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { Course } from '../../types/course'",
+        "import ProgressBar from '../../components/ui/ProgressBar'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { useParams, Link, useNavigate } from 'react-router-dom'\nimport {\n  IconArrowLeft,\n  IconArrowRight,"
+    },
+    {
+      "ruta": "frontend/src/pages/CourseProcessing/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 127,
+      "imports": [
+        "import { useEffect, useState, useCallback, useRef } from 'react'",
+        "import { useParams, useNavigate } from 'react-router-dom'",
+        "import { IconLoader2, IconArrowLeft } from '@tabler/icons-react'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { CourseProcessingState } from '../../types/course'",
+        "import ProcessingProgress from '../../components/courses/ProcessingProgress'",
+        "import ProcessingSuccess from '../../components/courses/ProcessingSuccess'",
+        "import ProcessingError from '../../components/courses/ProcessingError'"
+      ],
+      "preview": "import { useEffect, useState, useCallback, useRef } from 'react'\nimport { useParams, useNavigate } from 'react-router-dom'\nimport { IconLoader2, IconArrowLeft } from '@tabler/icons-react'\nimport { courseService } from '../../services/course.service'\nimport type { CourseProcessingState } from '../../types/course'"
+    },
+    {
+      "ruta": "frontend/src/pages/Courses/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 75,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { Link } from 'react-router-dom'",
+        "import { IconPlus } from '@tabler/icons-react'",
+        "import CourseCard from '../../components/courses/CourseCard'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { Course } from '../../types/course'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { Link } from 'react-router-dom'\nimport { IconPlus } from '@tabler/icons-react'\nimport CourseCard from '../../components/courses/CourseCard'\nimport { courseService } from '../../services/course.service'"
+    },
+    {
+      "ruta": "frontend/src/pages/CreateCourse/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 12,
+      "imports": [
+        "import CourseCreationForm from '../../components/courses/CourseCreationForm'"
+      ],
+      "preview": "import CourseCreationForm from '../../components/courses/CourseCreationForm'\n\nfunction CreateCourse() {\n  return (\n    <div className=\"mx-auto w-full max-w-3xl px-4 py-8 md:px-8 md:py-12\">"
+    },
+    {
+      "ruta": "frontend/src/pages/FinalExam/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 289,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { useParams } from 'react-router-dom'",
+        "import { examService } from '../../services/exam.service'",
+        "import { FinalExamTopBar } from '../../components/exam/FinalExamTopBar'",
+        "import { FinalExamQuestionCard } from '../../components/exam/FinalExamQuestionCard'",
+        "import { FinalExamProgress } from '../../components/exam/FinalExamProgress'",
+        "import { FinalExamResult } from '../../components/exam/FinalExamResult'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { useParams } from 'react-router-dom'\nimport {\n  IconArrowLeft,\n  IconArrowRight,"
+    },
+    {
+      "ruta": "frontend/src/pages/Home/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 83,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { Link } from 'react-router-dom'",
+        "import { IconPlus } from '@tabler/icons-react'",
+        "import CourseCard from '../../components/courses/CourseCard'",
+        "import CurrentSessionCard from '../../components/courses/CurrentSessionCard'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { Course, CurrentSession } from '../../types/course'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { Link } from 'react-router-dom'\nimport { IconPlus } from '@tabler/icons-react'\nimport CourseCard from '../../components/courses/CourseCard'\nimport CurrentSessionCard from '../../components/courses/CurrentSessionCard'"
+    },
+    {
+      "ruta": "frontend/src/pages/LearningPath/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 149,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { useParams, Link } from 'react-router-dom'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { LearningPath as LearningPathType } from '../../types/course'",
+        "import LearningPathHeader from '../../components/learning-path/LearningPathHeader'",
+        "import LearningPathNode from '../../components/learning-path/LearningPathNode'",
+        "import LearningPathConnector from '../../components/learning-path/LearningPathConnector'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { useParams, Link } from 'react-router-dom'\nimport {\n  IconLoader2,\n  IconAlertCircle,"
+    },
+    {
+      "ruta": "frontend/src/pages/Quiz/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 274,
+      "imports": [
+        "import { useState, useEffect } from 'react'",
+        "import { useParams, Link } from 'react-router-dom'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { Quiz, QuizResult, QuizReviewConcept, QuizAnswer } from '../../types/course'",
+        "import { QuizTopBar } from '../../components/quiz/QuizTopBar'",
+        "import { QuizQuestionCard } from '../../components/quiz/QuizQuestionCard'",
+        "import { QuizResultView } from '../../components/quiz/QuizResultView'",
+        "import { WeakConceptReview } from '../../components/quiz/WeakConceptReview'"
+      ],
+      "preview": "import { useState, useEffect } from 'react'\nimport { useParams, Link } from 'react-router-dom'\nimport {\n  IconArrowLeft,\n  IconAlertTriangle,"
+    },
+    {
+      "ruta": "frontend/src/pages/StudySession/index.tsx",
+      "tipo": ".tsx",
+      "lineas": 206,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { useParams, Link } from 'react-router-dom'",
+        "import { courseService } from '../../services/course.service'",
+        "import type { StudySession as StudySessionType } from '../../types/course'",
+        "import StudySessionTopBar from '../../components/study-session/StudySessionTopBar'",
+        "import SessionIntroBlock from '../../components/study-session/SessionIntroBlock'",
+        "import SessionConceptsBlock from '../../components/study-session/SessionConceptsBlock'",
+        "import SessionPracticeBlock from '../../components/study-session/SessionPracticeBlock'",
+        "import SessionQuizTransitionBlock from '../../components/study-session/SessionQuizTransitionBlock'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { useParams, Link } from 'react-router-dom'\nimport {\n  IconLoader2,\n  IconAlertCircle,"
+    },
+    {
+      "ruta": "frontend/src/components/courses/BuilderProgress.tsx",
+      "tipo": ".tsx",
+      "lineas": 255,
+      "imports": [
+        "import React from 'react'"
+      ],
+      "preview": "import React from 'react'\nimport {\n  IconCheck,\n  IconHammer,\n  IconPick,"
+    },
+    {
+      "ruta": "frontend/src/components/courses/CourseCard.tsx",
+      "tipo": ".tsx",
+      "lineas": 97,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconBook } from '@tabler/icons-react'",
+        "import type { Course, CourseStatus } from '../../types/course'",
+        "import ProgressBar from '../ui/ProgressBar'",
+        "import ProgressPath, { type PathNode } from './ProgressPath'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconBook } from '@tabler/icons-react'\nimport type { Course, CourseStatus } from '../../types/course'\nimport ProgressBar from '../ui/ProgressBar'\nimport ProgressPath, { type PathNode } from './ProgressPath'"
+    },
+    {
+      "ruta": "frontend/src/components/courses/CourseCreationForm.tsx",
+      "tipo": ".tsx",
+      "lineas": 164,
+      "imports": [
+        "import { useState, type FormEvent } from 'react'",
+        "import { useNavigate } from 'react-router-dom'",
+        "import { IconSparkles, IconArrowLeft, IconAlertCircle } from '@tabler/icons-react'",
+        "import { courseService, formatFileSize } from '../../services/course.service'",
+        "import FileUploadArea from './FileUploadArea'",
+        "import MaterialList from './MaterialList'",
+        "import type { SelectedFile } from './MaterialItem'"
+      ],
+      "preview": "import { useState, type FormEvent } from 'react'\nimport { useNavigate } from 'react-router-dom'\nimport { IconSparkles, IconArrowLeft, IconAlertCircle } from '@tabler/icons-react'\nimport { courseService, formatFileSize } from '../../services/course.service'\nimport FileUploadArea from './FileUploadArea'"
+    },
+    {
+      "ruta": "frontend/src/components/courses/CurrentSessionCard.tsx",
+      "tipo": ".tsx",
+      "lineas": 116,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import type { CurrentSession } from '../../types/course'",
+        "import ProgressBar from '../ui/ProgressBar'",
+        "import ProgressPath, { type PathNode } from './ProgressPath'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconArrowRight,\n  IconBook,\n  IconClock,"
+    },
+    {
+      "ruta": "frontend/src/components/courses/FileUploadArea.tsx",
+      "tipo": ".tsx",
+      "lineas": 132,
+      "imports": [
+        "import { useRef, useState, type DragEvent, type ChangeEvent } from 'react'",
+        "import { IconUpload, IconFileTypePdf, IconFileTypeDocx, IconFileTypePpt, IconFileText } from '@tabler/icons-react'"
+      ],
+      "preview": "import { useRef, useState, type DragEvent, type ChangeEvent } from 'react'\nimport { IconUpload, IconFileTypePdf, IconFileTypeDocx, IconFileTypePpt, IconFileText } from '@tabler/icons-react'\n\ninterface FileUploadAreaProps {\n  onFilesSelected: (files: File[]) => void"
+    },
+    {
+      "ruta": "frontend/src/components/courses/MaterialItem.tsx",
+      "tipo": ".tsx",
+      "lineas": 73,
+      "imports": [],
+      "preview": "import {\n  IconFileTypePdf,\n  IconFileTypeDocx,\n  IconFileTypePpt,\n  IconFileText,"
+    },
+    {
+      "ruta": "frontend/src/components/courses/MaterialList.tsx",
+      "tipo": ".tsx",
+      "lineas": 35,
+      "imports": [
+        "import MaterialItem, { type SelectedFile } from './MaterialItem'",
+        "import { formatFileSize } from '../../services/course.service'"
+      ],
+      "preview": "import MaterialItem, { type SelectedFile } from './MaterialItem'\nimport { formatFileSize } from '../../services/course.service'\n\ninterface MaterialListProps {\n  materials: SelectedFile[]"
+    },
+    {
+      "ruta": "frontend/src/components/courses/ProcessingError.tsx",
+      "tipo": ".tsx",
+      "lineas": 66,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconAlertTriangle, IconRefresh, IconArrowLeft } from '@tabler/icons-react'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconAlertTriangle, IconRefresh, IconArrowLeft } from '@tabler/icons-react'\n\ninterface ProcessingErrorProps {\n  courseName: string"
+    },
+    {
+      "ruta": "frontend/src/components/courses/ProcessingProgress.tsx",
+      "tipo": ".tsx",
+      "lineas": 119,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconSparkles, IconInfoCircle } from '@tabler/icons-react'",
+        "import type { CourseProcessingState } from '../../types/course'",
+        "import ProcessingStepItem from './ProcessingStepItem'",
+        "import BuilderProgress from './BuilderProgress'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconSparkles, IconInfoCircle } from '@tabler/icons-react'\nimport type { CourseProcessingState } from '../../types/course'\nimport ProcessingStepItem from './ProcessingStepItem'\nimport BuilderProgress from './BuilderProgress'"
+    },
+    {
+      "ruta": "frontend/src/components/courses/ProcessingStepItem.tsx",
+      "tipo": ".tsx",
+      "lineas": 93,
+      "imports": [
+        "import { IconCheck, IconLoader2, IconCircle, IconAlertCircle } from '@tabler/icons-react'",
+        "import type { ProcessingStep } from '../../types/course'"
+      ],
+      "preview": "import { IconCheck, IconLoader2, IconCircle, IconAlertCircle } from '@tabler/icons-react'\nimport type { ProcessingStep } from '../../types/course'\n\ninterface ProcessingStepItemProps {\n  step: ProcessingStep"
+    },
+    {
+      "ruta": "frontend/src/components/courses/ProcessingSuccess.tsx",
+      "tipo": ".tsx",
+      "lineas": 101,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import type { CourseProcessingState } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconCircleCheckFilled,\n  IconArrowRight,\n  IconBooks,"
+    },
+    {
+      "ruta": "frontend/src/components/courses/ProgressPath.tsx",
+      "tipo": ".tsx",
+      "lineas": 105,
+      "imports": [
+        "import { IconCheck, IconLock } from '@tabler/icons-react'"
+      ],
+      "preview": "import { IconCheck, IconLock } from '@tabler/icons-react'\n\nexport type PathNodeStatus = 'completed' | 'current' | 'locked'\n\nexport interface PathNode {"
+    },
+    {
+      "ruta": "frontend/src/components/exam/FinalExamCooldown.tsx",
+      "tipo": ".tsx",
+      "lineas": 160,
+      "imports": [
+        "import { useEffect, useState } from 'react'",
+        "import { Link } from 'react-router-dom'",
+        "import { examService } from '../../services/exam.service'"
+      ],
+      "preview": "import { useEffect, useState } from 'react'\nimport { Link } from 'react-router-dom'\nimport {\n  IconHourglass,\n  IconClock,"
+    },
+    {
+      "ruta": "frontend/src/components/exam/FinalExamProgress.tsx",
+      "tipo": ".tsx",
+      "lineas": 104,
+      "imports": [
+        "import { IconCheck } from '@tabler/icons-react'",
+        "import type { FinalExamAnswer, FinalExamQuestion } from '../../types/exam'"
+      ],
+      "preview": "import { IconCheck } from '@tabler/icons-react'\nimport type { FinalExamAnswer, FinalExamQuestion } from '../../types/exam'\n\ninterface FinalExamProgressProps {\n  questions: FinalExamQuestion[]"
+    },
+    {
+      "ruta": "frontend/src/components/exam/FinalExamQuestionCard.tsx",
+      "tipo": ".tsx",
+      "lineas": 119,
+      "imports": [
+        "import { IconBookmarks, IconSparkles } from '@tabler/icons-react'",
+        "import { MultipleChoiceQuestion } from './MultipleChoiceQuestion'",
+        "import { MatchingQuestion } from './MatchingQuestion'",
+        "import { OrderingQuestion } from './OrderingQuestion'"
+      ],
+      "preview": "import { IconBookmarks, IconSparkles } from '@tabler/icons-react'\nimport type {\n  FinalExamAnswer,\n  FinalExamQuestion,\n} from '../../types/exam'"
+    },
+    {
+      "ruta": "frontend/src/components/exam/FinalExamResult.tsx",
+      "tipo": ".tsx",
+      "lineas": 423,
+      "imports": [
+        "import { useState } from 'react'",
+        "import { Link } from 'react-router-dom'",
+        "import type { FinalExamResult as FinalExamResultType } from '../../types/exam'",
+        "import { FinalExamCooldown } from './FinalExamCooldown'"
+      ],
+      "preview": "import { useState } from 'react'\nimport { Link } from 'react-router-dom'\nimport {\n  IconTrophy,\n  IconCircleXFilled,"
+    },
+    {
+      "ruta": "frontend/src/components/exam/FinalExamTopBar.tsx",
+      "tipo": ".tsx",
+      "lineas": 149,
+      "imports": [
+        "import { useState } from 'react'",
+        "import { Link, useNavigate } from 'react-router-dom'",
+        "import type { FinalExam } from '../../types/exam'"
+      ],
+      "preview": "import { useState } from 'react'\nimport { Link, useNavigate } from 'react-router-dom'\nimport {\n  IconArrowLeft,\n  IconTrophy,"
+    },
+    {
+      "ruta": "frontend/src/components/exam/MatchingQuestion.tsx",
+      "tipo": ".tsx",
+      "lineas": 234,
+      "imports": [
+        "import { useState } from 'react'",
+        "import type { MatchingQuestion as MatchingQuestionType } from '../../types/exam'"
+      ],
+      "preview": "import { useState } from 'react'\nimport {\n  IconArrowsExchange,\n  IconCheck,\n  IconX,"
+    },
+    {
+      "ruta": "frontend/src/components/exam/MultipleChoiceQuestion.tsx",
+      "tipo": ".tsx",
+      "lineas": 66,
+      "imports": [
+        "import type { MultipleChoiceQuestion as MultipleChoiceQuestionType } from '../../types/exam'"
+      ],
+      "preview": "import type { MultipleChoiceQuestion as MultipleChoiceQuestionType } from '../../types/exam'\n\ninterface MultipleChoiceQuestionProps {\n  question: MultipleChoiceQuestionType\n  selectedOptionId?: string"
+    },
+    {
+      "ruta": "frontend/src/components/exam/OrderingQuestion.tsx",
+      "tipo": ".tsx",
+      "lineas": 120,
+      "imports": [
+        "import type { OrderingQuestion as OrderingQuestionType } from '../../types/exam'"
+      ],
+      "preview": "import {\n  IconArrowUp,\n  IconArrowDown,\n  IconArrowsSort,\n  IconHelpCircle,"
+    },
+    {
+      "ruta": "frontend/src/components/layout/AppLayout.tsx",
+      "tipo": ".tsx",
+      "lineas": 16,
+      "imports": [
+        "import { Outlet } from 'react-router-dom'",
+        "import TopBar from './TopBar'"
+      ],
+      "preview": "import { Outlet } from 'react-router-dom'\nimport TopBar from './TopBar'\n\nfunction AppLayout() {\n  return ("
+    },
+    {
+      "ruta": "frontend/src/components/layout/TopBar.tsx",
+      "tipo": ".tsx",
+      "lineas": 161,
+      "imports": [
+        "import { NavLink, matchPath, useLocation } from 'react-router-dom'",
+        "import { IconHome, IconBooks, IconFlame } from '@tabler/icons-react'",
+        "import logo from '../../assets/images/logo.svg'",
+        "import logoLight from '../../assets/images/logo-light.svg'",
+        "import { useTheme } from '../../theme/themeContext'"
+      ],
+      "preview": "import { NavLink, matchPath, useLocation } from 'react-router-dom'\nimport { IconHome, IconBooks, IconFlame } from '@tabler/icons-react'\nimport logo from '../../assets/images/logo.svg'\nimport logoLight from '../../assets/images/logo-light.svg'\nimport { useTheme } from '../../theme/themeContext'"
+    },
+    {
+      "ruta": "frontend/src/components/learning-path/FinalExamNode.tsx",
+      "tipo": ".tsx",
+      "lineas": 130,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import type { LearningPathNode } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconTrophy,\n  IconLock,\n  IconCircleCheckFilled,"
+    },
+    {
+      "ruta": "frontend/src/components/learning-path/LearningPathConnector.tsx",
+      "tipo": ".tsx",
+      "lineas": 49,
+      "imports": [
+        "import type { LearningPathNodeStatus } from '../../types/course'"
+      ],
+      "preview": "import type { LearningPathNodeStatus } from '../../types/course'\n\ninterface LearningPathConnectorProps {\n  fromStatus: LearningPathNodeStatus\n  toStatus?: LearningPathNodeStatus"
+    },
+    {
+      "ruta": "frontend/src/components/learning-path/LearningPathHeader.tsx",
+      "tipo": ".tsx",
+      "lineas": 101,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconArrowLeft, IconSparkles, IconLayersLinked, IconCheck, IconTarget } from '@tabler/icons-react'",
+        "import type { LearningPath } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconArrowLeft, IconSparkles, IconLayersLinked, IconCheck, IconTarget } from '@tabler/icons-react'\nimport type { LearningPath } from '../../types/course'\n\ninterface LearningPathHeaderProps {"
+    },
+    {
+      "ruta": "frontend/src/components/learning-path/LearningPathNode.tsx",
+      "tipo": ".tsx",
+      "lineas": 182,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import type { LearningPathNode as LearningPathNodeType } from '../../types/course'",
+        "import FinalExamNode from './FinalExamNode'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconCheck,\n  IconLock,\n  IconPlayerPlay,"
+    },
+    {
+      "ruta": "frontend/src/components/quiz/QuizQuestionCard.tsx",
+      "tipo": ".tsx",
+      "lineas": 150,
+      "imports": [
+        "import type { QuizQuestion } from '../../types/course'"
+      ],
+      "preview": "import {\n  IconArrowLeft,\n  IconArrowRight,\n  IconCheck,\n  IconBrain,"
+    },
+    {
+      "ruta": "frontend/src/components/quiz/QuizResultView.tsx",
+      "tipo": ".tsx",
+      "lineas": 322,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { useState } from 'react'",
+        "import type { Quiz, QuizResult } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconCheck,\n  IconX,\n  IconTrophy,"
+    },
+    {
+      "ruta": "frontend/src/components/quiz/QuizTopBar.tsx",
+      "tipo": ".tsx",
+      "lineas": 118,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconArrowLeft, IconSparkles } from '@tabler/icons-react'",
+        "import type { Quiz } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconArrowLeft, IconSparkles } from '@tabler/icons-react'\nimport type { Quiz } from '../../types/course'\n\ninterface QuizTopBarProps {"
+    },
+    {
+      "ruta": "frontend/src/components/quiz/WeakConceptReview.tsx",
+      "tipo": ".tsx",
+      "lineas": 124,
+      "imports": [
+        "import type { QuizReviewConcept } from '../../types/course'"
+      ],
+      "preview": "import {\n  IconArrowLeft,\n  IconArrowRight,\n  IconBrain,\n  IconCode,"
+    },
+    {
+      "ruta": "frontend/src/components/study-session/SessionConceptsBlock.tsx",
+      "tipo": ".tsx",
+      "lineas": 159,
+      "imports": [
+        "import { useState } from 'react'",
+        "import type { SessionConcept } from '../../types/course'"
+      ],
+      "preview": "import { useState } from 'react'\nimport {\n  IconArrowLeft,\n  IconArrowRight,\n  IconBrain,"
+    },
+    {
+      "ruta": "frontend/src/components/study-session/SessionIntroBlock.tsx",
+      "tipo": ".tsx",
+      "lineas": 99,
+      "imports": [
+        "import type { StudySession } from '../../types/course'"
+      ],
+      "preview": "import {\n  IconTarget,\n  IconBulb,\n  IconArrowRight,\n  IconCode,"
+    },
+    {
+      "ruta": "frontend/src/components/study-session/SessionPracticeBlock.tsx",
+      "tipo": ".tsx",
+      "lineas": 211,
+      "imports": [
+        "import { useState } from 'react'",
+        "import type { PracticeExercise } from '../../types/course'"
+      ],
+      "preview": "import { useState } from 'react'\nimport {\n  IconArrowLeft,\n  IconArrowRight,\n  IconCircleCheckFilled,"
+    },
+    {
+      "ruta": "frontend/src/components/study-session/SessionQuizTransitionBlock.tsx",
+      "tipo": ".tsx",
+      "lineas": 104,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import type { StudySession } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport {\n  IconBrain,\n  IconSparkles,\n  IconArrowRight,"
+    },
+    {
+      "ruta": "frontend/src/components/study-session/StudySessionTopBar.tsx",
+      "tipo": ".tsx",
+      "lineas": 106,
+      "imports": [
+        "import { Link } from 'react-router-dom'",
+        "import { IconArrowLeft, IconSparkles } from '@tabler/icons-react'",
+        "import type { StudySession } from '../../types/course'"
+      ],
+      "preview": "import { Link } from 'react-router-dom'\nimport { IconArrowLeft, IconSparkles } from '@tabler/icons-react'\nimport type { StudySession } from '../../types/course'\n\ninterface StudySessionTopBarProps {"
+    },
+    {
+      "ruta": "frontend/src/components/ui/ProgressBar.tsx",
+      "tipo": ".tsx",
+      "lineas": 30,
+      "imports": [],
+      "preview": "interface ProgressBarProps {\n  /** Porcentaje de 0 a 100 */\n  value: number\n  /** Texto accesible, p. ej. \"Progreso de Bases de Datos\" */\n  label: string"
+    },
+    {
+      "ruta": "backend/package.json",
+      "tipo": ".json",
+      "nombre": "package.json",
+      "dependencias": [
+        "@nestjs/common",
+        "@nestjs/core",
+        "@nestjs/platform-express",
+        "@prisma/client",
+        "reflect-metadata",
+        "rxjs",
+        "zod"
+      ],
+      "dev_dependencias": [
+        "@nestjs/cli",
+        "@nestjs/schematics",
+        "@nestjs/testing",
+        "@types/express",
+        "@types/jest",
+        "@types/node",
+        "@types/supertest",
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser",
+        "eslint",
+        "eslint-config-prettier",
+        "eslint-plugin-prettier",
+        "jest",
+        "prettier",
+        "prisma",
+        "source-map-support",
+        "supertest",
+        "ts-jest",
+        "ts-loader",
+        "ts-node",
+        "tsconfig-paths",
+        "typescript"
+      ]
+    },
+    {
+      "ruta": "frontend/package.json",
+      "tipo": ".json",
+      "nombre": "package.json",
+      "dependencias": [
+        "@tabler/icons-react",
+        "@tailwindcss/vite",
+        "react",
+        "react-dom",
+        "react-router-dom",
+        "tailwindcss"
+      ],
+      "dev_dependencias": [
+        "@eslint/js",
+        "@types/node",
+        "@types/react",
+        "@types/react-dom",
+        "@vitejs/plugin-react",
+        "eslint",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        "globals",
+        "typescript",
+        "typescript-eslint",
+        "vite"
+      ]
+    },
+    {
+      "ruta": "backend/tsconfig.json",
+      "tipo": ".json",
+      "nombre": "tsconfig.json",
+      "dependencias": [],
+      "dev_dependencias": []
+    },
+    {
+      "ruta": "frontend/tsconfig.json",
+      "tipo": ".json",
+      "nombre": "tsconfig.json",
+      "dependencias": [],
+      "dev_dependencias": []
+    }
+  ],
+  "resumen": {
+    "total_archivos": 85,
+    "por_tipo": {
+      ".ts": 36,
+      ".prisma": 1,
+      ".tsx": 48
+    },
+    "carpetas_backend": [
+      "backend/src/app.controller.spec.ts",
+      "backend/src/app.controller.ts",
+      "backend/src/app.module.ts",
+      "backend/src/app.service.ts",
+      "backend/src/main.ts",
+      "backend/src/database/database.module.ts",
+      "backend/src/database/prisma.service.spec.ts",
+      "backend/src/database/prisma.service.ts",
+      "backend/src/domain/models/course.ts",
+      "backend/src/domain/models/final-exam.ts",
+      "backend/src/domain/models/quiz.ts",
+      "backend/src/domain/models/session.ts",
+      "backend/src/domain/repositories/course.repository.ts",
+      "backend/src/domain/repositories/final-exam.repository.ts",
+      "backend/src/domain/repositories/quiz.repository.ts",
+      "backend/src/domain/repositories/session.repository.ts",
+      "backend/src/database/errors/database-error.ts",
+      "backend/src/database/mappers/final-exam-attempt-answer.mapper.ts",
+      "backend/src/database/mappers/final-exam-question.mapper.ts",
+      "backend/src/database/mappers/index.ts",
+      "backend/src/database/mappers/mappers.spec.ts",
+      "backend/src/database/mappers/quiz-attempt-answer.mapper.ts",
+      "backend/src/database/mappers/quiz-question.mapper.ts",
+      "backend/src/database/repositories/prisma-course.repository.ts",
+      "backend/src/database/repositories/prisma-final-exam.repository.ts",
+      "backend/src/database/repositories/prisma-quiz.repository.ts",
+      "backend/src/database/repositories/prisma-session.repository.ts",
+      "backend/src/database/repositories/repositories.spec.ts",
+      "backend/prisma/schema.prisma"
+    ],
+    "carpetas_frontend": [
+      "frontend/src/App.tsx",
+      "frontend/src/main.tsx",
+      "frontend/src/mocks/course.mock.ts",
+      "frontend/src/mocks/exam.mock.ts",
+      "frontend/src/services/course.service.ts",
+      "frontend/src/services/exam.service.ts",
+      "frontend/src/theme/theme.ts",
+      "frontend/src/theme/themeContext.ts",
+      "frontend/src/theme/ThemeProvider.tsx",
+      "frontend/src/types/course.ts",
+      "frontend/src/types/exam.ts",
+      "frontend/src/pages/CourseDetail/index.tsx",
+      "frontend/src/pages/CourseProcessing/index.tsx",
+      "frontend/src/pages/Courses/index.tsx",
+      "frontend/src/pages/CreateCourse/index.tsx",
+      "frontend/src/pages/FinalExam/index.tsx",
+      "frontend/src/pages/Home/index.tsx",
+      "frontend/src/pages/LearningPath/index.tsx",
+      "frontend/src/pages/Quiz/index.tsx",
+      "frontend/src/pages/StudySession/index.tsx",
+      "frontend/src/components/courses/BuilderProgress.tsx",
+      "frontend/src/components/courses/CourseCard.tsx",
+      "frontend/src/components/courses/CourseCreationForm.tsx",
+      "frontend/src/components/courses/CurrentSessionCard.tsx",
+      "frontend/src/components/courses/FileUploadArea.tsx",
+      "frontend/src/components/courses/MaterialItem.tsx",
+      "frontend/src/components/courses/MaterialList.tsx",
+      "frontend/src/components/courses/ProcessingError.tsx",
+      "frontend/src/components/courses/ProcessingProgress.tsx",
+      "frontend/src/components/courses/ProcessingStepItem.tsx",
+      "frontend/src/components/courses/ProcessingSuccess.tsx",
+      "frontend/src/components/courses/ProgressPath.tsx",
+      "frontend/src/components/exam/FinalExamCooldown.tsx",
+      "frontend/src/components/exam/FinalExamProgress.tsx",
+      "frontend/src/components/exam/FinalExamQuestionCard.tsx",
+      "frontend/src/components/exam/FinalExamResult.tsx",
+      "frontend/src/components/exam/FinalExamTopBar.tsx",
+      "frontend/src/components/exam/MatchingQuestion.tsx",
+      "frontend/src/components/exam/MultipleChoiceQuestion.tsx",
+      "frontend/src/components/exam/OrderingQuestion.tsx",
+      "frontend/src/components/layout/AppLayout.tsx",
+      "frontend/src/components/layout/TopBar.tsx",
+      "frontend/src/components/learning-path/FinalExamNode.tsx",
+      "frontend/src/components/learning-path/LearningPathConnector.tsx",
+      "frontend/src/components/learning-path/LearningPathHeader.tsx",
+      "frontend/src/components/learning-path/LearningPathNode.tsx",
+      "frontend/src/components/quiz/QuizQuestionCard.tsx",
+      "frontend/src/components/quiz/QuizResultView.tsx",
+      "frontend/src/components/quiz/QuizTopBar.tsx",
+      "frontend/src/components/quiz/WeakConceptReview.tsx",
+      "frontend/src/components/study-session/SessionConceptsBlock.tsx",
+      "frontend/src/components/study-session/SessionIntroBlock.tsx",
+      "frontend/src/components/study-session/SessionPracticeBlock.tsx",
+      "frontend/src/components/study-session/SessionQuizTransitionBlock.tsx",
+      "frontend/src/components/study-session/StudySessionTopBar.tsx",
+      "frontend/src/components/ui/ProgressBar.tsx"
+    ]
+  }
+}

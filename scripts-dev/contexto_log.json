@@ -1,0 +1,30 @@
+{
+  "terminos": [
+    "session",
+    "unlock",
+    "learning-path"
+  ],
+  "archivos": [
+    "backend/src/database/database.module.ts",
+    "backend/src/domain/models/session.ts",
+    "backend/src/domain/repositories/session.repository.ts",
+    "backend/src/database/repositories/prisma-session.repository.ts",
+    "backend/prisma/schema.prisma",
+    "frontend/src/App.tsx",
+    "frontend/src/mocks/course.mock.ts",
+    "frontend/src/pages/Home/index.tsx",
+    "frontend/src/pages/LearningPath/index.tsx",
+    "frontend/src/pages/StudySession/index.tsx",
+    "frontend/src/components/courses/CurrentSessionCard.tsx",
+    "frontend/src/components/learning-path/FinalExamNode.tsx",
+    "frontend/src/components/learning-path/LearningPathConnector.tsx",
+    "frontend/src/components/learning-path/LearningPathHeader.tsx",
+    "frontend/src/components/learning-path/LearningPathNode.tsx",
+    "frontend/src/components/study-session/SessionConceptsBlock.tsx",
+    "frontend/src/components/study-session/SessionIntroBlock.tsx",
+    "frontend/src/components/study-session/SessionPracticeBlock.tsx",
+    "frontend/src/components/study-session/SessionQuizTransitionBlock.tsx",
+    "frontend/src/components/study-session/StudySessionTopBar.tsx"
+  ],
+  "total": 20
+}
