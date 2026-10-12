@@ -1,10 +1,25 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { FinalExamRepository } from '../../domain/repositories/final-exam.repository';
 import { ExamAvailabilityService } from '../exams/exam-availability.service';
+import { GenerationPipelineService } from './generation-pipeline.service';
 import { CreateCourseDto } from './dto/create-course.dto';
+import { GenerateCourseDto } from './dto/generate-course.dto';
+import {
+  GenerationStatusResponseDto,
+  GenerationJobResponseDto,
+  GenerationStepDto,
+  ProcessingStepKey,
+  ProcessingStepStatus,
+} from './dto/generation-status-response.dto';
 import { Course } from '../../domain/models/course';
 import { Session } from '../../domain/models/session';
 import { QuizAttempt } from '../../domain/models/quiz';
@@ -35,6 +50,8 @@ export interface CourseProgressResult {
 
 @Injectable()
 export class CoursesService {
+  private readonly logger = new Logger(CoursesService.name);
+
   constructor(
     @Inject('CourseRepository')
     private readonly courseRepository: CourseRepository,
@@ -45,6 +62,7 @@ export class CoursesService {
     @Inject('FinalExamRepository')
     private readonly finalExamRepository: FinalExamRepository,
     private readonly examAvailabilityService: ExamAvailabilityService,
+    private readonly generationPipelineService: GenerationPipelineService,
   ) {}
 
   async list(): Promise<Course[]> {
@@ -154,5 +172,196 @@ export class CoursesService {
       throw new NotFoundException(`Course with id ${id} not found`);
     }
     await this.courseRepository.delete(id);
+  }
+
+  async startGeneration(
+    courseId: string,
+    dto?: GenerateCourseDto,
+  ): Promise<GenerationJobResponseDto> {
+    const course = await this.courseRepository.findById(courseId);
+    if (!course) {
+      throw new NotFoundException(`Course with id ${courseId} not found`);
+    }
+
+    if (dto?.materialIds && dto.materialIds.length > 0) {
+      const courseMaterials =
+        await this.courseRepository.getMaterialsByCourseId(courseId);
+      const validIds = new Set(courseMaterials.map((m) => m.id));
+      const invalidIds = dto.materialIds.filter((id) => !validIds.has(id));
+      if (invalidIds.length > 0) {
+        throw new BadRequestException(
+          `Material IDs [${invalidIds.join(', ')}] do not belong to course ${courseId}`,
+        );
+      }
+    }
+
+    await this.courseRepository.update(courseId, { status: 'PROCESSING' });
+
+    const job = await this.courseRepository.createGenerationJob({
+      courseId,
+      status: 'PENDING',
+      progress: 0,
+      currentStepIndex: 0,
+      errorMessage: null,
+    });
+
+    // Fire-and-forget: pipeline runs asynchronously after response is sent.
+    setImmediate(() => {
+      this.generationPipelineService
+        .run(courseId, job.id, dto?.materialIds)
+        .catch((err) => {
+          this.logger.error(
+            `Unhandled pipeline error (course=${courseId}, job=${job.id}): ${String(err)}`,
+          );
+        });
+    });
+
+    return {
+      id: job.id,
+      courseId: job.courseId,
+      status: job.status,
+      progress: job.progress,
+      currentStepIndex: job.currentStepIndex,
+      errorMessage: job.errorMessage,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  }
+
+  async getGenerationStatus(
+    courseId: string,
+  ): Promise<GenerationStatusResponseDto> {
+    const course = await this.courseRepository.findById(courseId);
+    if (!course) {
+      throw new NotFoundException(`Course with id ${courseId} not found`);
+    }
+
+    const job = await this.courseRepository.getLatestGenerationJob(courseId);
+    if (!job) {
+      throw new NotFoundException(
+        `No generation job found for course ${courseId}`,
+      );
+    }
+
+    const steps = this.mapProcessingSteps(
+      job.status,
+      job.currentStepIndex ?? 0,
+    );
+
+    const sessions = await this.sessionRepository.findByCourseId(courseId);
+    let conceptsCount = 0;
+    for (const session of sessions) {
+      const concepts = await this.sessionRepository.getConceptsBySessionId(
+        session.id,
+      );
+      conceptsCount += concepts.length;
+    }
+
+    return {
+      jobId: job.id,
+      courseId: course.id,
+      courseName: course.name,
+      status: job.status as GenerationStatusResponseDto['status'],
+      progressPercent: job.progress,
+      currentStepIndex: job.currentStepIndex ?? 0,
+      steps,
+      metrics: {
+        sessionsCount: sessions.length,
+        conceptsCount,
+        levelsCount: sessions.length > 0 ? Math.ceil(sessions.length / 4) : 0,
+      },
+      errorMessage: job.errorMessage,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  }
+
+  async getJobById(jobId: string): Promise<GenerationJobResponseDto> {
+    const job = await this.courseRepository.findGenerationJobById(jobId);
+    if (!job) {
+      throw new NotFoundException(`Generation job with id ${jobId} not found`);
+    }
+
+    return {
+      id: job.id,
+      courseId: job.courseId,
+      status: job.status,
+      progress: job.progress,
+      currentStepIndex: job.currentStepIndex,
+      errorMessage: job.errorMessage,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  }
+
+  private mapProcessingSteps(
+    status: string,
+    currentStepIndex: number,
+  ): GenerationStepDto[] {
+    const stepDefs: Array<{
+      key: ProcessingStepKey;
+      label: string;
+      description: string;
+    }> = [
+      {
+        key: 'EXTRACTION',
+        label: 'Analizando material de estudio',
+        description: 'Extrayendo texto, estructura y temas principales...',
+      },
+      {
+        key: 'CONCEPTS',
+        label: 'Detectando conceptos clave',
+        description: 'Identificando definiciones, teoremas y términos clave...',
+      },
+      {
+        key: 'DEPENDENCIES',
+        label: 'Comprendiendo dependencias',
+        description: 'Mapeando relaciones lógicas y orden de precedencia...',
+      },
+      {
+        key: 'GROUPING',
+        label: 'Organizando sesiones de aprendizaje',
+        description:
+          'Agrupando conceptos en sesiones didácticas paso a paso...',
+      },
+      {
+        key: 'LEARNING_PATH',
+        label: 'Construyendo tu ruta de aprendizaje',
+        description: 'Ensamblando niveles, checkpoints y miniquizzes...',
+      },
+    ];
+
+    return stepDefs.map((step, idx) => {
+      let stepStatus: ProcessingStepStatus = 'pending';
+
+      if (status === 'COMPLETED') {
+        stepStatus = 'completed';
+      } else if (status === 'ERROR') {
+        if (idx < currentStepIndex) {
+          stepStatus = 'completed';
+        } else if (idx === currentStepIndex) {
+          stepStatus = 'error';
+        } else {
+          stepStatus = 'pending';
+        }
+      } else if (status === 'PENDING') {
+        stepStatus = 'pending';
+      } else {
+        if (idx < currentStepIndex) {
+          stepStatus = 'completed';
+        } else if (idx === currentStepIndex) {
+          stepStatus = 'in_progress';
+        } else {
+          stepStatus = 'pending';
+        }
+      }
+
+      return {
+        key: step.key,
+        label: step.label,
+        description: step.description,
+        status: stepStatus,
+      };
+    });
   }
 }
