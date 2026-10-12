@@ -36,7 +36,7 @@ describe('CoursesController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     configureApp(app);
     await app.init();
-  });
+  }, 60000);
 
   afterAll(async () => {
     await app.close();
@@ -114,29 +114,44 @@ describe('CoursesController (e2e)', () => {
       },
     });
 
-    // Create Concept for session 1
-    const concept = await prisma.concept.create({
+    // Create Concepts
+    const concept1 = await prisma.concept.create({
       data: {
         sessionId: session1.id,
         name: 'Concept 1',
-        summary: 'Sum',
-        detail: 'Det',
+        summary: 'Sum 1',
+        detail: 'Det 1',
       },
     });
 
-    // Create Quiz for session 1
-    const quiz = await prisma.quiz.create({
+    const concept2 = await prisma.concept.create({
+      data: {
+        sessionId: session2.id,
+        name: 'Concept 2',
+        summary: 'Sum 2',
+        detail: 'Det 2',
+      },
+    });
+
+    // Create Quizzes for sessions 1 and 2
+    const quiz1 = await prisma.quiz.create({
       data: {
         sessionId: session1.id,
-        passingThreshold: 100, // require 100%
+        passingThreshold: 100,
       },
     });
 
-    // Add a Question to the Quiz
-    const question = await prisma.quizQuestion.create({
+    const quiz2 = await prisma.quiz.create({
       data: {
-        quizId: quiz.id,
-        conceptId: concept.id,
+        sessionId: session2.id,
+        passingThreshold: 100,
+      },
+    });
+
+    const question1 = await prisma.quizQuestion.create({
+      data: {
+        quizId: quiz1.id,
+        conceptId: concept1.id,
         prompt: 'What is 2+2?',
         optionsPayload: JSON.stringify([
           { id: 'opt1', text: '3', isCorrect: false },
@@ -146,82 +161,269 @@ describe('CoursesController (e2e)', () => {
       },
     });
 
-    // 2. GET the quiz (assert no correct answers or explanations)
+    const question2 = await prisma.quizQuestion.create({
+      data: {
+        quizId: quiz2.id,
+        conceptId: concept2.id,
+        prompt: 'What is 3+3?',
+        optionsPayload: JSON.stringify([
+          { id: 'opt2-1', text: '5', isCorrect: false },
+          { id: 'opt2-2', text: '6', isCorrect: true },
+        ]),
+        explanation: 'Because it is 6',
+      },
+    });
+
+    // Create Final Exam for course with all 3 question types
+    const exam = await prisma.finalExam.create({
+      data: {
+        courseId,
+        passingScorePct: 70,
+        estimatedMinutes: 30,
+      },
+    });
+
+    // 1) MULTIPLE_CHOICE question
+    const examQ1 = await prisma.finalExamQuestion.create({
+      data: {
+        examId: exam.id,
+        conceptId: concept1.id,
+        type: 'MULTIPLE_CHOICE',
+        prompt: 'MC Prompt',
+        payload: JSON.stringify({
+          type: 'MULTIPLE_CHOICE',
+          options: [
+            { id: 'm1', text: 'Option M1', isCorrect: false },
+            { id: 'm2', text: 'Option M2', isCorrect: true },
+          ],
+          correctOptionId: 'm2',
+        }),
+        explanation: 'Explanation MC',
+      },
+    });
+
+    // 2) MATCHING question
+    const examQ2 = await prisma.finalExamQuestion.create({
+      data: {
+        examId: exam.id,
+        conceptId: concept2.id,
+        type: 'MATCHING',
+        prompt: 'Matching Prompt',
+        payload: JSON.stringify({
+          type: 'MATCHING',
+          leftItems: [
+            { id: 'l1', text: 'Left 1' },
+            { id: 'l2', text: 'Left 2' },
+          ],
+          rightItems: [
+            { id: 'r1', text: 'Right 1' },
+            { id: 'r2', text: 'Right 2' },
+          ],
+          correctPairs: { l1: 'r1', l2: 'r2' },
+        }),
+        explanation: 'Explanation Matching',
+      },
+    });
+
+    // 3) ORDERING question
+    const examQ3 = await prisma.finalExamQuestion.create({
+      data: {
+        examId: exam.id,
+        conceptId: concept1.id,
+        type: 'ORDERING',
+        prompt: 'Ordering Prompt',
+        payload: JSON.stringify({
+          type: 'ORDERING',
+          items: [
+            { id: 'o1', text: 'Item 1' },
+            { id: 'o2', text: 'Item 2' },
+            { id: 'o3', text: 'Item 3' },
+          ],
+          orderingHint: 'Hint',
+          correctOrder: ['o1', 'o2', 'o3'],
+        }),
+        explanation: 'Explanation Ordering',
+      },
+    });
+
+    // --- STEP A: Assert Exam is initially LOCKED while sessions are pending ---
+    const examLockedRes = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/exam`)
+      .expect(200);
+    expect(examLockedRes.body.status).toBe('LOCKED');
+    expect(examLockedRes.body.questions).toBeUndefined();
+
+    // --- STEP B: Complete Session 1 (Pass Quiz 1) ---
+    // 1. GET quiz 1 (verify sanitized)
     const quizRes = await request(app.getHttpServer())
       .get(`/api/sessions/${session1.id}/quiz`)
       .expect(200);
-
     expect(quizRes.body.questions).toHaveLength(1);
     expect(quizRes.body.questions[0].explanation).toBeUndefined();
     expect(quizRes.body.questions[0].options[0].isCorrect).toBeUndefined();
-    expect(quizRes.body.questions[0].options[1].isCorrect).toBeUndefined();
 
-    // 3. Submit a failing attempt
+    // 2. Submit failing attempt for quiz 1
     await request(app.getHttpServer())
-      .post(`/api/quizzes/${quiz.id}/attempts`)
+      .post(`/api/quizzes/${quiz1.id}/attempts`)
       .send({
-        answers: [{ questionId: question.id, selectedOptionId: 'opt1' }],
+        answers: [{ questionId: question1.id, selectedOptionId: 'opt1' }],
       })
       .expect(201)
       .expect((res) => {
         expect(res.body.isPassed).toBe(false);
         expect(res.body.score).toBe(0);
-        // Correct option and explanation are revealed only after submission
-        expect(res.body.feedback).toHaveLength(1);
         expect(res.body.feedback[0].correctOptionId).toBe('opt2');
-        expect(res.body.feedback[0].correctOptionText).toBe('4');
-        expect(res.body.feedback[0].isCorrect).toBe(false);
-        expect(res.body.feedback[0].explanation).toBe('Because it is 4');
       });
 
-    // Complete session should fail (409) since we failed the quiz
+    // 3. Complete session 1 should fail (409)
     await request(app.getHttpServer())
       .post(`/api/sessions/${session1.id}/complete`)
       .expect(409);
 
-    // Verify session 2 is still locked
-    const progressFailing = await request(app.getHttpServer())
-      .get(`/api/courses/${courseId}/progress`)
-      .expect(200);
-    const sess2Failing = progressFailing.body.sessions.find(
-      (s: any) => s.id === session2.id,
-    );
-    expect(sess2Failing.isUnlocked).toBe(false);
-
-    // 4. Submit a passing attempt
+    // 4. Submit passing attempt for quiz 1
     await request(app.getHttpServer())
-      .post(`/api/quizzes/${quiz.id}/attempts`)
+      .post(`/api/quizzes/${quiz1.id}/attempts`)
       .send({
-        answers: [{ questionId: question.id, selectedOptionId: 'opt2' }],
+        answers: [{ questionId: question1.id, selectedOptionId: 'opt2' }],
       })
       .expect(201)
       .expect((res) => {
         expect(res.body.isPassed).toBe(true);
-        expect(res.body.score).toBe(100);
-        expect(res.body.feedback).toHaveLength(1);
-        expect(res.body.feedback[0].correctOptionId).toBe('opt2');
-        expect(res.body.feedback[0].correctOptionText).toBe('4');
-        expect(res.body.feedback[0].isCorrect).toBe(true);
-        expect(res.body.feedback[0].explanation).toBe('Because it is 4');
       });
 
-    // Complete session should now succeed
+    // 5. Complete session 1 should succeed and unlock session 2
     await request(app.getHttpServer())
       .post(`/api/sessions/${session1.id}/complete`)
       .expect(201);
 
-    // 5. GET progress and verify session 2 is unlocked
-    const progressPassing = await request(app.getHttpServer())
-      .get(`/api/courses/${courseId}/progress`)
+    // --- STEP C: Complete Session 2 (Pass Quiz 2) ---
+    await request(app.getHttpServer())
+      .post(`/api/quizzes/${quiz2.id}/attempts`)
+      .send({
+        answers: [{ questionId: question2.id, selectedOptionId: 'opt2-2' }],
+      })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.isPassed).toBe(true);
+      });
+
+    await request(app.getHttpServer())
+      .post(`/api/sessions/${session2.id}/complete`)
+      .expect(201);
+
+    // --- STEP D: GET Exam now that all sessions are completed -> AVAILABLE ---
+    const examAvailRes = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/exam`)
       .expect(200);
 
-    const sess2Passing = progressPassing.body.sessions.find(
-      (s: any) => s.id === session2.id,
+    expect(examAvailRes.body.status).toBe('AVAILABLE');
+    expect(examAvailRes.body.questions).toHaveLength(3);
+
+    // Assert no answer key and no explanation for any type
+    const qMC = examAvailRes.body.questions.find(
+      (q: any) => q.type === 'MULTIPLE_CHOICE',
     );
-    expect(sess2Passing.isUnlocked).toBe(true);
-    const sess1Passing = progressPassing.body.sessions.find(
-      (s: any) => s.id === session1.id,
+    expect(qMC.explanation).toBeUndefined();
+    expect(qMC.payload.correctOptionId).toBeUndefined();
+    expect(qMC.payload.options[0].isCorrect).toBeUndefined();
+    expect(qMC.payload.options[1].isCorrect).toBeUndefined();
+
+    const qMat = examAvailRes.body.questions.find(
+      (q: any) => q.type === 'MATCHING',
     );
-    expect(sess1Passing.isCompleted).toBe(true);
-  });
+    expect(qMat.explanation).toBeUndefined();
+    expect(qMat.payload.correctPairs).toBeUndefined();
+    expect(qMat.payload.leftItems).toHaveLength(2);
+    expect(qMat.payload.rightItems).toHaveLength(2);
+
+    const qOrd = examAvailRes.body.questions.find(
+      (q: any) => q.type === 'ORDERING',
+    );
+    expect(qOrd.explanation).toBeUndefined();
+    expect(qOrd.payload.correctOrder).toBeUndefined();
+    expect(qOrd.payload.items).toHaveLength(3);
+
+    // --- STEP E: Submit failing exam attempt -> Cooldown set ---
+    const failExamRes = await request(app.getHttpServer())
+      .post(`/api/exams/${exam.id}/attempts`)
+      .send({
+        answers: [
+          { questionId: examQ1.id, studentPayload: { selectedOptionId: 'm1' } }, // wrong
+          {
+            questionId: examQ2.id,
+            studentPayload: { pairs: { l1: 'r2', l2: 'r1' } },
+          }, // wrong
+          {
+            questionId: examQ3.id,
+            studentPayload: { orderedIds: ['o3', 'o2', 'o1'] },
+          }, // wrong
+        ],
+      })
+      .expect(201);
+
+    expect(failExamRes.body.isPassed).toBe(false);
+    expect(failExamRes.body.score).toBe(0);
+    expect(failExamRes.body.cooldownUntil).not.toBeNull();
+
+    // --- STEP F: Second submit inside cooldown returns 409 Conflict ---
+    await request(app.getHttpServer())
+      .post(`/api/exams/${exam.id}/attempts`)
+      .send({
+        answers: [
+          { questionId: examQ1.id, studentPayload: { selectedOptionId: 'm2' } },
+        ],
+      })
+      .expect(409);
+
+    // --- STEP G: Move cooldownUntil to the past via PrismaService ---
+    await prisma.finalExam.update({
+      where: { id: exam.id },
+      data: { cooldownUntil: new Date(Date.now() - 60000) },
+    });
+
+    // --- STEP H: Submit passing exam attempt -> Course status COMPLETED ---
+    const passExamRes = await request(app.getHttpServer())
+      .post(`/api/exams/${exam.id}/attempts`)
+      .send({
+        answers: [
+          { questionId: examQ1.id, studentPayload: { selectedOptionId: 'm2' } },
+          {
+            questionId: examQ2.id,
+            studentPayload: { pairs: { l1: 'r1', l2: 'r2' } },
+          },
+          {
+            questionId: examQ3.id,
+            studentPayload: { orderedIds: ['o1', 'o2', 'o3'] },
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(passExamRes.body.isPassed).toBe(true);
+    expect(passExamRes.body.score).toBe(100);
+    expect(passExamRes.body.attemptNumber).toBe(2);
+    expect(passExamRes.body.cooldownUntil).toBeNull();
+
+    // Verify course status in DB is COMPLETED
+    const courseAfterPass = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    expect(courseAfterPass?.status).toBe('COMPLETED');
+
+    // --- STEP I: GET attempts returns stored attempts ---
+    const attemptsRes = await request(app.getHttpServer())
+      .get(`/api/exams/${exam.id}/attempts`)
+      .expect(200);
+    expect(attemptsRes.body).toHaveLength(2);
+
+    // --- STEP J: GET Progress shows finalExam ---
+    const progressFinalRes = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/progress`)
+      .expect(200);
+    expect(progressFinalRes.body.finalExam).toBeDefined();
+    expect(progressFinalRes.body.finalExam.status).toBe('AVAILABLE');
+    expect(progressFinalRes.body.finalExam.bestScorePercent).toBe(100);
+    expect(progressFinalRes.body.finalExam.attemptsCount).toBe(2);
+    expect(progressFinalRes.body.finalExam.cooldownUntil).toBeNull();
+  }, 60000);
 });

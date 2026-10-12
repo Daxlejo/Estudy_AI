@@ -31,7 +31,7 @@ describe('PrismaCourseRepository', () => {
     const courseData = {
       name: 'Test Course',
       description: 'A test course',
-      status: 'DRAFT',
+      status: 'CREATED' as const,
     };
 
     const created = await repository.create(courseData);

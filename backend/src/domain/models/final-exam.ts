@@ -10,17 +10,20 @@ export interface FinalExam {
 export type FinalExamQuestionType = 'MULTIPLE_CHOICE' | 'MATCHING' | 'ORDERING';
 
 export interface MultipleChoicePayload {
-  options: { id: string; text: string }[];
+  options: { id: string; text: string; isCorrect?: boolean }[];
+  correctOptionId?: string;
 }
 
 export interface MatchingPayload {
   leftItems: { id: string; text: string }[];
   rightItems: { id: string; text: string }[];
+  correctPairs?: Record<string, string>;
 }
 
 export interface OrderingPayload {
   items: { id: string; text: string }[];
   orderingHint?: string;
+  correctOrder?: string[];
 }
 
 export type FinalExamQuestionPayload =

@@ -7,7 +7,7 @@ import {
   Delete,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { CoursesService } from './courses.service';
+import { CoursesService, CourseProgressResult } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { DatabaseError } from '../../database/errors/database-error';
 
@@ -15,7 +15,7 @@ import { DatabaseError } from '../../database/errors/database-error';
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
-  private handleError(error: unknown) {
+  private handleError(error: unknown): never {
     if (error instanceof DatabaseError) {
       throw new InternalServerErrorException('A database error occurred');
     }
@@ -41,7 +41,7 @@ export class CoursesController {
   }
 
   @Get(':id/progress')
-  async getProgress(@Param('id') id: string) {
+  async getProgress(@Param('id') id: string): Promise<CourseProgressResult> {
     try {
       return await this.coursesService.getCourseProgress(id);
     } catch (e) {

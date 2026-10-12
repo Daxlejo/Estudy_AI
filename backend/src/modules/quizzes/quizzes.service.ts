@@ -8,7 +8,45 @@ import {
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { Quiz, QuizAttempt } from '../../domain/models/quiz';
+import { Session } from '../../domain/models/session';
 import { AnswerDto } from './dto/submit-attempt.dto';
+
+export interface SanitizedQuizOption {
+  id: string;
+  text: string;
+}
+
+export interface SanitizedQuizQuestion {
+  id: string;
+  quizId: string;
+  conceptId: string;
+  prompt: string;
+  context: string | null;
+  options: SanitizedQuizOption[];
+  createdAt: Date;
+}
+
+export interface GetQuizResponse extends Quiz {
+  questions: SanitizedQuizQuestion[];
+}
+
+export interface QuizAttemptFeedbackItem {
+  questionId: string;
+  selectedOptionId: string | null;
+  selectedOptionText: string | null;
+  correctOptionId: string;
+  correctOptionText: string;
+  isCorrect: boolean;
+  explanation: string;
+}
+
+export interface SubmitQuizAttemptResult {
+  score: number;
+  isPassed: boolean;
+  attemptNumber: number;
+  nextSession: Session | null;
+  feedback: QuizAttemptFeedbackItem[];
+}
 
 @Injectable()
 export class QuizzesService {
@@ -19,9 +57,7 @@ export class QuizzesService {
     private readonly sessionRepository: SessionRepository,
   ) {}
 
-  async getQuizBySession(
-    sessionId: string,
-  ): Promise<Quiz & { questions: any[] }> {
+  async getQuizBySession(sessionId: string): Promise<GetQuizResponse> {
     const quiz = await this.quizRepository.findBySessionId(sessionId);
     if (!quiz) {
       throw new NotFoundException(`Quiz for session ${sessionId} not found`);
@@ -30,7 +66,7 @@ export class QuizzesService {
     const questions = await this.quizRepository.getQuestionsByQuizId(quiz.id);
 
     // Strip out correct answers and explanations
-    const safeQuestions = questions.map((q) => {
+    const safeQuestions: SanitizedQuizQuestion[] = questions.map((q) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { explanation, ...rest } = q;
       return {
@@ -57,7 +93,10 @@ export class QuizzesService {
     return this.quizRepository.getAttemptsByQuizId(quizId);
   }
 
-  async submitAttempt(quizId: string, answersDto: AnswerDto[]): Promise<any> {
+  async submitAttempt(
+    quizId: string,
+    answersDto: AnswerDto[],
+  ): Promise<SubmitQuizAttemptResult> {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) {
       throw new NotFoundException(`Quiz ${quizId} not found`);

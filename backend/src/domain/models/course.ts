@@ -1,8 +1,11 @@
+export type CourseStatus =
+  'CREATED' | 'PROCESSING' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'ERROR';
+
 export interface Course {
   id: string;
   name: string;
   description: string | null;
-  status: string;
+  status: CourseStatus;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -6,10 +7,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.8-flash",
+    model=model_name,
     google_api_key=os.getenv("GOOGLE_API_KEY"),
-    temperature=0
+    temperature=0,
+    max_retries=0,
 )
 
 class EstadoAuditoria(TypedDict):
@@ -26,7 +30,7 @@ NOMBRES_PASOS = {
     3: "Dependencias",
     4: "Agrupacion",
     5: "Ruta",
-    6: "Contenido bajo demanda"
+    6: "Contenido bajo demanda",
 }
 
 def nodo_analisis_estatico(state: EstadoAuditoria):
@@ -34,18 +38,19 @@ def nodo_analisis_estatico(state: EstadoAuditoria):
     codigo = state["codigo_fuente"]
     lineas = codigo.split("\n")
     lineas_limpias = [
-        l for l in lineas
+        l
+        for l in lineas
         if l.strip() and not l.strip().startswith("//") and not l.strip().startswith("*")
     ]
     codigo_limpio = "\n".join(lineas_limpias)
     return {
         "codigo_fuente": codigo_limpio,
-        "intentos": state["intentos"] + 1
+        "intentos": state["intentos"] + 1,
     }
 
 def nodo_auditar_pipeline(state: EstadoAuditoria):
     paso = state["paso_pipeline"]
-    
+
     if paso is not None:
         nombre_paso = NOMBRES_PASOS.get(paso, f"Paso {paso}")
         print(f"[2/3] Auditando paso {paso} - {nombre_paso}...")
@@ -71,8 +76,20 @@ def nodo_auditar_pipeline(state: EstadoAuditoria):
             "Si hay problemas, listalos numerados en maximo 3 lineas cada uno."
         )
 
-    respuesta = llm.invoke(prompt)
-    contenido = respuesta.content if isinstance(respuesta.content, str) else respuesta.content[0].get("text", "")
+    try:
+        respuesta = llm.invoke(prompt)
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower() or "RateLimit" in type(e).__name__:
+            print("Error de cuota de Gemini API (429 / RESOURCE_EXHAUSTED): Cuota diaria excedida.")
+            sys.exit(2)
+        raise
+
+    contenido = (
+        respuesta.content
+        if isinstance(respuesta.content, str)
+        else respuesta.content[0].get("text", "")
+    )
     contenido = contenido.strip()
 
     if contenido == "SIN_HALLAZGOS" or not contenido:
@@ -93,8 +110,20 @@ def nodo_generar_parche(state: EstadoAuditoria):
         "Despues del codigo agrega una linea que diga: CAMBIOS: y lista en maximo 2 lineas que cambiaste."
     )
 
-    respuesta = llm.invoke(prompt)
-    contenido_parche = respuesta.content if isinstance(respuesta.content, str) else respuesta.content[0].get("text", "")
+    try:
+        respuesta = llm.invoke(prompt)
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower() or "RateLimit" in type(e).__name__:
+            print("Error de cuota de Gemini API (429 / RESOURCE_EXHAUSTED): Cuota diaria excedida.")
+            sys.exit(2)
+        raise
+
+    contenido_parche = (
+        respuesta.content
+        if isinstance(respuesta.content, str)
+        else respuesta.content[0].get("text", "")
+    )
     return {"parche_sugerido": contenido_parche.strip()}
 
 def decidir_siguiente(state: EstadoAuditoria):
@@ -115,8 +144,8 @@ workflow.add_conditional_edges(
     decidir_siguiente,
     {
         "corregir": "parches",
-        "fin": END
-    }
+        "fin": END,
+    },
 )
 workflow.add_edge("parches", END)
 
@@ -124,33 +153,54 @@ app = workflow.compile()
 
 if __name__ == "__main__":
     import argparse
-    import os
-    
+
     parser = argparse.ArgumentParser(description="Auditor de codigo")
-    parser.add_argument("path", help="Ruta relativa a la raiz del proyecto")
+    parser.add_argument("paths", nargs="+", help="Rutas relativas a la raiz del proyecto")
     parser.add_argument("--step", type=int, default=None, help="Paso del pipeline")
     args = parser.parse_args()
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    file_path = os.path.join(project_root, args.path)
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        codigo = f.read()
+    combined_code_parts = []
+    total_lines = 0
+
+    for rel_path in args.paths:
+        file_path = os.path.join(project_root, rel_path)
+        if not os.path.exists(file_path):
+            print(f"Error: Archivo no encontrado: {rel_path}")
+            sys.exit(1)
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            total_lines += len(lines)
+            combined_code_parts.append(f"// FILE: {rel_path}\n" + "".join(lines))
+
+    if total_lines > 600:
+        print(f"Error: El total de lineas ({total_lines}) excede el limite maximo de 600 lineas permitido.")
+        sys.exit(1)
+
+    codigo_completo = "\n\n".join(combined_code_parts)
 
     estado_inicial = {
-        "modulo_path": args.path,
-        "codigo_fuente": codigo,
+        "modulo_path": ", ".join(args.paths),
+        "codigo_fuente": codigo_completo,
         "paso_pipeline": args.step,
         "hallazgos": [],
         "parche_sugerido": "",
-        "intentos": 0
+        "intentos": 0,
     }
 
-    resultado = app.invoke(estado_inicial)
+    try:
+        resultado = app.invoke(estado_inicial)
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower() or "RateLimit" in type(e).__name__:
+            print("Error de cuota de Gemini API (429 / RESOURCE_EXHAUSTED): Cuota diaria excedida.")
+            sys.exit(2)
+        raise
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("RESULTADO DE LA AUDITORIA")
-    print("="*50)
+    print("=" * 50)
 
     if resultado["hallazgos"]:
         print("\nHALLAZGOS:")
@@ -158,4 +208,4 @@ if __name__ == "__main__":
             print(f"  {h}")
         print(f"\nPARCHE SUGERIDO:\n{resultado['parche_sugerido']}")
     else:
-        print("\n OK - No se encontraron problemas en este fragmento.")
+        print("\n OK - No se encontraron problemas en este fragmento.")
