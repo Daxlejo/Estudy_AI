@@ -20,9 +20,21 @@ export interface FinalExamRepository {
   ): Promise<FinalExamQuestion>;
   getQuestionsByExamId(examId: string): Promise<FinalExamQuestion[]>;
 
+  findByCourseIdWithQuestions(
+    courseId: string,
+  ): Promise<(FinalExam & { questions: FinalExamQuestion[] }) | null>;
+  updateCooldownUntil(
+    examId: string,
+    cooldownUntil: Date | null,
+  ): Promise<FinalExam>;
+
   createAttempt(
-    attempt: Omit<FinalExamAttempt, 'id' | 'submittedAt'>,
+    attempt: Omit<FinalExamAttempt, 'id' | 'submittedAt' | 'attemptNumber'>,
     answers: Omit<FinalExamAttemptAnswer, 'id' | 'attemptId' | 'createdAt'>[],
   ): Promise<FinalExamAttempt>;
   getAttemptsByCourseId(courseId: string): Promise<FinalExamAttempt[]>;
+  getAttemptsByExamId(examId: string): Promise<FinalExamAttempt[]>;
+  getAttemptById(
+    attemptId: string,
+  ): Promise<(FinalExamAttempt & { answers: FinalExamAttemptAnswer[] }) | null>;
 }

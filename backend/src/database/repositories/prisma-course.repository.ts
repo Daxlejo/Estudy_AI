@@ -8,24 +8,31 @@ export class PrismaCourseRepository implements CourseRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string): Promise<Course | null> {
-    return this.prisma.course.findUnique({ where: { id } });
+    return this.prisma.course.findUnique({
+      where: { id },
+    }) as Promise<Course | null>;
   }
 
   async findAll(): Promise<Course[]> {
-    return this.prisma.course.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.course.findMany({
+      orderBy: { createdAt: 'desc' },
+    }) as Promise<Course[]>;
   }
 
   async create(
     data: Omit<Course, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<Course> {
-    return this.prisma.course.create({ data });
+    return this.prisma.course.create({ data }) as Promise<Course>;
   }
 
   async update(
     id: string,
     data: Partial<Omit<Course, 'id' | 'createdAt' | 'updatedAt'>>,
   ): Promise<Course> {
-    return this.prisma.course.update({ where: { id }, data });
+    return this.prisma.course.update({
+      where: { id },
+      data,
+    }) as Promise<Course>;
   }
 
   async delete(id: string): Promise<void> {

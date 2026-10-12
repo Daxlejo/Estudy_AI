@@ -3,17 +3,26 @@ import { FinalExamQuestionPayload } from '../../domain/models/final-exam';
 import { MapperError } from '../errors/database-error';
 
 const multipleChoicePayloadSchema = z.object({
-  options: z.array(z.object({ id: z.string(), text: z.string() })),
+  options: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      isCorrect: z.boolean().optional(),
+    }),
+  ),
+  correctOptionId: z.string().optional(),
 });
 
 const matchingPayloadSchema = z.object({
   leftItems: z.array(z.object({ id: z.string(), text: z.string() })),
   rightItems: z.array(z.object({ id: z.string(), text: z.string() })),
+  correctPairs: z.record(z.string(), z.string()).optional(),
 });
 
 const orderingPayloadSchema = z.object({
   items: z.array(z.object({ id: z.string(), text: z.string() })),
   orderingHint: z.string().optional(),
+  correctOrder: z.array(z.string()).optional(),
 });
 
 export class FinalExamQuestionMapper {
