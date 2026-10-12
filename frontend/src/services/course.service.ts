@@ -15,7 +15,6 @@ import {
 } from '../mocks/course.mock'
 import type {
   Course,
-  CourseMaterial,
   CourseProcessingState,
   CreateCourseDto,
   CurrentSession,
@@ -24,56 +23,116 @@ import type {
   ProcessingStep,
   Quiz,
   QuizAnswer,
-  QuizAnswerEvaluation,
   QuizResult,
   QuizReviewConcept,
   StudySession,
 } from '../types/course'
 import { examService } from './exam.service'
 import type { FinalExamAnswer } from '../types/exam'
+import { apiClient, ApiError } from './api'
+import {
+  type BackendCourse,
+  type BackendSession,
+  type BackendConcept,
+  type CourseProgressResult,
+  type GenerationStatusResponse,
+  type BackendQuizResponse,
+  type BackendSubmitQuizResponse,
+  formatFileSize,
+  mapBackendCourseToFrontend,
+  mapBackendLearningPath,
+  mapBackendStudySession,
+  mapBackendQuiz,
+  mapBackendQuizResult,
+  evaluateLocalMockQuiz,
+} from './course.mapper'
 
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+export { formatFileSize }
 
-function detectFileType(name: string, fallbackType: string): string {
-  const ext = name.split('.').pop()?.toLowerCase()
-  if (ext === 'pdf') return 'pdf'
-  if (ext === 'docx' || ext === 'doc') return 'docx'
-  if (ext === 'pptx' || ext === 'ppt') return 'pptx'
-  if (ext === 'txt') return 'txt'
-  return fallbackType || 'file'
-}
-
-/**
- * Capa de servicio para operaciones de cursos y procesamiento.
- * Actualmente implementada con datos mock en memoria.
- * Mañana esta misma firma será conectada a la API NestJS sin tocar los componentes UI.
- */
 class CourseService {
   /**
    * Obtiene la lista completa de cursos del usuario.
    */
   async getCourses(): Promise<Course[]> {
-    // Simula una breve latencia de lectura local en Electron
+    try {
+      const backendCourses = await apiClient.get<BackendCourse[]>('/courses')
+      if (backendCourses && backendCourses.length > 0) {
+        return Promise.all(
+          backendCourses.map(async (c) => {
+            let prog: CourseProgressResult | undefined
+            try {
+              prog = await apiClient.get<CourseProgressResult>(`/courses/${c.id}/progress`)
+            } catch {
+              // sin progreso calculado aún
+            }
+            return mapBackendCourseToFrontend(c, prog)
+          }),
+        )
+      }
+    } catch (error) {
+      console.warn('[CourseService] Error al consultar cursos en backend; recurriendo a store en memoria:', error)
+    }
     return [...memoryCourseStore]
   }
 
   /**
-   * Obtiene el detalle de un curso por su ID.
+   * Obtiene el detalle de un curso por ID.
    */
   async getCourse(courseId: string): Promise<Course | null> {
-    const course = memoryCourseStore.find((c) => String(c.id) === String(courseId))
+    try {
+      const c = await apiClient.get<BackendCourse>(`/courses/${courseId}`)
+      if (c) {
+        let prog: CourseProgressResult | undefined
+        try {
+          prog = await apiClient.get<CourseProgressResult>(`/courses/${c.id}/progress`)
+        } catch {
+          // sin progreso disponible
+        }
+        return mapBackendCourseToFrontend(c, prog)
+      }
+    } catch (error) {
+      console.warn(`[CourseService] Error al consultar curso ${courseId} en backend; recurriendo a memoria:`, error)
+    }
+
+    const course = memoryCourseStore.find((item) => String(item.id) === String(courseId))
     return course ? { ...course } : null
   }
 
   /**
    * Obtiene la ruta de aprendizaje estructurada de un curso.
-   * Si no existe previamente, se genera dinámicamente según el temario del curso.
    */
   async getLearningPath(courseId: string): Promise<LearningPath | null> {
+    try {
+      const [course, sessions, progress] = await Promise.all([
+        apiClient.get<BackendCourse>(`/courses/${courseId}`),
+        apiClient.get<BackendSession[]>(`/courses/${courseId}/sessions`),
+        apiClient.get<CourseProgressResult>(`/courses/${courseId}/progress`),
+      ])
+
+      if (course && sessions && sessions.length > 0) {
+        const conceptsMap = new Map<string, string[]>()
+        await Promise.all(
+          sessions.map(async (s) => {
+            try {
+              const fullSession = await apiClient.get<
+                BackendSession & { concepts: BackendConcept[] }
+              >(`/sessions/${s.id}`)
+              conceptsMap.set(
+                s.id,
+                fullSession.concepts.map((concept) => concept.name),
+              )
+            } catch {
+              // sin conceptos para esta sesión
+            }
+          }),
+        )
+
+        return mapBackendLearningPath(course, sessions, progress, conceptsMap)
+      }
+    } catch (error) {
+      console.warn(`[CourseService] Error al consultar ruta de aprendizaje para curso ${courseId}:`, error)
+    }
+
     const existing = memoryLearningPathStore.get(String(courseId))
     if (existing) {
       return {
@@ -82,10 +141,10 @@ class CourseService {
       }
     }
 
-    const course = await this.getCourse(courseId)
-    if (!course) return null
+    const localCourse = await this.getCourse(courseId)
+    if (!localCourse) return null
 
-    const generated = generateMockLearningPath(course)
+    const generated = generateMockLearningPath(localCourse)
     memoryLearningPathStore.set(String(courseId), generated)
 
     return {
@@ -102,42 +161,77 @@ class CourseService {
   }
 
   /**
-   * Obtiene una sesión de estudio completa con su material didáctico,
-   * conceptos clave, práctica guiada y desafío conceptual.
+   * Obtiene una sesión de estudio completa con su material didáctico.
    */
   async getStudySession(sessionId: string): Promise<StudySession | null> {
-    const session = getMockStudySession(sessionId)
-    if (!session) return null
+    try {
+      const session = await apiClient.get<BackendSession & { concepts: BackendConcept[] }>(
+        `/sessions/${sessionId}`,
+      )
+      if (session) {
+        const [course, sessions, quiz] = await Promise.all([
+          apiClient.get<BackendCourse>(`/courses/${session.courseId}`).catch(() => null),
+          apiClient.get<BackendSession[]>(`/courses/${session.courseId}/sessions`).catch(() => []),
+          apiClient.get<{ id: string }>(`/sessions/${sessionId}/quiz`).catch(() => null),
+        ])
+
+        return mapBackendStudySession(
+          session,
+          session.concepts,
+          course,
+          sessions.length,
+          quiz?.id || session.id,
+        )
+      }
+    } catch {
+      // Fallback a mock
+    }
+
+    const mockSession = getMockStudySession(sessionId)
+    if (!mockSession) return null
 
     return {
-      ...session,
-      concepts: session.concepts.map((c) => ({ ...c })),
+      ...mockSession,
+      concepts: mockSession.concepts.map((c) => ({ ...c })),
       guidedPractice: {
-        ...session.guidedPractice,
-        options: session.guidedPractice.options.map((o) => ({ ...o })),
+        ...mockSession.guidedPractice,
+        options: mockSession.guidedPractice.options.map((o) => ({ ...o })),
       },
       challenge: {
-        ...session.challenge,
-        options: session.challenge.options.map((o) => ({ ...o })),
+        ...mockSession.challenge,
+        options: mockSession.challenge.options.map((o) => ({ ...o })),
       },
     }
   }
 
   /**
-   * Calcula el umbral mínimo determinista de respuestas correctas según el total de preguntas:
-   * 6 preguntas -> 4
-   * 7 preguntas -> 4
-   * 8 preguntas -> 5
+   * Calcula el umbral mínimo determinista de respuestas correctas.
    */
   getMinimumCorrectAnswers(totalQuestions: number): number {
     return getMinimumCorrectAnswers(totalQuestions)
   }
 
   /**
-   * Obtiene la estructura completa de un miniquiz correspondiente a su ID o sesión asociada.
+   * Obtiene la estructura completa de un miniquiz correspondiente a una sesión o ID.
    */
-  async getQuiz(quizId: string): Promise<Quiz | null> {
-    const quiz = getMockQuiz(quizId)
+  async getQuiz(quizOrSessionId: string): Promise<Quiz | null> {
+    try {
+      const data = await apiClient.get<BackendQuizResponse>(`/sessions/${quizOrSessionId}/quiz`)
+      if (data) {
+        const session = await apiClient
+          .get<BackendSession>(`/sessions/${data.sessionId}`)
+          .catch(() => null)
+        const course = session
+          ? await apiClient.get<BackendCourse>(`/courses/${session.courseId}`).catch(() => null)
+          : null
+
+        return mapBackendQuiz(data, session, course)
+      }
+    } catch {
+      // Fallback a mock
+    }
+
+    const quiz = getMockQuiz(quizOrSessionId)
     if (!quiz) return null
 
     return {
@@ -150,77 +244,35 @@ class CourseService {
   }
 
   /**
-   * Evalúa las respuestas del estudiante en el miniquiz, calcula el puntaje
-   * determinista y, en caso de aprobación, desbloquea la siguiente sesión en la ruta.
+   * Evalúa las respuestas del estudiante en el miniquiz.
    */
   async submitQuiz(quizId: string, answers: QuizAnswer[]): Promise<QuizResult> {
+    try {
+      const response = await apiClient.post<BackendSubmitQuizResponse>(
+        `/quizzes/${quizId}/attempts`,
+        {
+          answers: answers.map((a) => ({
+            questionId: a.questionId,
+            selectedOptionId: a.selectedOptionId,
+          })),
+        },
+      )
+      return mapBackendQuizResult(quizId, response)
+    } catch {
+      // Fallback a mock en memoria si no está en backend
+    }
+
     const quiz = getInternalMockQuiz(quizId)
     if (!quiz) {
       throw new Error(`Miniquiz no encontrado con ID: ${quizId}`)
     }
 
-    const totalQuestions = quiz.questions.length
-    const evaluations: QuizAnswerEvaluation[] = []
-    const weakConceptIdsSet = new Set<string>()
-    let correctCount = 0
-
-    // Mapear respuestas del estudiante por questionId
-    const answersMap = new Map(answers.map((a) => [a.questionId, a.selectedOptionId]))
-
-    for (const question of quiz.questions) {
-      const selectedOptionId = answersMap.get(question.id) || ''
-      const selectedOption = question.options.find((o) => o.id === selectedOptionId)
-      const correctOption = question.options.find((o) => o.isCorrect) || question.options[0]
-
-      const isCorrect = selectedOption?.isCorrect ?? false
-      if (isCorrect) {
-        correctCount++
-      } else {
-        weakConceptIdsSet.add(question.conceptId)
-      }
-
-      evaluations.push({
-        questionId: question.id,
-        prompt: question.prompt,
-        conceptId: question.conceptId,
-        conceptName: question.conceptName,
-        selectedOptionId,
-        selectedOptionText: selectedOption?.text || 'Sin respuesta seleccionada',
-        correctOptionId: correctOption.id,
-        correctOptionText: correctOption.text,
-        isCorrect,
-        explanation: question.explanation,
-      })
-    }
-
-    const incorrectCount = totalQuestions - correctCount
-    const scorePercent = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
-    const passingThreshold = this.getMinimumCorrectAnswers(totalQuestions)
-    const passed = correctCount >= passingThreshold
-    const weakConceptIds = Array.from(weakConceptIdsSet)
-
-    // Si el estudiante aprobó, se actualiza el estado de la sesión y se desbloquea la siguiente
-    let nextSessionId: string | undefined
-    if (passed) {
-      const unlockResult = unlockNextSessionAfterQuiz(quiz.sessionId)
-      nextSessionId = unlockResult?.nextSessionId
-    }
-
-    return {
-      quizId: quiz.id,
-      sessionId: quiz.sessionId,
-      courseId: quiz.courseId,
-      totalQuestions,
-      correctAnswers: correctCount,
-      incorrectAnswers: incorrectCount,
-      scorePercent,
-      passed,
-      passingThreshold,
-      weakConceptIds,
-      answers: evaluations,
-      attemptNumber: quiz.attemptNumber,
-      nextSessionId,
-    }
+    return evaluateLocalMockQuiz(
+      quiz,
+      answers,
+      this.getMinimumCorrectAnswers(quiz.questions.length),
+      unlockNextSessionAfterQuiz,
+    )
   }
 
   /**
@@ -228,7 +280,6 @@ class CourseService {
    */
   async getReviewConcepts(_quizId: string, weakConceptIds: string[]): Promise<QuizReviewConcept[]> {
     const results: QuizReviewConcept[] = []
-
     for (const conceptId of weakConceptIds) {
       if (mockQuizReviewConcepts[conceptId]) {
         results.push({ ...mockQuizReviewConcepts[conceptId] })
@@ -237,18 +288,18 @@ class CourseService {
           id: conceptId,
           name: `Concepto de estudio (${conceptId})`,
           summary: 'Regla conceptual fundamental evaluada en el miniquiz.',
-          detail: 'Revisa detenidamente los enunciados y restricciones teóricas de este principio antes de reintentar.',
+          detail: 'Revisa detenidamente los enunciados y restricciones teóricas antes de reintentar.',
         })
       }
     }
-
     return results
   }
 
   /**
-   * Genera un nuevo intento de miniquiz con preguntas adaptativas diferentes para los mismos conceptos.
+   * Genera un nuevo intento de miniquiz.
    */
-  async retryQuiz(quizId: string, _weakConceptIds?: string[]): Promise<Quiz> {
+  async retryQuiz(quizId: string, weakConceptIds?: string[]): Promise<Quiz> {
+    void weakConceptIds
     const currentAttempt = memoryQuizAttemptStore.get(quizId) || 1
     const nextAttempt = currentAttempt + 1
     memoryQuizAttemptStore.set(quizId, nextAttempt)
@@ -268,69 +319,100 @@ class CourseService {
   }
 
   /**
-   * Crea un nuevo curso en estado PROCESSING a partir del nombre y los materiales subidos.
+   * Crea un nuevo curso y sube los materiales al backend real, disparando el pipeline de IA.
    */
   async createCourse(dto: CreateCourseDto): Promise<Course> {
-    const id = `course-${Date.now().toString(36)}`
+    try {
+      const created = await apiClient.post<BackendCourse>('/courses', {
+        name: dto.name.trim(),
+        description: `Curso estructurado por EstudyAI a partir de materiales de estudio.`,
+      })
 
-    const materials: CourseMaterial[] = dto.materials.map((m, idx) => ({
-      id: `mat-${Date.now()}-${idx}`,
-      name: m.name,
-      sizeBytes: m.sizeBytes,
-      formattedSize: formatFileSize(m.sizeBytes),
-      type: detectFileType(m.name, m.type),
-      uploadedAt: new Date().toISOString(),
-    }))
+      const uploadedMaterialIds: string[] = []
 
-    const newCourse: Course = {
-      id,
-      name: dto.name.trim(),
-      description: `Ruta personalizada generada a partir de ${materials.length} material(es).`,
-      status: 'PROCESSING',
-      progress: {
-        completedSessions: 0,
-        totalSessions: 14,
-        progressPercent: 0,
-        conceptsLearned: 0,
-        totalConcepts: 36,
-        currentLevel: 1,
-        totalLevels: 4,
-      },
-      materials,
-      createdAt: new Date().toISOString(),
+      if (dto.files && dto.files.length > 0) {
+        for (const file of dto.files) {
+          const formData = new FormData()
+          formData.append('file', file)
+          const matRes = await apiClient.postFormData<{ id: string }>(
+            `/courses/${created.id}/materials`,
+            formData,
+          )
+          if (matRes?.id) {
+            uploadedMaterialIds.push(matRes.id)
+          }
+        }
+      }
+
+      await apiClient.post(`/courses/${created.id}/generate`, {
+        materialIds: uploadedMaterialIds.length > 0 ? uploadedMaterialIds : undefined,
+      })
+
+      return {
+        id: created.id,
+        name: created.name,
+        description: created.description || undefined,
+        status: 'PROCESSING',
+        progress: {
+          completedSessions: 0,
+          totalSessions: 0,
+          progressPercent: 0,
+        },
+        materials: [],
+        createdAt: created.createdAt,
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error
+      }
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo conectar con el servidor backend para crear el curso.',
+        { cause: error },
+      )
     }
-
-    memoryCourseStore.unshift(newCourse)
-
-    // Inicializa el estado de procesamiento para este curso
-    const initialSteps: ProcessingStep[] = INITIAL_PROCESSING_STEPS.map((s, idx) => ({
-      ...s,
-      status: idx === 0 ? 'in_progress' : 'pending',
-    }))
-
-    const processingState: CourseProcessingState = {
-      courseId: id,
-      courseName: newCourse.name,
-      status: 'EXTRACTING',
-      progressPercent: 12,
-      currentStepIndex: 0,
-      steps: initialSteps,
-      metrics: {
-        sessionsCount: 14,
-        conceptsCount: 36,
-        levelsCount: 4,
-      },
-    }
-
-    memoryProcessingStore.set(id, processingState)
-
-    return newCourse
   }
 
   /**
-   * Obtiene el estado actual de procesamiento de un curso.
+   * Obtiene el estado actual de procesamiento de un curso desde el backend real.
    */
   async getCourseProcessingStatus(courseId: string): Promise<CourseProcessingState | null> {
+    try {
+      const res = await apiClient.get<GenerationStatusResponse>(
+        `/courses/${courseId}/generation-status`,
+      )
+      if (res) {
+        let status: ProcessingStatus = 'EXTRACTING'
+        if (res.status === 'COMPLETED') status = 'COMPLETED'
+        else if (res.status === 'ERROR' || res.status === 'FAILED') status = 'ERROR'
+        else if (res.status === 'ANALYZING_CONCEPTS') status = 'ANALYZING_CONCEPTS'
+        else if (res.status === 'ANALYZING_DEPENDENCIES') status = 'ANALYZING_DEPENDENCIES'
+        else if (res.status === 'BUILDING_PATH') status = 'BUILDING_PATH'
+        else if (res.status === 'PENDING') status = 'PENDING'
+
+        const steps: ProcessingStep[] = (res.steps || []).map((s) => ({
+          key: s.key as ProcessingStep['key'],
+          label: s.label,
+          description: s.description,
+          status: s.status,
+        }))
+
+        return {
+          courseId: res.courseId,
+          courseName: res.courseName,
+          status,
+          progressPercent: res.progressPercent ?? 0,
+          currentStepIndex: res.currentStepIndex ?? 0,
+          steps: steps.length > 0 ? steps : INITIAL_PROCESSING_STEPS,
+          metrics: res.metrics,
+          errorMessage: res.errorMessage || undefined,
+        }
+      }
+    } catch {
+      // Fallback a memoria
+    }
+
     const existing = memoryProcessingStore.get(String(courseId))
     if (existing) {
       return { ...existing, steps: existing.steps.map((s) => ({ ...s })) }
@@ -339,8 +421,11 @@ class CourseService {
     const course = await this.getCourse(courseId)
     if (!course) return null
 
-    // Si el curso ya existe y está listo
-    if (course.status === 'READY' || course.status === 'IN_PROGRESS' || course.status === 'COMPLETED') {
+    if (
+      course.status === 'READY' ||
+      course.status === 'IN_PROGRESS' ||
+      course.status === 'COMPLETED'
+    ) {
       const completedSteps: ProcessingStep[] = INITIAL_PROCESSING_STEPS.map((s) => ({
         ...s,
         status: 'completed',
@@ -364,12 +449,18 @@ class CourseService {
   }
 
   /**
-   * Reinicia la simulación de procesamiento tras un error.
+   * Reinicia la generación tras un error.
    */
   async retryCourseProcessing(courseId: string): Promise<CourseProcessingState> {
-    const course = await this.getCourse(courseId)
-    const courseName = course?.name ?? 'Curso'
+    try {
+      await apiClient.post(`/courses/${courseId}/generate`)
+      const updated = await this.getCourseProcessingStatus(courseId)
+      if (updated) return updated
+    } catch {
+      // Fallback a simulación
+    }
 
+    const course = await this.getCourse(courseId)
     const resetSteps: ProcessingStep[] = INITIAL_PROCESSING_STEPS.map((s, idx) => ({
       ...s,
       status: idx === 0 ? 'in_progress' : 'pending',
@@ -377,7 +468,7 @@ class CourseService {
 
     const resetState: CourseProcessingState = {
       courseId,
-      courseName,
+      courseName: course?.name ?? 'Curso',
       status: 'EXTRACTING',
       progressPercent: 15,
       currentStepIndex: 0,
@@ -390,17 +481,12 @@ class CourseService {
     }
 
     memoryProcessingStore.set(String(courseId), resetState)
-
-    if (course) {
-      course.status = 'PROCESSING'
-    }
-
     return resetState
   }
 
   /**
-   * Simula el avance en tiempo real del procesamiento para la UI.
-   * Retorna una función para cancelar la suscripción / limpiar timers.
+   * Sondea en vivo el estado real de procesamiento del backend y notifica a la UI.
+   * Cancela el polling cuando finaliza (COMPLETED o ERROR) o si el componente se desmonta.
    */
   subscribeToProcessing(
     courseId: string,
@@ -408,103 +494,34 @@ class CourseService {
   ): () => void {
     let isCancelled = false
     let timerId: ReturnType<typeof setTimeout> | null = null
+    const abortController = new AbortController()
 
-    // Etapas ordenadas de simulación
-    const stages: Array<{
-      status: ProcessingStatus
-      stepIndex: number
-      progress: number
-      delayMs: number
-      shouldError?: boolean
-    }> = [
-      { status: 'EXTRACTING', stepIndex: 0, progress: 20, delayMs: 1200 },
-      { status: 'ANALYZING_CONCEPTS', stepIndex: 1, progress: 42, delayMs: 1400 },
-      { status: 'ANALYZING_DEPENDENCIES', stepIndex: 2, progress: 65, delayMs: 1500 },
-      { status: 'BUILDING_PATH', stepIndex: 3, progress: 85, delayMs: 1600 },
-      { status: 'BUILDING_PATH', stepIndex: 4, progress: 95, delayMs: 1200 },
-      { status: 'COMPLETED', stepIndex: 5, progress: 100, delayMs: 1000 },
-    ]
-
-    let currentStageIndex = 0
-
-    const executeNextStage = async () => {
+    const poll = async () => {
       if (isCancelled) return
 
-      const currentState = await this.getCourseProcessingStatus(courseId)
-      if (!currentState) return
+      try {
+        const state = await this.getCourseProcessingStatus(courseId)
+        if (isCancelled || !state) return
 
-      // Si el nombre contiene [error] simula error en el paso de dependencias
-      const course = await this.getCourse(courseId)
-      const simulateFail = course?.name.toLowerCase().includes('[error]')
+        onUpdate(state)
 
-      if (currentStageIndex >= stages.length) {
-        return
+        if (state.status === 'COMPLETED' || state.status === 'ERROR') {
+          return
+        }
+      } catch {
+        // En caso de error transitorio de red, continúa el sondeo
       }
 
-      const stage = stages[currentStageIndex]
-
-      if (simulateFail && stage.stepIndex === 2) {
-        const errorSteps: ProcessingStep[] = currentState.steps.map((s, idx) => {
-          if (idx < 2) return { ...s, status: 'completed' }
-          if (idx === 2) return { ...s, status: 'error' }
-          return { ...s, status: 'pending' }
-        })
-
-        const errorState: CourseProcessingState = {
-          ...currentState,
-          status: 'ERROR',
-          errorMessage: 'No pudimos terminar de preparar tu curso. Revisa tus archivos e inténtalo de nuevo.',
-          steps: errorSteps,
-        }
-
-        memoryProcessingStore.set(String(courseId), errorState)
-        if (course) course.status = 'ERROR'
-        onUpdate(errorState)
-        return
-      }
-
-      // Actualizar pasos
-      const updatedSteps: ProcessingStep[] = currentState.steps.map((step, idx) => {
-        if (stage.status === 'COMPLETED') {
-          return { ...step, status: 'completed' }
-        }
-        if (idx < stage.stepIndex) {
-          return { ...step, status: 'completed' }
-        }
-        if (idx === stage.stepIndex) {
-          return { ...step, status: 'in_progress' }
-        }
-        return { ...step, status: 'pending' }
-      })
-
-      const updatedState: CourseProcessingState = {
-        ...currentState,
-        status: stage.status,
-        progressPercent: stage.progress,
-        currentStepIndex: stage.stepIndex,
-        steps: updatedSteps,
-      }
-
-      memoryProcessingStore.set(String(courseId), updatedState)
-
-      if (stage.status === 'COMPLETED' && course) {
-        course.status = 'READY'
-      }
-
-      onUpdate(updatedState)
-
-      currentStageIndex++
-
-      if (currentStageIndex < stages.length && !isCancelled) {
-        timerId = setTimeout(executeNextStage, stage.delayMs)
+      if (!isCancelled) {
+        timerId = setTimeout(poll, 1500)
       }
     }
 
-    // Iniciar simulación de inmediato
-    timerId = setTimeout(executeNextStage, 400)
+    poll()
 
     return () => {
       isCancelled = true
+      abortController.abort()
       if (timerId) clearTimeout(timerId)
     }
   }
