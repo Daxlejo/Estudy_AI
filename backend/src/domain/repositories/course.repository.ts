@@ -21,4 +21,6 @@ export interface CourseRepository {
     data: Partial<Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>>,
   ): Promise<GenerationJob>;
   getGenerationJobsByCourseId(courseId: string): Promise<GenerationJob[]>;
+  findGenerationJobById(id: string): Promise<GenerationJob | null>;
+  getLatestGenerationJob(courseId: string): Promise<GenerationJob | null>;
 }

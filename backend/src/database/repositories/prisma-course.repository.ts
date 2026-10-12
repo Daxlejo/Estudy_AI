@@ -55,14 +55,19 @@ export class PrismaCourseRepository implements CourseRepository {
   async createGenerationJob(
     job: Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<GenerationJob> {
-    return this.prisma.generationJob.create({ data: job });
+    return this.prisma.generationJob.create({
+      data: job,
+    }) as Promise<GenerationJob>;
   }
 
   async updateGenerationJob(
     id: string,
     data: Partial<Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>>,
   ): Promise<GenerationJob> {
-    return this.prisma.generationJob.update({ where: { id }, data });
+    return this.prisma.generationJob.update({
+      where: { id },
+      data,
+    }) as Promise<GenerationJob>;
   }
 
   async getGenerationJobsByCourseId(
@@ -71,6 +76,21 @@ export class PrismaCourseRepository implements CourseRepository {
     return this.prisma.generationJob.findMany({
       where: { courseId },
       orderBy: { createdAt: 'desc' },
-    });
+    }) as Promise<GenerationJob[]>;
+  }
+
+  async findGenerationJobById(id: string): Promise<GenerationJob | null> {
+    return this.prisma.generationJob.findUnique({
+      where: { id },
+    }) as Promise<GenerationJob | null>;
+  }
+
+  async getLatestGenerationJob(
+    courseId: string,
+  ): Promise<GenerationJob | null> {
+    return this.prisma.generationJob.findFirst({
+      where: { courseId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    }) as Promise<GenerationJob | null>;
   }
 }
