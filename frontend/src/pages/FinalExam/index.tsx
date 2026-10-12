@@ -37,14 +37,8 @@ export default function FinalExamPage() {
       const data = await examService.getFinalExam(examId)
       setExam(data)
 
-      // Verificar si hay resultado previo en memoria
       const existingResult = await examService.getFinalExamResult(data.id)
-      if (existingResult) {
-        setResult(existingResult)
-      } else {
-        setResult(null)
-      }
-
+      setResult(existingResult || null)
       setAnswersMap(new Map())
       setCurrentQuestionIndex(0)
     } finally {
@@ -53,7 +47,29 @@ export default function FinalExamPage() {
   }
 
   useEffect(() => {
-    loadExamData()
+    let isMounted = true
+
+    async function init() {
+      try {
+        const data = await examService.getFinalExam(examId)
+        if (!isMounted) return
+        setExam(data)
+
+        const existingResult = await examService.getFinalExamResult(data.id)
+        if (!isMounted) return
+        setResult(existingResult || null)
+        setAnswersMap(new Map())
+        setCurrentQuestionIndex(0)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    init()
+
+    return () => {
+      isMounted = false
+    }
   }, [examId])
 
   if (loading || !exam) {

@@ -34,7 +34,6 @@ function StudySession() {
     if (!id) return
 
     let isMounted = true
-    setLoading(true)
 
     courseService
       .getStudySession(id)
