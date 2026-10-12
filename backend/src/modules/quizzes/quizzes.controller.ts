@@ -6,7 +6,12 @@ import {
   Body,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { QuizzesService } from './quizzes.service';
+import {
+  QuizzesService,
+  GetQuizResponse,
+  SubmitQuizAttemptResult,
+} from './quizzes.service';
+import { QuizAttempt } from '../../domain/models/quiz';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import { DatabaseError } from '../../database/errors/database-error';
 
@@ -14,7 +19,7 @@ import { DatabaseError } from '../../database/errors/database-error';
 export class QuizzesController {
   constructor(private readonly quizzesService: QuizzesService) {}
 
-  private handleError(error: unknown) {
+  private handleError(error: unknown): never {
     if (error instanceof DatabaseError) {
       throw new InternalServerErrorException('A database error occurred');
     }
@@ -22,7 +27,9 @@ export class QuizzesController {
   }
 
   @Get('sessions/:sessionId/quiz')
-  async getQuizBySession(@Param('sessionId') sessionId: string) {
+  async getQuizBySession(
+    @Param('sessionId') sessionId: string,
+  ): Promise<GetQuizResponse> {
     try {
       return await this.quizzesService.getQuizBySession(sessionId);
     } catch (e) {
@@ -34,7 +41,7 @@ export class QuizzesController {
   async submitAttempt(
     @Param('quizId') quizId: string,
     @Body() dto: SubmitAttemptDto,
-  ) {
+  ): Promise<SubmitQuizAttemptResult> {
     try {
       return await this.quizzesService.submitAttempt(quizId, dto.answers);
     } catch (e) {
@@ -43,7 +50,7 @@ export class QuizzesController {
   }
 
   @Get('quizzes/:quizId/attempts')
-  async listAttempts(@Param('quizId') quizId: string) {
+  async listAttempts(@Param('quizId') quizId: string): Promise<QuizAttempt[]> {
     try {
       return await this.quizzesService.listAttempts(quizId);
     } catch (e) {

@@ -118,10 +118,10 @@ describe('QuizzesService', () => {
 
       // Verify no explanation on any question
       for (const q of result.questions) {
-        expect(q.explanation).toBeUndefined();
+        expect('explanation' in q).toBe(false);
         // Verify no isCorrect on any option
         for (const opt of q.options) {
-          expect(opt.isCorrect).toBeUndefined();
+          expect('isCorrect' in opt).toBe(false);
         }
       }
 
