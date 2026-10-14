@@ -372,7 +372,7 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
 
   private systemPromptQuiz(): string {
     return `You are an academic quiz designer.
-Create a multiple-choice quiz for the provided learning session.
+Create a high-quality multiple-choice quiz for the provided learning session.
 Return ONLY a JSON object with:
   passingThreshold (integer 60-80, percentage needed to pass),
   questions (array of question objects).
@@ -380,8 +380,12 @@ Each question must have:
   conceptName (must match one of the provided concept names),
   prompt (the question text),
   context (optional short excerpt or code snippet),
-  options (array of {id: string, text: string, isCorrect: boolean} — exactly one isCorrect=true),
+  options (array of 4 options with {id: string, text: string, isCorrect: boolean} — exactly one isCorrect=true),
   explanation (why the correct answer is right).
+Quality requirements for options:
+  - Exactly one option must be clearly correct based on the provided material.
+  - Exactly three options must be plausible but incorrect distractors related to the topic.
+  - Do NOT include generic filler options, random noise, or answers unrelated to the concept being tested.
 Create 3-5 questions, one per concept if possible.`;
   }
 

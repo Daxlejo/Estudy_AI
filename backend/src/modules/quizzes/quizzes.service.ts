@@ -85,6 +85,34 @@ export class QuizzesService {
     };
   }
 
+  async getQuizById(quizId: string): Promise<GetQuizResponse> {
+    const quiz = await this.quizRepository.findById(quizId);
+    if (!quiz) {
+      throw new NotFoundException(`Quiz with id ${quizId} not found`);
+    }
+
+    const questions = await this.quizRepository.getQuestionsByQuizId(quiz.id);
+
+    // Strip out correct answers and explanations
+    const safeQuestions: SanitizedQuizQuestion[] = questions.map((q) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { explanation, ...rest } = q;
+      return {
+        ...rest,
+        options: q.options.map((opt) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { isCorrect, ...safeOpt } = opt;
+          return safeOpt;
+        }),
+      };
+    });
+
+    return {
+      ...quiz,
+      questions: safeQuestions,
+    };
+  }
+
   async listAttempts(quizId: string): Promise<QuizAttempt[]> {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) {

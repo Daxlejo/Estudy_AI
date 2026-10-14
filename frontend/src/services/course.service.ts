@@ -216,10 +216,16 @@ class CourseService {
    */
   async getQuiz(quizOrSessionId: string): Promise<Quiz | null> {
     try {
-      const data = await apiClient.get<BackendQuizResponse>(`/sessions/${quizOrSessionId}/quiz`)
+      let data: BackendQuizResponse | null = null
+      try {
+        data = await apiClient.get<BackendQuizResponse>(`/quizzes/${quizOrSessionId}`)
+      } catch {
+        data = await apiClient.get<BackendQuizResponse>(`/sessions/${quizOrSessionId}/quiz`)
+      }
+
       if (data) {
         const session = await apiClient
-          .get<BackendSession>(`/sessions/${data.sessionId}`)
+          .get<BackendSession & { concepts: BackendConcept[] }>(`/sessions/${data.sessionId}`)
           .catch(() => null)
         const course = session
           ? await apiClient.get<BackendCourse>(`/courses/${session.courseId}`).catch(() => null)

@@ -88,7 +88,7 @@ export function SessionQuizTransitionBlock({
           </button>
 
           <Link
-            to={`/quiz/${session.quizId}`}
+            to={`/quiz/${session.quizId || session.id}`}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_55%,transparent)] focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.99] sm:w-auto"
           >
             Iniciar miniquiz

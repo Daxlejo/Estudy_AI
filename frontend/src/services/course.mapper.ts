@@ -312,9 +312,11 @@ export function mapBackendStudySession(
 
 export function mapBackendQuiz(
   data: BackendQuizResponse,
-  session: BackendSession | null,
+  session: (BackendSession & { concepts?: BackendConcept[] }) | null,
   course: BackendCourse | null,
 ): Quiz {
+  const conceptsMap = new Map((session?.concepts || []).map((c) => [c.id, c.name]))
+
   return {
     id: data.id,
     sessionId: data.sessionId,
@@ -328,7 +330,7 @@ export function mapBackendQuiz(
       id: q.id,
       quizId: data.id,
       conceptId: q.conceptId,
-      conceptName: 'Concepto evaluado',
+      conceptName: conceptsMap.get(q.conceptId) || 'Concepto evaluado',
       prompt: q.prompt,
       context: q.context || undefined,
       options: q.options.map((o) => ({ id: o.id, text: o.text })),
