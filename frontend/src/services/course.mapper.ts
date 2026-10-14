@@ -127,14 +127,19 @@ export function formatFileSize(bytes: number): string {
 }
 
 export function parsePracticeExercise(raw: string, fallbackPrompt: string): PracticeExercise {
+  const trimmed = raw?.trim() || ''
+  const jsonContent = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim()
   try {
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.options)) {
-      return {
-        id: parsed.id || `practice-${Date.now()}`,
-        prompt: parsed.prompt || fallbackPrompt,
-        context: parsed.context,
-        options: parsed.options,
+    const parsed = JSON.parse(jsonContent)
+    if (parsed && typeof parsed === 'object') {
+      const prompt = parsed.prompt || parsed.instruction || parsed.text || trimmed || fallbackPrompt
+      if (Array.isArray(parsed.options) && parsed.options.length > 0) {
+        return {
+          id: parsed.id || `practice-${Date.now()}`,
+          prompt,
+          context: parsed.context,
+          options: parsed.options,
+        }
       }
     }
   } catch {
@@ -142,7 +147,7 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
   }
   return {
     id: `practice-${Date.now()}`,
-    prompt: raw || fallbackPrompt,
+    prompt: trimmed || fallbackPrompt,
     options: [
       {
         id: 'opt-1',

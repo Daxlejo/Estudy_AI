@@ -348,9 +348,11 @@ Return ONLY a JSON object with key "sessions" containing an array of session obj
 Each session must have:
   sequenceOrder (integer starting at 1), title, learningObjective, durationMinutes (10-60),
   xpReward (50 or 100), introTitle, introContent (2-3 paragraphs), introKeyTakeaway (1 sentence),
-  introCodeSnippet (optional markdown code block), guidedPractice (1-2 paragraphs),
-  challenge (1 paragraph), conceptNames (array of concept names from the provided list).
-Create between 3 and 8 sessions. Every concept must appear in exactly one session.`;
+  introCodeSnippet (optional markdown code block),
+  guidedPractice (1-2 paragraphs with a concrete, step-by-step practical exercise directly applying the session concepts from the material),
+  challenge (1 paragraph posing a specific conceptual or coding challenge that requires synthesizing the session concepts),
+  conceptNames (array of concept names from the provided list).
+Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text.`;
   }
 
   private userMessageSessions(

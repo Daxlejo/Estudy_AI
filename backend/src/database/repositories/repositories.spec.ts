@@ -23,8 +23,13 @@ describe('PrismaCourseRepository', () => {
   });
 
   afterEach(async () => {
-    // Clean up to prevent isolated test state leakage
-    await prisma.course.deleteMany({});
+    // Clean up test data without violating foreign key constraints on existing DB courses
+    await prisma.generationJob.deleteMany({
+      where: { course: { name: { in: ['Test Course', 'Gen Course'] } } },
+    });
+    await prisma.course.deleteMany({
+      where: { name: { in: ['Test Course', 'Gen Course'] } },
+    });
   });
 
   it('should create and retrieve a course', async () => {
