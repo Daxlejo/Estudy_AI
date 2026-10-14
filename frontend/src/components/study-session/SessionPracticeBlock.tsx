@@ -20,6 +20,11 @@ interface SessionPracticeBlockProps {
   onBack: () => void
 }
 
+function cleanPromptText(text: string): string {
+  if (!text) return ''
+  return text.replace(/^#{1,6}\s+/gm, '').trim()
+}
+
 export function SessionPracticeBlock({
   exercise,
   blockNumber,
@@ -69,9 +74,13 @@ export function SessionPracticeBlock({
           </div>
         )}
 
-        <h2 className="font-heading text-xl font-bold tracking-tight text-text-primary md:text-2xl">
-          {exercise.prompt}
-        </h2>
+        <h3 className="font-heading text-lg font-bold tracking-tight text-text-primary md:text-xl">
+          {blockNumber === 3 ? 'Instrucciones del ejercicio' : 'Planteamiento del desafío'}
+        </h3>
+
+        <div className="mt-3 text-sm leading-relaxed text-text-secondary md:text-base whitespace-pre-line">
+          {cleanPromptText(exercise.prompt)}
+        </div>
 
         <p className="mt-2 text-xs text-text-secondary md:text-sm">
           {blockNumber === 3
