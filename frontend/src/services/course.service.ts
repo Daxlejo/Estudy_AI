@@ -1,13 +1,3 @@
-import {
-  INITIAL_PROCESSING_STEPS,
-  generateMockLearningPath,
-  getMinimumCorrectAnswers,
-  getMockStudySession,
-  memoryCourseStore,
-  memoryCurrentSession,
-  memoryLearningPathStore,
-  memoryProcessingStore,
-} from '../mocks/course.mock'
 import type {
   Course,
   CourseProcessingState,
@@ -43,11 +33,48 @@ import {
 
 export { formatFileSize }
 
+export const INITIAL_PROCESSING_STEPS: ProcessingStep[] = [
+  {
+    key: 'EXTRACTION',
+    label: 'Analizando material de estudio',
+    description: 'Extrayendo texto, estructura y temas principales...',
+    status: 'pending',
+  },
+  {
+    key: 'CONCEPTS',
+    label: 'Detectando conceptos clave',
+    description: 'Identificando definiciones, teoremas y términos clave...',
+    status: 'pending',
+  },
+  {
+    key: 'DEPENDENCIES',
+    label: 'Comprendiendo dependencias',
+    description: 'Mapeando relaciones lógicas y orden de precedencia...',
+    status: 'pending',
+  },
+  {
+    key: 'GROUPING',
+    label: 'Organizando sesiones de aprendizaje',
+    description: 'Agrupando conceptos en sesiones didácticas paso a paso...',
+    status: 'pending',
+  },
+  {
+    key: 'LEARNING_PATH',
+    label: 'Construyendo tu ruta de aprendizaje',
+    description: 'Ensamblando niveles, checkpoints y miniquizzes...',
+    status: 'pending',
+  },
+]
+
+export function getMinimumCorrectAnswers(totalQuestions: number): number {
+  return Math.ceil(totalQuestions * 0.7)
+}
+
 const localQuizAttemptStore = new Map<string, number>()
 
 class CourseService {
   /**
-   * Obtiene la lista completa de cursos del usuario.
+   * Obtiene la lista completa de cursos del usuario desde el backend real.
    */
   async getCourses(): Promise<Course[]> {
     try {
@@ -65,14 +92,15 @@ class CourseService {
           }),
         )
       }
+      return []
     } catch (error) {
-      console.warn('[CourseService] Error al consultar cursos en backend; recurriendo a store en memoria:', error)
+      console.warn('[CourseService] Error al consultar cursos en backend:', error)
+      return []
     }
-    return [...memoryCourseStore]
   }
 
   /**
-   * Obtiene el detalle de un curso por ID.
+   * Obtiene el detalle de un curso por ID desde el backend real.
    */
   async getCourse(courseId: string): Promise<Course | null> {
     try {
@@ -87,15 +115,14 @@ class CourseService {
         return mapBackendCourseToFrontend(c, prog)
       }
     } catch (error) {
-      console.warn(`[CourseService] Error al consultar curso ${courseId} en backend; recurriendo a memoria:`, error)
+      console.warn(`[CourseService] Error al consultar curso ${courseId} en backend:`, error)
     }
 
-    const course = memoryCourseStore.find((item) => String(item.id) === String(courseId))
-    return course ? { ...course } : null
+    return null
   }
 
   /**
-   * Obtiene la ruta de aprendizaje estructurada de un curso.
+   * Obtiene la ruta de aprendizaje estructurada de un curso desde el backend real.
    */
   async getLearningPath(courseId: string): Promise<LearningPath | null> {
     try {
@@ -129,35 +156,47 @@ class CourseService {
       console.warn(`[CourseService] Error al consultar ruta de aprendizaje para curso ${courseId}:`, error)
     }
 
-    const existing = memoryLearningPathStore.get(String(courseId))
-    if (existing) {
-      return {
-        ...existing,
-        nodes: existing.nodes.map((n) => ({ ...n, concepts: [...n.concepts] })),
-      }
-    }
-
-    const localCourse = await this.getCourse(courseId)
-    if (!localCourse) return null
-
-    const generated = generateMockLearningPath(localCourse)
-    memoryLearningPathStore.set(String(courseId), generated)
-
-    return {
-      ...generated,
-      nodes: generated.nodes.map((n) => ({ ...n, concepts: [...n.concepts] })),
-    }
+    return null
   }
 
   /**
-   * Obtiene la sesión de estudio actual sugerida para el usuario.
+   * Obtiene la sesión de estudio actual sugerida para el usuario desde cursos y sesiones reales.
    */
   async getCurrentSession(): Promise<CurrentSession | null> {
-    return { ...memoryCurrentSession }
+    const courses = await this.getCourses()
+    if (!courses || courses.length === 0) return null
+
+    const activeCourse =
+      courses.find((c) => c.status === 'IN_PROGRESS' || c.status === 'READY') || courses[0]
+    if (!activeCourse) return null
+
+    try {
+      const sessions = await apiClient.get<BackendSession[]>(`/courses/${activeCourse.id}/sessions`)
+      if (sessions && sessions.length > 0) {
+        const currentSession = sessions[0]
+        return {
+          courseId: activeCourse.id,
+          courseTitle: activeCourse.name,
+          sessionId: currentSession.id,
+          sessionNumber: currentSession.sequenceOrder,
+          title: currentSession.title,
+          completedSessions: activeCourse.progress?.completedSessions || 0,
+          totalSessions: sessions.length,
+          progressPercent: activeCourse.progress?.progressPercent || 0,
+          durationMinutes: currentSession.durationMinutes || 15,
+          concepts: 3,
+          streakDays: 1,
+        }
+      }
+    } catch {
+      // Sin sesiones activas
+    }
+
+    return null
   }
 
   /**
-   * Obtiene una sesión de estudio completa con su material didáctico.
+   * Obtiene una sesión de estudio completa con su material didáctico desde el backend real.
    */
   async getStudySession(sessionId: string): Promise<StudySession | null> {
     try {
@@ -179,25 +218,11 @@ class CourseService {
           quiz?.id || session.id,
         )
       }
-    } catch {
-      // Fallback a mock
+    } catch (error) {
+      console.warn(`[CourseService] Error al cargar sesión ${sessionId} en backend:`, error)
     }
 
-    const mockSession = getMockStudySession(sessionId)
-    if (!mockSession) return null
-
-    return {
-      ...mockSession,
-      concepts: mockSession.concepts.map((c) => ({ ...c })),
-      guidedPractice: {
-        ...mockSession.guidedPractice,
-        options: mockSession.guidedPractice.options.map((o) => ({ ...o })),
-      },
-      challenge: {
-        ...mockSession.challenge,
-        options: mockSession.challenge.options.map((o) => ({ ...o })),
-      },
-    }
+    return null
   }
 
   /**
@@ -417,12 +442,7 @@ class CourseService {
         }
       }
     } catch {
-      // Fallback a memoria
-    }
-
-    const existing = memoryProcessingStore.get(String(courseId))
-    if (existing) {
-      return { ...existing, steps: existing.steps.map((s) => ({ ...s })) }
+      // Sin respuesta del estado de generación
     }
 
     const course = await this.getCourse(courseId)
@@ -445,9 +465,9 @@ class CourseService {
         currentStepIndex: completedSteps.length,
         steps: completedSteps,
         metrics: {
-          sessionsCount: course.progress.totalSessions || 15,
-          conceptsCount: course.progress.totalConcepts || 42,
-          levelsCount: course.progress.totalLevels || 5,
+          sessionsCount: course.progress.totalSessions || 0,
+          conceptsCount: course.progress.totalConcepts || 0,
+          levelsCount: course.progress.totalLevels || 1,
         },
       }
     }
@@ -463,8 +483,8 @@ class CourseService {
       await apiClient.post(`/courses/${courseId}/generate`)
       const updated = await this.getCourseProcessingStatus(courseId)
       if (updated) return updated
-    } catch {
-      // Fallback a simulación
+    } catch (error) {
+      console.warn(`[CourseService] Error al reintentar generación del curso ${courseId}:`, error)
     }
 
     const course = await this.getCourse(courseId)
@@ -473,7 +493,7 @@ class CourseService {
       status: idx === 0 ? 'in_progress' : 'pending',
     }))
 
-    const resetState: CourseProcessingState = {
+    return {
       courseId,
       courseName: course?.name ?? 'Curso',
       status: 'EXTRACTING',
@@ -481,14 +501,11 @@ class CourseService {
       currentStepIndex: 0,
       steps: resetSteps,
       metrics: {
-        sessionsCount: 14,
-        conceptsCount: 36,
-        levelsCount: 4,
+        sessionsCount: course?.progress.totalSessions || 0,
+        conceptsCount: course?.progress.totalConcepts || 0,
+        levelsCount: course?.progress.totalLevels || 1,
       },
     }
-
-    memoryProcessingStore.set(String(courseId), resetState)
-    return resetState
   }
 
   /**
