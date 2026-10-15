@@ -9,6 +9,7 @@ import {
   IconInfoCircle,
 } from '@tabler/icons-react'
 import type { PracticeExercise } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface SessionPracticeBlockProps {
   exercise: PracticeExercise
@@ -20,10 +21,6 @@ interface SessionPracticeBlockProps {
   onBack: () => void
 }
 
-function cleanPromptText(text: string): string {
-  if (!text) return ''
-  return text.replace(/^#{1,6}\s+/gm, '').trim()
-}
 
 export function SessionPracticeBlock({
   exercise,
@@ -78,8 +75,8 @@ export function SessionPracticeBlock({
           {blockNumber === 3 ? 'Instrucciones del ejercicio' : 'Planteamiento del desafío'}
         </h3>
 
-        <div className="mt-3 text-sm leading-relaxed text-text-secondary md:text-base whitespace-pre-line">
-          {cleanPromptText(exercise.prompt)}
+        <div className="mt-3">
+          <MarkdownRenderer content={exercise.prompt} />
         </div>
 
         <div className="mt-6 border-t border-border/70 pt-4">

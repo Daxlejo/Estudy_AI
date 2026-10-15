@@ -131,6 +131,7 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
   const jsonContent = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim()
   try {
     const parsed = JSON.parse(jsonContent)
+    if (parsed && typeof parsed === 'object') {
       const prompt =
         parsed.prompt ||
         parsed.instruction ||
