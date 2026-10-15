@@ -76,6 +76,7 @@ export interface CourseProcessingState {
 
 export interface CreateCourseDto {
   name: string
+  description?: string
   materials: Array<{
     name: string
     sizeBytes: number

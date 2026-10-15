@@ -99,6 +99,21 @@ export class GenerationPipelineService {
         throw new Error(`AI generated invalid concepts response: ${issues}`);
       }
       const rawConcepts = conceptsValidation.data.concepts;
+      const generatedSummary = conceptsValidation.data.courseSummary;
+
+      if (generatedSummary) {
+        const currentCourse = await this.courseRepository.findById(courseId);
+        const isGeneric =
+          !currentCourse?.description ||
+          currentCourse.description.trim() === '' ||
+          currentCourse.description ===
+            'Curso estructurado por EstudyAI a partir de materiales de estudio.';
+        if (isGeneric) {
+          await this.courseRepository.update(courseId, {
+            description: generatedSummary,
+          });
+        }
+      }
 
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 40, 1);
 
@@ -326,8 +341,12 @@ export class GenerationPipelineService {
 
   private systemPromptConcepts(): string {
     return `You are an expert academic curriculum designer.
-Your task is to extract the key concepts from the provided study material.
-Return ONLY a JSON object with a single key "concepts" whose value is an array.
+Your task is to analyze the provided study material and extract:
+1. A concise (1-2 sentences) course summary capturing the essence and key topics of the material (e.g., "Curso estructurado de Programación Orientada a Objetos enfocado en clases, objetos, encapsulamiento, herencia y polimorfismo.").
+2. The key concepts from the material.
+Return ONLY a JSON object with two keys:
+  "courseSummary": a string with the 1-2 sentence overview of the course based on the material,
+  "concepts": an array of concept objects.
 Each concept must have: name (string ≤80 chars), summary (one sentence), detail (1-2 paragraphs), example (optional string).
 Extract between 5 and 30 concepts. Focus on the most important ideas.`;
   }

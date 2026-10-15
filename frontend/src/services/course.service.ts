@@ -331,7 +331,7 @@ class CourseService {
     try {
       const created = await apiClient.post<BackendCourse>('/courses', {
         name: dto.name.trim(),
-        description: `Curso estructurado por EstudyAI a partir de materiales de estudio.`,
+        description: dto.description?.trim() || undefined,
       })
 
       const uploadedMaterialIds: string[] = []

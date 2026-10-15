@@ -18,6 +18,7 @@ export const aiExtractedConceptSchema = z.object({
 });
 
 export const aiConceptsResponseSchema = z.object({
+  courseSummary: z.string().trim().optional(),
   concepts: z
     .array(aiExtractedConceptSchema)
     .min(1, 'At least one concept is required'),

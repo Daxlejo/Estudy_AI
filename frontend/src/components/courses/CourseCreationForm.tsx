@@ -9,6 +9,7 @@ import type { SelectedFile } from './MaterialItem'
 export function CourseCreationForm() {
   const navigate = useNavigate()
   const [courseName, setCourseName] = useState('')
+  const [courseDescription, setCourseDescription] = useState('')
   const [materials, setMaterials] = useState<SelectedFile[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export function CourseCreationForm() {
 
       const created = await courseService.createCourse({
         name: courseName.trim(),
+        description: courseDescription.trim() || undefined,
         materials: materials.map((m) => ({
           name: m.name,
           sizeBytes: m.sizeBytes,
@@ -132,6 +134,22 @@ export function CourseCreationForm() {
             Por favor ingresa un nombre para identificar el curso.
           </p>
         )}
+      </div>
+
+      {/* Campo: Descripción del curso (opcional) */}
+      <div className="space-y-2">
+        <label htmlFor="course-description" className="block text-sm font-semibold text-text-primary">
+          Descripción del curso <span className="text-xs font-normal text-text-secondary">(opcional)</span>
+        </label>
+        <textarea
+          id="course-description"
+          value={courseDescription}
+          onChange={(e) => setCourseDescription(e.target.value)}
+          placeholder="Añade una descripción o déjalo en blanco para que la IA la genere a partir de tus materiales..."
+          rows={3}
+          disabled={isSubmitting}
+          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary/50 transition-all duration-150 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20"
+        />
       </div>
 
       {/* Campo: Materiales de aprendizaje */}
