@@ -228,42 +228,80 @@ export class GenerationPipelineService {
         conceptIdByName.has(c.name),
       );
 
-      if (allConcepts.length > 0) {
-        const rawExamData = await this.aiService.completeJson<unknown>(
-          this.systemPromptFinalExam(),
-          this.userMessageFinalExam(allConcepts),
+      if (allConcepts.length === 0) {
+        throw new Error(
+          'Cannot generate final exam: no concepts were persisted for this course.',
         );
+      }
 
-        const examValidation = aiFinalExamResponseSchema.safeParse(rawExamData);
-        if (!examValidation.success) {
-          const issues = examValidation.error.issues
-            .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
-            .join('; ');
-          throw new Error(`AI generated invalid final exam: ${issues}`);
-        }
-        const rawExam = examValidation.data;
+      const rawExamData = await this.aiService.completeJson<unknown>(
+        this.systemPromptFinalExam(),
+        this.userMessageFinalExam(allConcepts),
+      );
 
-        const exam = await this.finalExamRepository.create({
-          courseId,
-          passingScorePct: rawExam.passingScorePct ?? 70,
-          estimatedMinutes: rawExam.estimatedMinutes ?? 30,
-          cooldownUntil: null,
+      const examValidation = aiFinalExamResponseSchema.safeParse(rawExamData);
+      if (!examValidation.success) {
+        const issues = examValidation.error.issues
+          .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+          .join('; ');
+        throw new Error(`AI generated invalid final exam: ${issues}`);
+      }
+      const rawExam = examValidation.data;
+
+      const exam = await this.finalExamRepository.create({
+        courseId,
+        passingScorePct: rawExam.passingScorePct ?? 70,
+        estimatedMinutes: rawExam.estimatedMinutes ?? 30,
+        cooldownUntil: null,
+      });
+      createdExamId = exam.id;
+
+      const fallbackConceptId = Array.from(conceptIdByName.values())[0];
+      let questionsAdded = 0;
+
+      for (const rawQ of rawExam.questions ?? []) {
+        const conceptId =
+          conceptIdByName.get(rawQ.conceptName) || fallbackConceptId;
+        if (!conceptId) continue;
+        await this.finalExamRepository.addQuestion({
+          examId: exam.id,
+          conceptId,
+          type: rawQ.type,
+          prompt: rawQ.prompt,
+          context: rawQ.context ?? null,
+          payload: rawQ.payload as FinalExamQuestionPayload,
+          explanation: rawQ.explanation,
         });
-        createdExamId = exam.id;
+        questionsAdded++;
+      }
 
-        for (const rawQ of rawExam.questions ?? []) {
-          const conceptId = conceptIdByName.get(rawQ.conceptName);
-          if (!conceptId) continue;
-          await this.finalExamRepository.addQuestion({
-            examId: exam.id,
-            conceptId,
-            type: rawQ.type,
-            prompt: rawQ.prompt,
-            context: rawQ.context ?? null,
-            payload: rawQ.payload as FinalExamQuestionPayload,
-            explanation: rawQ.explanation,
-          });
-        }
+      if (questionsAdded === 0 && fallbackConceptId) {
+        await this.finalExamRepository.addQuestion({
+          examId: exam.id,
+          conceptId: fallbackConceptId,
+          type: 'MULTIPLE_CHOICE',
+          prompt: `¿Cuál es el propósito fundamental de ${allConcepts[0]?.name || 'los conceptos vistos en el curso'}?`,
+          context: null,
+          payload: {
+            type: 'MULTIPLE_CHOICE',
+            options: [
+              {
+                id: 'opt-1',
+                text:
+                  allConcepts[0]?.summary ||
+                  'Aplicar el principio de diseño modular.',
+                isCorrect: true,
+              },
+              {
+                id: 'opt-2',
+                text: 'Generar redundancia en el código.',
+                isCorrect: false,
+              },
+            ],
+            correctOptionId: 'opt-1',
+          },
+          explanation: 'Evalúa la comprensión del concepto central del curso.',
+        });
       }
 
       // ── Finish ────────────────────────────────────────────────────────────

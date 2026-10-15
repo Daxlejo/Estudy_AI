@@ -5,15 +5,9 @@ import type {
   FinalExamQuestion,
   FinalExamAnswerEvaluation,
 } from '../types/exam'
-import {
-  evaluateMockFinalExam,
-  getMockFinalExam,
-  getMockFinalExamCooldown,
-  memoryExamResultsStore,
-  startMockFinalExamRetry,
-  clearMockFinalExamCooldownDev,
-} from '../mocks/exam.mock'
 import { apiClient } from './api'
+
+const localExamResultsStore = new Map<string, FinalExamResult>()
 
 interface SanitizedBackendExam {
   id: string
@@ -59,66 +53,78 @@ export class ExamService {
    * Obtiene la estructura del examen final para el estudiante.
    * La UI nunca recibe las respuestas correctas desde el endpoint seguro.
    */
-  async getFinalExam(examIdOrCourseId: string): Promise<FinalExam> {
-    try {
-      const res = await apiClient.get<SanitizedBackendExam>(`/courses/${examIdOrCourseId}/exam`)
-      if (res && res.questions && res.questions.length > 0) {
-        const questions: FinalExamQuestion[] = res.questions.map((q) => {
-          const base = {
-            id: q.id,
-            examId: res.id,
-            conceptId: q.conceptId,
-            conceptName: 'Concepto clave',
-            prompt: q.prompt,
-            context: q.context || undefined,
-          }
+  async getFinalExam(examIdOrCourseId: string): Promise<FinalExam & { status?: string }> {
+    const cleanCourseId = examIdOrCourseId.replace(/-exam$/, '')
+    const res = await apiClient.get<SanitizedBackendExam>(`/courses/${cleanCourseId}/exam`)
 
-          if (q.type === 'MATCHING') {
-            return {
-              ...base,
-              type: 'MATCHING' as const,
-              leftItems: q.payload.leftItems || [],
-              rightItems: q.payload.rightItems || [],
-            }
-          }
-
-          if (q.type === 'ORDERING') {
-            return {
-              ...base,
-              type: 'ORDERING' as const,
-              items: q.payload.items || [],
-              orderingHint: q.payload.orderingHint,
-            }
-          }
-
-          return {
-            ...base,
-            type: 'MULTIPLE_CHOICE' as const,
-            options: q.payload.options || [],
-          }
-        })
-
-        const total = res.totalQuestions || questions.length
-        const passingPct = res.passingScorePct || 70
-        const passingThreshold = Math.ceil((passingPct / 100) * total)
-
-        return {
-          id: res.id,
-          courseId: res.courseId,
-          courseTitle: 'Evaluación Final del Curso',
-          totalQuestions: total,
-          passingThreshold,
-          passingScorePercent: passingPct,
-          estimatedMinutes: res.estimatedMinutes || 30,
-          attemptNumber: 1,
-          questions,
-        }
+    if (res.status === 'LOCKED') {
+      const total = res.totalQuestions || 0
+      const passingPct = res.passingScorePct || 70
+      return {
+        id: res.id,
+        courseId: res.courseId,
+        courseTitle: 'Evaluación Final del Curso',
+        totalQuestions: total,
+        passingThreshold: Math.ceil((passingPct / 100) * (total || 1)),
+        passingScorePercent: passingPct,
+        estimatedMinutes: res.estimatedMinutes || 30,
+        attemptNumber: 1,
+        questions: [],
+        status: 'LOCKED',
       }
-    } catch {
-      // Fallback a mock si no existe en backend o si es un ID de prueba local
     }
 
-    return getMockFinalExam(examIdOrCourseId)
+    const questions: FinalExamQuestion[] = (res.questions || []).map((q) => {
+      const base = {
+        id: q.id,
+        examId: res.id,
+        conceptId: q.conceptId,
+        conceptName: 'Concepto clave',
+        prompt: q.prompt,
+        context: q.context || undefined,
+      }
+
+      if (q.type === 'MATCHING') {
+        return {
+          ...base,
+          type: 'MATCHING' as const,
+          leftItems: q.payload.leftItems || [],
+          rightItems: q.payload.rightItems || [],
+        }
+      }
+
+      if (q.type === 'ORDERING') {
+        return {
+          ...base,
+          type: 'ORDERING' as const,
+          items: q.payload.items || [],
+          orderingHint: q.payload.orderingHint,
+        }
+      }
+
+      return {
+        ...base,
+        type: 'MULTIPLE_CHOICE' as const,
+        options: q.payload.options || [],
+      }
+    })
+
+    const total = res.totalQuestions || questions.length
+    const passingPct = res.passingScorePct || 70
+    const passingThreshold = Math.ceil((passingPct / 100) * total)
+
+    return {
+      id: res.id,
+      courseId: res.courseId,
+      courseTitle: 'Evaluación Final del Curso',
+      totalQuestions: total,
+      passingThreshold,
+      passingScorePercent: passingPct,
+      estimatedMinutes: res.estimatedMinutes || 30,
+      attemptNumber: 1,
+      questions,
+      status: res.status,
+    }
   }
 
   /**
@@ -179,20 +185,19 @@ export class ExamService {
         completedAt: new Date().toISOString(),
       }
 
-      memoryExamResultsStore.set(examId, result)
+      localExamResultsStore.set(examId, result)
       return result
-    } catch {
-      // Fallback a evaluación local en memoria
+    } catch (err) {
+      console.error('[ExamService] Error al evaluar examen final en backend:', err)
+      throw err
     }
-
-    return evaluateMockFinalExam(examId, answers)
   }
 
   /**
    * Obtiene el último resultado evaluado para un examen dado.
    */
   async getFinalExamResult(examId: string): Promise<FinalExamResult | null> {
-    return memoryExamResultsStore.get(examId) || null
+    return localExamResultsStore.get(examId) || null
   }
 
   /**
@@ -204,7 +209,8 @@ export class ExamService {
     cooldownUntil?: string
   }> {
     try {
-      const res = await apiClient.get<SanitizedBackendExam>(`/courses/${courseId}/exam`)
+      const cleanCourseId = courseId.replace(/-exam$/, '')
+      const res = await apiClient.get<SanitizedBackendExam>(`/courses/${cleanCourseId}/exam`)
       if (res && res.status === 'COOLDOWN' && res.cooldownUntil) {
         const remaining = Math.max(
           0,
@@ -217,10 +223,10 @@ export class ExamService {
         }
       }
     } catch {
-      // Fallback
+      // Sin cooldown en caso de fallo de red
     }
 
-    return getMockFinalExamCooldown(courseId)
+    return { inCooldown: false, remainingSeconds: 0 }
   }
 
   /**
@@ -235,18 +241,15 @@ export class ExamService {
    * Inicia el reintento del examen final tras cumplirse el periodo de enfriamiento.
    */
   async startFinalExamRetry(courseId: string): Promise<FinalExam> {
-    try {
-      return await this.getFinalExam(courseId)
-    } catch {
-      return startMockFinalExamRetry(courseId)
-    }
+    return this.getFinalExam(courseId)
   }
 
   /**
    * Herramienta de desarrollo para simular fin de enfriamiento.
    */
-  async clearCooldownDev(courseId: string): Promise<void> {
-    clearMockFinalExamCooldownDev(courseId)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async clearCooldownDev(courseId?: string): Promise<void> {
+    // No-op para backend real
   }
 }
 

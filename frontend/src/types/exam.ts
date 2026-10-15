@@ -142,6 +142,7 @@ export interface FinalExam {
   passingScorePercent: number
   totalQuestions: number
   estimatedMinutes: number
+  status?: string
 }
 
 export interface FinalExamAttemptRecord {

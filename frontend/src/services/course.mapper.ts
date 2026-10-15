@@ -283,7 +283,7 @@ export function mapBackendLearningPath(
 
   const completedCount = nodes.filter((n) => n.status === 'COMPLETED').length
   const totalCount = nodes.length
-  const currentSession = nodes.find((n) => n.status === 'CURRENT')
+  const currentSession = nodes.find((n) => n.status === 'CURRENT' && n.type === 'SESSION')
 
   return {
     courseId: course.id,
