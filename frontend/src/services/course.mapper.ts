@@ -131,8 +131,16 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
   const jsonContent = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim()
   try {
     const parsed = JSON.parse(jsonContent)
-    if (parsed && typeof parsed === 'object') {
-      const prompt = parsed.prompt || parsed.instruction || parsed.text || trimmed || fallbackPrompt
+      const prompt =
+        parsed.prompt ||
+        parsed.instruction ||
+        parsed.instructions ||
+        parsed.exercise ||
+        parsed.description ||
+        parsed.task ||
+        parsed.text ||
+        trimmed ||
+        fallbackPrompt
       if (Array.isArray(parsed.options) && parsed.options.length > 0) {
         return {
           id: parsed.id || `practice-${Date.now()}`,
@@ -140,6 +148,25 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
           context: parsed.context,
           options: parsed.options,
         }
+      }
+      return {
+        id: parsed.id || `practice-${Date.now()}`,
+        prompt,
+        context: parsed.context,
+        options: [
+          {
+            id: 'opt-1',
+            text: 'He comprendido la explicación y completado el ejercicio reflexivo.',
+            isCorrect: true,
+            feedback: '¡Excelente! Continuemos al siguiente paso para consolidar el aprendizaje.',
+          },
+          {
+            id: 'opt-2',
+            text: 'Requiero repasar los conceptos clave antes de continuar.',
+            isCorrect: false,
+            feedback: 'Recuerda revisar los conceptos clave de la sesión antes de avanzar.',
+          },
+        ],
       }
     }
   } catch {

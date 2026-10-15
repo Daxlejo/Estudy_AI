@@ -368,10 +368,10 @@ Each session must have:
   sequenceOrder (integer starting at 1), title, learningObjective, durationMinutes (10-60),
   xpReward (50 or 100), introTitle, introContent (2-3 paragraphs), introKeyTakeaway (1 sentence),
   introCodeSnippet (optional markdown code block),
-  guidedPractice (1-2 paragraphs with a concrete, step-by-step practical exercise directly applying the session concepts from the material),
-  challenge (1 paragraph posing a specific conceptual or coding challenge that requires synthesizing the session concepts),
+  guidedPractice (a detailed, step-by-step practical exercise directly applying the session concepts from the material with clear instructions, concrete code examples to analyze or write, and actionable tasks for the student to complete),
+  challenge (a concrete coding or conceptual challenge presenting a specific scenario or problem with clear requirements and constraints, requiring the student to apply and synthesize the session concepts),
   conceptNames (array of concept names from the provided list).
-Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text.`;
+Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic (e.g. for Object-Oriented Programming, include concrete classes, methods, inheritance hierarchies, and clear tasks to execute or solve).`;
   }
 
   private userMessageSessions(
