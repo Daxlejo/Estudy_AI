@@ -372,6 +372,7 @@ export function mapBackendQuiz(
 export function mapBackendQuizResult(
   quizId: string,
   res: BackendSubmitQuizResponse,
+  quiz?: Quiz | null,
 ): QuizResult {
   const totalQuestions = res.feedback.length
   const correctAnswers = res.feedback.filter((f) => f.isCorrect).length
@@ -379,14 +380,21 @@ export function mapBackendQuizResult(
   const weakConceptIds: string[] = []
 
   const evaluations: QuizAnswerEvaluation[] = res.feedback.map((f) => {
+    const matchedQ = quiz?.questions.find((q) => q.id === f.questionId)
+    const conceptId = matchedQ?.conceptId || f.questionId
+    const conceptName = matchedQ?.conceptName || 'Concepto evaluado'
+    const prompt = matchedQ?.prompt || ''
+
     if (!f.isCorrect) {
-      weakConceptIds.push(f.questionId)
+      if (conceptId && !weakConceptIds.includes(conceptId)) {
+        weakConceptIds.push(conceptId)
+      }
     }
     return {
       questionId: f.questionId,
-      prompt: '',
-      conceptId: f.questionId,
-      conceptName: 'Concepto evaluado',
+      prompt,
+      conceptId,
+      conceptName,
       selectedOptionId: f.selectedOptionId || '',
       selectedOptionText: f.selectedOptionText || 'Sin respuesta',
       correctOptionId: f.correctOptionId,
@@ -398,14 +406,14 @@ export function mapBackendQuizResult(
 
   return {
     quizId,
-    sessionId: res.nextSession?.id || '',
-    courseId: res.nextSession?.courseId || '',
+    sessionId: quiz?.sessionId || res.nextSession?.id || '',
+    courseId: quiz?.courseId || res.nextSession?.courseId || '',
     totalQuestions,
     correctAnswers,
     incorrectAnswers,
     scorePercent: res.score,
     passed: res.isPassed,
-    passingThreshold: 70,
+    passingThreshold: quiz?.passingThreshold || 70,
     weakConceptIds,
     answers: evaluations,
     attemptNumber: res.attemptNumber,

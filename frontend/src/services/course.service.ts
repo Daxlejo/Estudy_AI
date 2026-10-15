@@ -2,16 +2,11 @@ import {
   INITIAL_PROCESSING_STEPS,
   generateMockLearningPath,
   getMinimumCorrectAnswers,
-  getInternalMockQuiz,
-  getMockQuiz,
   getMockStudySession,
   memoryCourseStore,
   memoryCurrentSession,
   memoryLearningPathStore,
   memoryProcessingStore,
-  memoryQuizAttemptStore,
-  mockQuizReviewConcepts,
-  unlockNextSessionAfterQuiz,
 } from '../mocks/course.mock'
 import type {
   Course,
@@ -44,10 +39,11 @@ import {
   mapBackendStudySession,
   mapBackendQuiz,
   mapBackendQuizResult,
-  evaluateLocalMockQuiz,
 } from './course.mapper'
 
 export { formatFileSize }
+
+const localQuizAttemptStore = new Map<string, number>()
 
 class CourseService {
   /**
@@ -215,86 +211,90 @@ class CourseService {
    * Obtiene la estructura completa de un miniquiz correspondiente a una sesión o ID.
    */
   async getQuiz(quizOrSessionId: string): Promise<Quiz | null> {
+    let data: BackendQuizResponse | null
     try {
-      let data: BackendQuizResponse | null = null
+      data = await apiClient.get<BackendQuizResponse>(`/sessions/${quizOrSessionId}/quiz`)
+    } catch {
       try {
         data = await apiClient.get<BackendQuizResponse>(`/quizzes/${quizOrSessionId}`)
       } catch {
-        data = await apiClient.get<BackendQuizResponse>(`/sessions/${quizOrSessionId}/quiz`)
+        data = null
       }
-
-      if (data) {
-        const session = await apiClient
-          .get<BackendSession & { concepts: BackendConcept[] }>(`/sessions/${data.sessionId}`)
-          .catch(() => null)
-        const course = session
-          ? await apiClient.get<BackendCourse>(`/courses/${session.courseId}`).catch(() => null)
-          : null
-
-        return mapBackendQuiz(data, session, course)
-      }
-    } catch {
-      // Fallback a mock
     }
 
-    const quiz = getMockQuiz(quizOrSessionId)
-    if (!quiz) return null
+    if (!data) {
+      return null
+    }
+
+    const session = await apiClient
+      .get<BackendSession & { concepts: BackendConcept[] }>(`/sessions/${data.sessionId}`)
+      .catch(() => null)
+    const course = session
+      ? await apiClient.get<BackendCourse>(`/courses/${session.courseId}`).catch(() => null)
+      : null
+
+    const attemptNumber = localQuizAttemptStore.get(data.id) || 1
 
     return {
-      ...quiz,
-      questions: quiz.questions.map((q) => ({
-        ...q,
-        options: q.options.map((o) => ({ ...o })),
-      })),
+      ...mapBackendQuiz(data, session, course),
+      attemptNumber,
     }
   }
 
   /**
-   * Evalúa las respuestas del estudiante en el miniquiz.
+   * Evalúa las respuestas del estudiante en el miniquiz usando el backend real.
    */
   async submitQuiz(quizId: string, answers: QuizAnswer[]): Promise<QuizResult> {
-    try {
-      const response = await apiClient.post<BackendSubmitQuizResponse>(
-        `/quizzes/${quizId}/attempts`,
-        {
-          answers: answers.map((a) => ({
-            questionId: a.questionId,
-            selectedOptionId: a.selectedOptionId,
-          })),
-        },
-      )
-      return mapBackendQuizResult(quizId, response)
-    } catch {
-      // Fallback a mock en memoria si no está en backend
-    }
-
-    const quiz = getInternalMockQuiz(quizId)
-    if (!quiz) {
-      throw new Error(`Miniquiz no encontrado con ID: ${quizId}`)
-    }
-
-    return evaluateLocalMockQuiz(
-      quiz,
-      answers,
-      this.getMinimumCorrectAnswers(quiz.questions.length),
-      unlockNextSessionAfterQuiz,
+    const currentQuiz = await this.getQuiz(quizId).catch(() => null)
+    const response = await apiClient.post<BackendSubmitQuizResponse>(
+      `/quizzes/${quizId}/attempts`,
+      {
+        answers: answers.map((a) => ({
+          questionId: a.questionId,
+          selectedOptionId: a.selectedOptionId,
+        })),
+      },
     )
+    return mapBackendQuizResult(quizId, response, currentQuiz)
   }
 
   /**
    * Obtiene la explicación y reglas pedagógicas asociadas a los conceptos débiles detectados.
    */
-  async getReviewConcepts(_quizId: string, weakConceptIds: string[]): Promise<QuizReviewConcept[]> {
+  async getReviewConcepts(quizId: string, weakConceptIds: string[]): Promise<QuizReviewConcept[]> {
     const results: QuizReviewConcept[] = []
+    let sessionConcepts: BackendConcept[] = []
+
+    try {
+      const quiz = await this.getQuiz(quizId)
+      if (quiz?.sessionId) {
+        const session = await apiClient.get<BackendSession & { concepts: BackendConcept[] }>(
+          `/sessions/${quiz.sessionId}`,
+        )
+        if (session?.concepts) {
+          sessionConcepts = session.concepts
+        }
+      }
+    } catch {
+      // Ignorar error al recuperar conceptos de sesión
+    }
+
     for (const conceptId of weakConceptIds) {
-      if (mockQuizReviewConcepts[conceptId]) {
-        results.push({ ...mockQuizReviewConcepts[conceptId] })
+      const matched = sessionConcepts.find((c) => c.id === conceptId)
+      if (matched) {
+        results.push({
+          id: matched.id,
+          name: matched.name,
+          summary: matched.summary || 'Concepto clave evaluado en la sesión.',
+          detail: matched.detail || 'Revisa los conceptos y explicaciones de la sesión antes de reintentar el miniquiz.',
+          example: matched.example || undefined,
+        })
       } else {
         results.push({
           id: conceptId,
-          name: `Concepto de estudio (${conceptId})`,
-          summary: 'Regla conceptual fundamental evaluada en el miniquiz.',
-          detail: 'Revisa detenidamente los enunciados y restricciones teóricas antes de reintentar.',
+          name: `Concepto evaluado (${conceptId.slice(0, 8)})`,
+          summary: 'Regla conceptual evaluada en el miniquiz.',
+          detail: 'Revisa detenidamente los conceptos teóricos y ejemplos de la sesión antes de reintentar.',
         })
       }
     }
@@ -302,22 +302,23 @@ class CourseService {
   }
 
   /**
-   * Genera un nuevo intento de miniquiz.
+   * Genera un nuevo intento de miniquiz preservando la identidad del curso y sesión activa.
    */
   async retryQuiz(quizId: string, weakConceptIds?: string[]): Promise<Quiz> {
     void weakConceptIds
-    const currentAttempt = memoryQuizAttemptStore.get(quizId) || 1
-    const nextAttempt = currentAttempt + 1
-    memoryQuizAttemptStore.set(quizId, nextAttempt)
-
-    const newQuiz = getMockQuiz(quizId, nextAttempt)
-    if (!newQuiz) {
-      throw new Error(`Error al generar reintento para el quiz: ${quizId}`)
+    const quiz = await this.getQuiz(quizId)
+    if (!quiz) {
+      throw new Error(`Error al recuperar el miniquiz para reintento: ${quizId}`)
     }
 
+    const currentAttempt = localQuizAttemptStore.get(quiz.id) || quiz.attemptNumber || 1
+    const nextAttempt = currentAttempt + 1
+    localQuizAttemptStore.set(quiz.id, nextAttempt)
+
     return {
-      ...newQuiz,
-      questions: newQuiz.questions.map((q) => ({
+      ...quiz,
+      attemptNumber: nextAttempt,
+      questions: quiz.questions.map((q) => ({
         ...q,
         options: q.options.map((o) => ({ ...o })),
       })),

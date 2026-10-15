@@ -247,8 +247,8 @@ export class ExamService {
   /**
    * Herramienta de desarrollo para simular fin de enfriamiento.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async clearCooldownDev(courseId?: string): Promise<void> {
+  async clearCooldownDev(_courseId?: string): Promise<void> {
+    void _courseId
     // No-op para backend real
   }
 }
