@@ -37,6 +37,17 @@ export class QuizzesController {
     }
   }
 
+  @Get('quizzes/:quizId')
+  async getQuizById(
+    @Param('quizId') quizId: string,
+  ): Promise<GetQuizResponse> {
+    try {
+      return await this.quizzesService.getQuizById(quizId);
+    } catch (e) {
+      this.handleError(e);
+    }
+  }
+
   @Post('quizzes/:quizId/attempts')
   async submitAttempt(
     @Param('quizId') quizId: string,

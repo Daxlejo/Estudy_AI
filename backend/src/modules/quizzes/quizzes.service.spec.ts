@@ -145,6 +145,42 @@ describe('QuizzesService', () => {
     });
   });
 
+  describe('getQuizById', () => {
+    it('should return quiz questions without leaking isCorrect and without explanation anywhere', async () => {
+      quizRepository.findById.mockResolvedValue(mockQuiz);
+      quizRepository.getQuestionsByQuizId.mockResolvedValue(mockQuestions);
+
+      const result = await service.getQuizById('quiz-1');
+
+      expect(result.id).toBe('quiz-1');
+      expect(result.questions).toHaveLength(2);
+
+      for (const q of result.questions) {
+        expect('explanation' in q).toBe(false);
+        for (const opt of q.options) {
+          expect('isCorrect' in opt).toBe(false);
+        }
+      }
+
+      expect(result.questions[0].options[0]).toEqual({
+        id: 'opt1',
+        text: 'Option 1',
+      });
+      expect(result.questions[0].options[1]).toEqual({
+        id: 'opt2',
+        text: 'Option 2',
+      });
+    });
+
+    it('should throw NotFoundException if quiz does not exist', async () => {
+      quizRepository.findById.mockResolvedValue(null);
+
+      await expect(service.getQuizById('quiz-999')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('submitAttempt', () => {
     beforeEach(() => {
       quizRepository.findById.mockResolvedValue(mockQuiz);

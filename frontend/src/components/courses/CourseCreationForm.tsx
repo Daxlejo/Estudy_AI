@@ -9,8 +9,10 @@ import type { SelectedFile } from './MaterialItem'
 export function CourseCreationForm() {
   const navigate = useNavigate()
   const [courseName, setCourseName] = useState('')
+  const [courseDescription, setCourseDescription] = useState('')
   const [materials, setMaterials] = useState<SelectedFile[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [touched, setTouched] = useState({ name: false, materials: false })
 
   const isNameValid = courseName.trim().length > 0
@@ -29,32 +31,46 @@ export function CourseCreationForm() {
 
     setMaterials((prev) => [...prev, ...newItems])
     setTouched((prev) => ({ ...prev, materials: true }))
+    setSubmitError(null)
   }
 
   const handleRemoveMaterial = (id: string) => {
     setMaterials((prev) => prev.filter((m) => m.id !== id))
+    setSubmitError(null)
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setTouched({ name: true, materials: true })
+    setSubmitError(null)
 
     if (!isFormValid || isSubmitting) return
 
     try {
       setIsSubmitting(true)
+      const rawFiles = materials
+        .map((m) => m.fileRef)
+        .filter((f): f is File => f !== undefined)
+
       const created = await courseService.createCourse({
         name: courseName.trim(),
+        description: courseDescription.trim() || undefined,
         materials: materials.map((m) => ({
           name: m.name,
           sizeBytes: m.sizeBytes,
           type: m.type,
         })),
+        files: rawFiles,
       })
 
       navigate(`/cursos/${created.id}/procesando`)
-    } catch {
+    } catch (err) {
       setIsSubmitting(false)
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo iniciar la creación del curso. Intenta nuevamente.',
+      )
     }
   }
 
@@ -86,6 +102,13 @@ export function CourseCreationForm() {
         </p>
       </div>
 
+      {submitError && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger">
+          <IconAlertCircle className="size-5 shrink-0" />
+          <p>{submitError}</p>
+        </div>
+      )}
+
       {/* Campo: Nombre del curso */}
       <div className="space-y-2">
         <label htmlFor="course-name" className="block text-sm font-semibold text-text-primary">
@@ -111,6 +134,22 @@ export function CourseCreationForm() {
             Por favor ingresa un nombre para identificar el curso.
           </p>
         )}
+      </div>
+
+      {/* Campo: Descripción del curso (opcional) */}
+      <div className="space-y-2">
+        <label htmlFor="course-description" className="block text-sm font-semibold text-text-primary">
+          Descripción del curso <span className="text-xs font-normal text-text-secondary">(opcional)</span>
+        </label>
+        <textarea
+          id="course-description"
+          value={courseDescription}
+          onChange={(e) => setCourseDescription(e.target.value)}
+          placeholder="Añade una descripción o déjalo en blanco para que la IA la genere a partir de tus materiales..."
+          rows={3}
+          disabled={isSubmitting}
+          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary/50 transition-all duration-150 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20"
+        />
       </div>
 
       {/* Campo: Materiales de aprendizaje */}

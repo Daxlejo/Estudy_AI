@@ -9,6 +9,11 @@ import {
 } from '@nestjs/common';
 import { CoursesService, CourseProgressResult } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
+import { GenerateCourseDto } from './dto/generate-course.dto';
+import {
+  GenerationStatusResponseDto,
+  GenerationJobResponseDto,
+} from './dto/generation-status-response.dto';
 import { DatabaseError } from '../../database/errors/database-error';
 
 @Controller('courses')
@@ -49,10 +54,33 @@ export class CoursesController {
     }
   }
 
+  @Get(':id/generation-status')
+  async getGenerationStatus(
+    @Param('id') id: string,
+  ): Promise<GenerationStatusResponseDto> {
+    try {
+      return await this.coursesService.getGenerationStatus(id);
+    } catch (e) {
+      this.handleError(e);
+    }
+  }
+
   @Post()
   async create(@Body() createCourseDto: CreateCourseDto) {
     try {
       return await this.coursesService.create(createCourseDto);
+    } catch (e) {
+      this.handleError(e);
+    }
+  }
+
+  @Post(':id/generate')
+  async generate(
+    @Param('id') id: string,
+    @Body() generateCourseDto?: GenerateCourseDto,
+  ): Promise<GenerationJobResponseDto> {
+    try {
+      return await this.coursesService.startGeneration(id, generateCourseDto);
     } catch (e) {
       this.handleError(e);
     }

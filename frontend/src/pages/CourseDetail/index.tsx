@@ -17,6 +17,7 @@ function CourseDetail() {
   const navigate = useNavigate()
   const [course, setCourse] = useState<Course | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [isExamCurrent, setIsExamCurrent] = useState(false)
   const [loading, setLoading] = useState(Boolean(id))
 
   useEffect(() => {
@@ -42,8 +43,15 @@ function CourseDetail() {
     courseService
       .getLearningPath(id)
       .then((path) => {
-        if (isMounted && path?.currentSessionId) {
-          setCurrentSessionId(path.currentSessionId)
+        if (isMounted) {
+          const currentNode = path?.nodes.find((n) => n.status === 'CURRENT')
+          if (currentNode?.type === 'FINAL_EXAM') {
+            setIsExamCurrent(true)
+            setCurrentSessionId(null)
+          } else if (path?.currentSessionId) {
+            setIsExamCurrent(false)
+            setCurrentSessionId(path.currentSessionId)
+          }
         }
       })
       .catch(() => {
@@ -141,10 +149,16 @@ function CourseDetail() {
           </div>
 
           <Link
-            to={currentSessionId ? `/sesion/${currentSessionId}` : `/cursos/${course.id}/ruta`}
+            to={
+              isExamCurrent
+                ? `/examen/${course.id}`
+                : currentSessionId
+                  ? `/sesion/${currentSessionId}`
+                  : `/cursos/${course.id}/ruta`
+            }
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-heading text-sm font-bold text-on-primary shadow-md hover:scale-[1.02] transition-transform"
           >
-            Iniciar sesión de estudio
+            {isExamCurrent ? 'Continuar al Examen Final' : 'Iniciar sesión de estudio'}
             <IconArrowRight className="size-4" />
           </Link>
         </div>

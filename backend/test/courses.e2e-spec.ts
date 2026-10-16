@@ -47,6 +47,10 @@ describe('CoursesController (e2e)', () => {
     if (fs.existsSync(testDbPath + '-journal')) {
       fs.unlinkSync(testDbPath + '-journal');
     }
+    const testStoragePath = path.join(__dirname, '..', 'storage');
+    if (fs.existsSync(testStoragePath)) {
+      fs.rmSync(testStoragePath, { recursive: true, force: true });
+    }
   });
 
   it('/api/courses (GET)', () => {
@@ -426,4 +430,165 @@ describe('CoursesController (e2e)', () => {
     expect(progressFinalRes.body.finalExam.attemptsCount).toBe(2);
     expect(progressFinalRes.body.finalExam.cooldownUntil).toBeNull();
   }, 60000);
+
+  it('Generation job lifecycle: generate and get status via API (e2e)', async () => {
+    // 1. Course not found returns 404
+    await request(app.getHttpServer())
+      .post('/api/courses/non-existent-course/generate')
+      .send({})
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .get('/api/courses/non-existent-course/generation-status')
+      .expect(404);
+
+    // 2. Create course
+    const courseRes = await request(app.getHttpServer())
+      .post('/api/courses')
+      .send({ name: 'E2E Gen Course', description: 'Testing generation job' })
+      .expect(201);
+    const courseId = courseRes.body.id;
+
+    // 3. Course exists but has no generation jobs yet -> returns 404
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/generation-status`)
+      .expect(404);
+
+    // 4. Trigger generation with invalid material ID -> returns 400
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/generate`)
+      .send({ materialIds: ['00000000-0000-0000-0000-000000000000'] })
+      .expect(400);
+
+    // 5. Trigger generation -> returns 201 with PENDING job
+    const genRes = await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/generate`)
+      .send({})
+      .expect(201);
+
+    expect(genRes.body.id).toBeDefined();
+    expect(genRes.body.courseId).toBe(courseId);
+    expect(genRes.body.status).toBe('PENDING');
+    expect(genRes.body.progress).toBe(0);
+
+    // The pipeline runs asynchronously via setImmediate.
+    // Without uploaded materials it fails immediately, so by the time
+    // we poll the course may already be in ERROR state.
+    // Give the event loop a tick so the pipeline settles.
+    await new Promise((r) => setTimeout(r, 200));
+
+    // 6. Course status should now be ERROR (no materials uploaded)
+    const courseInDb = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}`)
+      .expect(200);
+    expect(courseInDb.body.status).toBe('ERROR');
+
+    // 7. Poll generation status -> returns 200 with ERROR state
+    const statusRes = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/generation-status`)
+      .expect(200);
+
+    expect(statusRes.body.jobId).toBe(genRes.body.id);
+    expect(statusRes.body.courseId).toBe(courseId);
+    expect(statusRes.body.courseName).toBe('E2E Gen Course');
+    expect(statusRes.body.status).toBe('ERROR');
+    expect(statusRes.body.errorMessage).toBeDefined();
+    // Verify no secrets or student answer keys are exposed in generation status
+    expect(JSON.stringify(statusRes.body)).not.toContain('correctOptionId');
+    expect(JSON.stringify(statusRes.body)).not.toContain('isCorrect');
+    expect(JSON.stringify(statusRes.body)).not.toContain('Bearer');
+    expect(statusRes.body.steps).toHaveLength(5);
+    expect(statusRes.body.steps[0].key).toBe('EXTRACTION');
+    // First step should be marked as error since extraction found no materials
+    expect(statusRes.body.steps[0].status).toBe('error');
+    expect(statusRes.body.metrics).toEqual({
+      sessionsCount: 0,
+      conceptsCount: 0,
+      levelsCount: 0,
+    });
+  });
+
+  it('Material ingestion lifecycle: upload valid materials, reject invalid inputs, persist metadata (e2e)', async () => {
+    const prisma = app.get(PrismaService);
+
+    // 1. Create a dedicated course
+    const courseRes = await request(app.getHttpServer())
+      .post('/api/courses')
+      .send({
+        name: 'E2E Materials Course',
+        description: 'Testing material upload',
+      })
+      .expect(201);
+    const courseId = courseRes.body.id;
+
+    // 2. Upload to non-existent course -> 404
+    await request(app.getHttpServer())
+      .post('/api/courses/non-existent-course/materials')
+      .attach('file', Buffer.from('# Intro to Algorithms'), 'notes.md')
+      .expect(404);
+
+    // 3. Upload without file attached -> 400
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .expect(400);
+
+    // 4. Upload empty file -> 400
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.alloc(0), 'empty.txt')
+      .expect(400);
+
+    // 5. Upload unsupported type (.pdf) -> 415
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.from('%PDF-1.4 sample'), 'slides.pdf')
+      .expect(415);
+
+    // 6. Upload binary/malformed UTF-8 -> 422
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.from([0xff, 0xfe, 0xfd]), 'bad.txt')
+      .expect(422);
+
+    // 7. Upload valid markdown (.md) -> 201
+    const mdContent =
+      '# Sorting Algorithms\n\nQuicksort and mergesort are divide and conquer.';
+    const mdRes = await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.from(mdContent, 'utf-8'), 'algorithms.md')
+      .expect(201);
+
+    expect(mdRes.body.id).toBeDefined();
+    expect(mdRes.body.courseId).toBe(courseId);
+    expect(mdRes.body.name).toBe('algorithms.md');
+    expect(mdRes.body.type).toBe('md');
+    expect(mdRes.body.sizeBytes).toBe(Buffer.byteLength(mdContent, 'utf-8'));
+    expect(mdRes.body.extractedCharacters).toBe(mdContent.length);
+    expect(mdRes.body.uploadedAt).toBeDefined();
+    expect(mdRes.body.storagePath).toBeUndefined();
+
+    // 8. Upload valid plain text (.txt) -> 201
+    const txtContent =
+      'Binary Search Trees\n\nSearch time is O(log n) on average.';
+    const txtRes = await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.from(txtContent, 'utf-8'), 'trees.txt')
+      .expect(201);
+
+    expect(txtRes.body.id).toBeDefined();
+    expect(txtRes.body.courseId).toBe(courseId);
+    expect(txtRes.body.name).toBe('trees.txt');
+    expect(txtRes.body.type).toBe('txt');
+    expect(txtRes.body.sizeBytes).toBe(Buffer.byteLength(txtContent, 'utf-8'));
+    expect(txtRes.body.extractedCharacters).toBe(txtContent.length);
+
+    // 9. Verify database has persisted both materials
+    const storedMaterials = await prisma.material.findMany({
+      where: { courseId },
+      orderBy: { name: 'asc' },
+    });
+    expect(storedMaterials).toHaveLength(2);
+    expect(storedMaterials[0].name).toBe('algorithms.md');
+    expect(storedMaterials[1].name).toBe('trees.txt');
+  });
 });

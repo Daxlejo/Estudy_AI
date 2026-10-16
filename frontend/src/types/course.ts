@@ -36,6 +36,7 @@ export interface Course {
 }
 
 export type ProcessingStatus =
+  | 'PENDING'
   | 'EXTRACTING'
   | 'ANALYZING_CONCEPTS'
   | 'ANALYZING_DEPENDENCIES'
@@ -75,11 +76,13 @@ export interface CourseProcessingState {
 
 export interface CreateCourseDto {
   name: string
+  description?: string
   materials: Array<{
     name: string
     sizeBytes: number
     type: string
   }>
+  files?: File[]
 }
 
 export interface CurrentSession {

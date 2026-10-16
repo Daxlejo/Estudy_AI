@@ -19,7 +19,6 @@ interface FinalExamCooldownProps {
 
 export function FinalExamCooldown({
   courseId,
-  weakConceptIds: _weakConceptIds = [],
   attemptNumber,
   onRetryUnlocked,
 }: FinalExamCooldownProps) {
@@ -29,8 +28,6 @@ export function FinalExamCooldown({
 
   // Polling del cooldown cada segundo
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval>
-
     const checkCooldown = async () => {
       const status = await examService.getFinalExamCooldown(courseId)
       if (status.inCooldown) {
@@ -43,7 +40,7 @@ export function FinalExamCooldown({
     }
 
     checkCooldown()
-    timer = setInterval(checkCooldown, 1000)
+    const timer = setInterval(checkCooldown, 1000)
 
     return () => clearInterval(timer)
   }, [courseId])

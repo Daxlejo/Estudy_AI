@@ -20,10 +20,19 @@ export interface Material {
   uploadedAt: Date;
 }
 
+export type GenerationJobStatus =
+  | 'PENDING'
+  | 'EXTRACTING'
+  | 'ANALYZING_CONCEPTS'
+  | 'ANALYZING_DEPENDENCIES'
+  | 'BUILDING_PATH'
+  | 'COMPLETED'
+  | 'ERROR';
+
 export interface GenerationJob {
   id: string;
   courseId: string;
-  status: string;
+  status: GenerationJobStatus;
   progress: number;
   currentStepIndex: number | null;
   errorMessage: string | null;

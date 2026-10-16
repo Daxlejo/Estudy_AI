@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import {
   IconArrowLeft,
   IconArrowRight,
   IconCheck,
   IconAlertTriangle,
   IconRotateClockwise,
+  IconLock,
 } from '@tabler/icons-react'
 import { examService } from '../../services/exam.service'
 import type {
@@ -20,10 +21,11 @@ import { FinalExamResult } from '../../components/exam/FinalExamResult'
 
 export default function FinalExamPage() {
   const { id } = useParams<{ id: string }>()
-  const examId = id || '1'
+  const examId = (id || '1').replace(/-exam$/, '')
 
   const [exam, setExam] = useState<FinalExam | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answersMap, setAnswersMap] = useState<Map<string, FinalExamAnswer>>(new Map())
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,30 +35,57 @@ export default function FinalExamPage() {
   // Cargar examen y chequear si ya había resultado o cooldown
   const loadExamData = async () => {
     setLoading(true)
+    setError(null)
     try {
       const data = await examService.getFinalExam(examId)
       setExam(data)
 
-      // Verificar si hay resultado previo en memoria
-      const existingResult = await examService.getFinalExamResult(data.id)
-      if (existingResult) {
-        setResult(existingResult)
-      } else {
-        setResult(null)
+      if (data.status !== 'LOCKED') {
+        const existingResult = await examService.getFinalExamResult(data.id)
+        setResult(existingResult || null)
       }
-
       setAnswersMap(new Map())
       setCurrentQuestionIndex(0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar la evaluación final.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadExamData()
+    let isMounted = true
+
+    async function init() {
+      try {
+        setError(null)
+        const data = await examService.getFinalExam(examId)
+        if (!isMounted) return
+        setExam(data)
+
+        if (data.status !== 'LOCKED') {
+          const existingResult = await examService.getFinalExamResult(data.id)
+          if (!isMounted) return
+          setResult(existingResult || null)
+        }
+        setAnswersMap(new Map())
+        setCurrentQuestionIndex(0)
+      } catch (err) {
+        if (!isMounted) return
+        setError(err instanceof Error ? err.message : 'Error al cargar la evaluación final.')
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    init()
+
+    return () => {
+      isMounted = false
+    }
   }, [examId])
 
-  if (loading || !exam) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="flex flex-col items-center gap-3 text-center">
@@ -67,6 +96,63 @@ export default function FinalExamPage() {
           <span className="text-xs text-text-secondary">
             Preparando preguntas integrales del curso
           </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !exam) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
+        <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 shadow-sm">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-error/15 text-error">
+            <IconAlertTriangle className="size-8" />
+          </div>
+          <h2 className="font-heading text-xl font-bold text-text-primary">
+            No se pudo cargar la evaluación final
+          </h2>
+          <p className="text-sm leading-relaxed text-text-secondary">
+            {error || 'No fue posible recuperar los datos del examen para este curso.'}
+          </p>
+          <div className="mt-2 flex gap-3">
+            <button
+              type="button"
+              onClick={loadExamData}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-high px-4 py-2.5 text-xs font-semibold text-text-primary transition hover:bg-surface"
+            >
+              Reintentar
+            </button>
+            <Link
+              to={`/cursos/${examId}/ruta`}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+            >
+              Volver a la Ruta
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (exam.status === 'LOCKED' || exam.questions.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
+        <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 shadow-sm">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-warning/15 text-warning">
+            <IconLock className="size-8" />
+          </div>
+          <h2 className="font-heading text-xl font-bold text-text-primary">
+            Evaluación Final Bloqueada
+          </h2>
+          <p className="text-sm leading-relaxed text-text-secondary">
+            Debes completar y aprobar todas las sesiones de estudio y sus respectivos cuestionarios antes de rendir la evaluación final de este curso.
+          </p>
+          <Link
+            to={`/cursos/${examId}/ruta`}
+            className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+          >
+            Volver a la Ruta de Aprendizaje
+          </Link>
         </div>
       </div>
     )

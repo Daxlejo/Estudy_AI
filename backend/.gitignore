@@ -41,3 +41,7 @@ Thumbs.db
 *.db
 *.db-journal
 /prisma/dev.db
+
+# Uploaded materials storage
+/storage
+

@@ -6,6 +6,7 @@ import {
   IconBook,
 } from '@tabler/icons-react'
 import type { StudySession } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface SessionIntroBlockProps {
   session: StudySession
@@ -47,9 +48,9 @@ export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProp
           {introduction.title}
         </h2>
 
-        <p className="mt-4 text-base leading-relaxed text-text-secondary md:text-lg">
-          {introduction.content}
-        </p>
+        <div className="mt-4">
+          <MarkdownRenderer content={introduction.content} />
+        </div>
 
         {/* Tarjeta destacada: Idea clave / Principio fundamental */}
         <div className="mt-6 flex items-start gap-4 rounded-xl border border-primary/30 bg-primary/5 p-4 md:p-5">
@@ -73,9 +74,13 @@ export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProp
               <IconCode className="size-3.5" />
               <span>Ejemplo representativo:</span>
             </div>
-            <pre className="overflow-x-auto rounded-xl border border-border bg-surface-high p-4 font-mono text-xs text-text-primary md:text-sm">
-              <code>{introduction.codeSnippet}</code>
-            </pre>
+            <MarkdownRenderer
+              content={
+                introduction.codeSnippet.trim().startsWith('```')
+                  ? introduction.codeSnippet
+                  : `\`\`\`python\n${introduction.codeSnippet}\n\`\`\``
+              }
+            />
           </div>
         )}
       </div>

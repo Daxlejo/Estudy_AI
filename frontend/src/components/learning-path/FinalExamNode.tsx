@@ -17,6 +17,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
   const isCompleted = node.status === 'COMPLETED'
   const isCurrent = node.status === 'CURRENT'
   const isLocked = node.status === 'LOCKED'
+  const courseId = node.id.replace(/-exam$/, '')
 
   return (
     <div
@@ -96,7 +97,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
         <div className="flex shrink-0 items-center justify-end sm:pl-4">
           {isCurrent && (
             <Link
-              to={`/examen/${node.id}`}
+              to={`/examen/${courseId}`}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-tertiary px-6 py-3 font-heading text-sm font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:brightness-110 sm:w-auto"
             >
               Comenzar examen final
@@ -106,7 +107,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
 
           {isCompleted && (
             <Link
-              to={`/examen/${node.id}`}
+              to={`/examen/${courseId}`}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-high px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:border-secondary hover:text-secondary sm:w-auto"
             >
               Ver resultados del examen

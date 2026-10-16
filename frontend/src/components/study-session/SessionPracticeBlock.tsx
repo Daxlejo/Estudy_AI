@@ -9,6 +9,7 @@ import {
   IconInfoCircle,
 } from '@tabler/icons-react'
 import type { PracticeExercise } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface SessionPracticeBlockProps {
   exercise: PracticeExercise
@@ -19,6 +20,7 @@ interface SessionPracticeBlockProps {
   onContinue: () => void
   onBack: () => void
 }
+
 
 export function SessionPracticeBlock({
   exercise,
@@ -69,15 +71,24 @@ export function SessionPracticeBlock({
           </div>
         )}
 
-        <h2 className="font-heading text-xl font-bold tracking-tight text-text-primary md:text-2xl">
-          {exercise.prompt}
-        </h2>
+        <h3 className="font-heading text-lg font-bold tracking-tight text-text-primary md:text-xl">
+          {blockNumber === 3 ? 'Instrucciones del ejercicio' : 'Planteamiento del desafío'}
+        </h3>
 
-        <p className="mt-2 text-xs text-text-secondary md:text-sm">
-          {blockNumber === 3
-            ? 'Selecciona una alternativa para comprobar tu intuición conceptual. Recibirás retroalimentación instantánea.'
-            : 'Este desafío requiere aplicar de manera combinada los conceptos aprendidos en un escenario más exigente.'}
-        </p>
+        <div className="mt-3">
+          <MarkdownRenderer content={exercise.prompt} />
+        </div>
+
+        <div className="mt-6 border-t border-border/70 pt-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            Autoevaluación de la actividad
+          </p>
+          <p className="mt-1 text-xs text-text-secondary md:text-sm">
+            {blockNumber === 3
+              ? 'Realiza el ejercicio guiado propuesto arriba y selecciona tu resultado para continuar:'
+              : 'Resuelve el desafío conceptual propuesto arriba y selecciona tu nivel de comprensión para continuar:'}
+          </p>
+        </div>
 
         {/* Lista de opciones seleccionables */}
         <div className="mt-6 space-y-3" role="radiogroup" aria-label="Opciones de respuesta">
