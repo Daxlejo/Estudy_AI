@@ -1,6 +1,44 @@
-# Scripts de desarrollo
+# Local dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Virtual environments & Python cache
+.venv/
 scripts-dev/.venv/
-scripts-dev/.env
+__pycache__/
+*.py[cod]
+
+# Generated build, coverage & dev script output
+dist/
+backend/dist/
+frontend/dist/
+coverage/
+backend/coverage/
+frontend/coverage/
 scripts-dev/contexto_actual.txt
 scripts-dev/contexto_log.json
 scripts-dev/indice_proyecto.json
+
+# Local environment files (preserve tracked templates)
+.env
+.env.*
+!.env.example
+!backend/.env.example
+scripts-dev/.env
+
+# Local databases & uploaded materials
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+backend/prisma/*.db
+backend/prisma/*.db-journal
+storage/
+backend/storage/
+
+# Logs & OS metadata
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
