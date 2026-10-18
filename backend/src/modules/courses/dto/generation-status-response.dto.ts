@@ -21,6 +21,7 @@ export interface GenerationStatusResponseDto {
   jobId: string;
   courseId: string;
   courseName: string;
+  bannerKey?: string | null;
   status:
     | 'PENDING'
     | 'EXTRACTING'

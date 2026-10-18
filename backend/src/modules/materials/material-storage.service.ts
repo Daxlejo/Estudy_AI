@@ -67,6 +67,20 @@ export class MaterialStorageService {
   }
 
   /**
+   * Elimina de forma recursiva el directorio de almacenamiento asociado a un curso.
+   * Valida estrictamente el UUID y previene cualquier escape del directorio raiz.
+   */
+  async removeCourseDirectory(courseId: string): Promise<void> {
+    if (!UUID_PATTERN.test(courseId)) {
+      throw new MaterialStorageError(
+        'Invalid course identifier for storage cleanup',
+      );
+    }
+    const courseDir = this.resolveInsideRoot(courseId);
+    await fs.rm(courseDir, { recursive: true, force: true });
+  }
+
+  /**
    * Resuelve una ruta relativa y garantiza que permanezca dentro de la raiz.
    */
   resolveInsideRoot(relativePath: string): string {

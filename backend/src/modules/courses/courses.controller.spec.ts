@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { DatabaseError } from '../../database/errors/database-error';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('CoursesController', () => {
   let controller: CoursesController;
@@ -17,6 +18,7 @@ describe('CoursesController', () => {
       getById: jest.fn(),
       getCourseProgress: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn(),
       startGeneration: jest.fn(),
       getGenerationStatus: jest.fn(),
@@ -26,7 +28,10 @@ describe('CoursesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CoursesController],
       providers: [{ provide: CoursesService, useValue: service }],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<CoursesController>(CoursesController);
   });
@@ -145,6 +150,13 @@ describe('CoursesController', () => {
       const result = await controller.create({ name: 'New' });
       expect(service.create).toHaveBeenCalledWith({ name: 'New' });
       expect(result).toEqual({ id: '1', name: 'New' });
+    });
+
+    it('should update course', async () => {
+      service.update.mockResolvedValue({ id: '1', name: 'Updated' } as any);
+      const result = await controller.update('1', { name: 'Updated' });
+      expect(service.update).toHaveBeenCalledWith('1', { name: 'Updated' });
+      expect(result).toEqual({ id: '1', name: 'Updated' });
     });
 
     it('should delete course', async () => {

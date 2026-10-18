@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsIn } from 'class-validator';
+import { COURSE_BANNER_KEYS } from '../../../domain/models/course';
 
 export class CreateCourseDto {
   @IsString()
@@ -8,4 +9,9 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(COURSE_BANNER_KEYS)
+  bannerKey?: string;
 }

@@ -7,10 +7,12 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { ExamsModule } from './modules/exams/exams.module';
 import { MaterialsModule } from './modules/materials/materials.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    AuthModule,
     CoursesModule,
     SessionsModule,
     QuizzesModule,

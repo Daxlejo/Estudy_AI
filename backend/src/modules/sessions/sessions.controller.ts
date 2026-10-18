@@ -4,10 +4,17 @@ import {
   Post,
   Param,
   InternalServerErrorException,
+  UseGuards,
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { DatabaseError } from '../../database/errors/database-error';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  CurrentUser,
+  CurrentUserPayload,
+} from '../auth/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
@@ -20,27 +27,36 @@ export class SessionsController {
   }
 
   @Get('courses/:courseId/sessions')
-  async listByCourse(@Param('courseId') courseId: string) {
+  async listByCourse(
+    @Param('courseId') courseId: string,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
     try {
-      return await this.sessionsService.listByCourse(courseId);
+      return await this.sessionsService.listByCourse(courseId, user?.sub);
     } catch (e) {
       this.handleError(e);
     }
   }
 
   @Get('sessions/:id')
-  async getById(@Param('id') id: string) {
+  async getById(
+    @Param('id') id: string,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
     try {
-      return await this.sessionsService.getById(id);
+      return await this.sessionsService.getById(id, user?.sub);
     } catch (e) {
       this.handleError(e);
     }
   }
 
   @Post('sessions/:id/complete')
-  async completeSession(@Param('id') id: string) {
+  async completeSession(
+    @Param('id') id: string,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
     try {
-      return await this.sessionsService.completeSession(id);
+      return await this.sessionsService.completeSession(id, user?.sub);
     } catch (e) {
       this.handleError(e);
     }

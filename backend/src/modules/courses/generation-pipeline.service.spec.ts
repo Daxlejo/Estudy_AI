@@ -545,5 +545,28 @@ describe('GenerationPipelineService', () => {
         ['m1'],
       );
     });
+
+    it('should instruct AI to generate content in English when language="en" is passed', async () => {
+      await service.run('course-1', 'job-1', ['m1'], 'en');
+
+      expect(aiService.completeJson).toHaveBeenCalledTimes(4);
+      for (const [systemPrompt] of aiService.completeJson.mock.calls) {
+        expect(systemPrompt).toContain(
+          'IMPORTANT: Generate ALL content (summaries, titles, explanations, exercises, questions, options, and feedback) in English.',
+        );
+      }
+    });
+
+    it('should instruct AI to generate content in Spanish by default', async () => {
+      await service.run('course-1', 'job-1', ['m1']);
+
+      expect(aiService.completeJson).toHaveBeenCalledTimes(4);
+      for (const [systemPrompt] of aiService.completeJson.mock.calls) {
+        expect(systemPrompt).toContain(
+          'IMPORTANTE: Genera TODO el contenido (resúmenes, títulos, explicaciones, ejercicios, preguntas, opciones y retroalimentación) en Español.',
+        );
+      }
+    });
   });
 });
+

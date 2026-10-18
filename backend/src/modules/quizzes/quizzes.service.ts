@@ -4,9 +4,11 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
+import { CourseRepository } from '../../domain/repositories/course.repository';
 import { Quiz, QuizAttempt } from '../../domain/models/quiz';
 import { Session } from '../../domain/models/session';
 import { AnswerDto } from './dto/submit-attempt.dto';
@@ -55,9 +57,33 @@ export class QuizzesService {
     private readonly quizRepository: QuizRepository,
     @Inject('SessionRepository')
     private readonly sessionRepository: SessionRepository,
+    @Inject('CourseRepository')
+    private readonly courseRepository: CourseRepository,
   ) {}
 
-  async getQuizBySession(sessionId: string): Promise<GetQuizResponse> {
+  private async validateQuizSessionOwnership(
+    sessionId: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+    const session = await this.sessionRepository.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException(`Session ${sessionId} not found`);
+    }
+    const course = await this.courseRepository.findById(session.courseId);
+    if (!course || !course.userId || course.userId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this quiz',
+      );
+    }
+  }
+
+  async getQuizBySession(
+    sessionId: string,
+    userId?: string,
+  ): Promise<GetQuizResponse> {
+    await this.validateQuizSessionOwnership(sessionId, userId);
+
     const quiz = await this.quizRepository.findBySessionId(sessionId);
     if (!quiz) {
       throw new NotFoundException(`Quiz for session ${sessionId} not found`);
@@ -85,11 +111,12 @@ export class QuizzesService {
     };
   }
 
-  async getQuizById(quizId: string): Promise<GetQuizResponse> {
+  async getQuizById(quizId: string, userId?: string): Promise<GetQuizResponse> {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) {
       throw new NotFoundException(`Quiz with id ${quizId} not found`);
     }
+    await this.validateQuizSessionOwnership(quiz.sessionId, userId);
 
     const questions = await this.quizRepository.getQuestionsByQuizId(quiz.id);
 
@@ -113,22 +140,25 @@ export class QuizzesService {
     };
   }
 
-  async listAttempts(quizId: string): Promise<QuizAttempt[]> {
+  async listAttempts(quizId: string, userId?: string): Promise<QuizAttempt[]> {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) {
       throw new NotFoundException(`Quiz ${quizId} not found`);
     }
+    await this.validateQuizSessionOwnership(quiz.sessionId, userId);
     return this.quizRepository.getAttemptsByQuizId(quizId);
   }
 
   async submitAttempt(
     quizId: string,
     answersDto: AnswerDto[],
+    userId?: string,
   ): Promise<SubmitQuizAttemptResult> {
     const quiz = await this.quizRepository.findById(quizId);
     if (!quiz) {
       throw new NotFoundException(`Quiz ${quizId} not found`);
     }
+    await this.validateQuizSessionOwnership(quiz.sessionId, userId);
 
     const questions = await this.quizRepository.getQuestionsByQuizId(quizId);
     const session = await this.sessionRepository.findById(quiz.sessionId);

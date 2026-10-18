@@ -4,6 +4,7 @@ import { SessionRepository } from '../../domain/repositories/session.repository'
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { FinalExamRepository } from '../../domain/repositories/final-exam.repository';
 import { FinalExamQuestionPayload } from '../../domain/models/final-exam';
+import { GenerationJobStatus } from '../../domain/models/course';
 import { MaterialsService } from '../materials/materials.service';
 import { AiService } from '../ai/ai.service';
 import {
@@ -15,15 +16,11 @@ import {
   AiSession,
 } from './dto/ai-course-plan.dto';
 
-/**
- * Orchestrates the full AI-driven course-generation pipeline for a given
- * GenerationJob.  Must be called via setImmediate / fire-and-forget so the
- * HTTP response returns before the pipeline starts.
- *
- * Pipeline steps (matching GenerationJobStatus values):
- *   PENDING → EXTRACTING → ANALYZING_CONCEPTS → ANALYZING_DEPENDENCIES
- *           → BUILDING_PATH → COMPLETED | ERROR
- */
+export type CourseGenerationLanguage = 'es' | 'en';
+
+// Orchestrates the full AI-driven course-generation pipeline for a given GenerationJob.
+// Pipeline steps (matching GenerationJobStatus values):
+//   PENDING -> EXTRACTING -> ANALYZING_CONCEPTS -> ANALYZING_DEPENDENCIES -> BUILDING_PATH -> COMPLETED | ERROR
 @Injectable()
 export class GenerationPipelineService {
   private readonly logger = new Logger(GenerationPipelineService.name);
@@ -41,17 +38,19 @@ export class GenerationPipelineService {
     private readonly aiService: AiService,
   ) {}
 
-  /**
-   * Entry point.  Updates job status/progress at each step and persists all
-   * generated artefacts.  On any error the job is marked ERROR, the course
-   * status reverted to ERROR, and partially persisted entities rolled back.
-   */
+  // Entry point. Updates job status/progress at each step and persists all generated artefacts.
+  // On any error the job is marked ERROR, the course status reverted to ERROR, and partially persisted entities rolled back.
   async run(
     courseId: string,
     jobId: string,
     materialIds?: string[],
+    language: CourseGenerationLanguage = 'es',
   ): Promise<void> {
-    this.logger.log(`Pipeline started (course=${courseId}, job=${jobId})`);
+    const resolvedLang: CourseGenerationLanguage =
+      language === 'en' ? 'en' : 'es';
+    this.logger.log(
+      `Pipeline started (course=${courseId}, job=${jobId}, lang=${resolvedLang})`,
+    );
     const createdSessionIds: string[] = [];
     let createdExamId: string | null = null;
 
@@ -61,7 +60,7 @@ export class GenerationPipelineService {
         throw new Error(`Course with id ${courseId} not found`);
       }
 
-      // ── Step 0: EXTRACTING ───────────────────────────────────────────────
+      // Step 0: EXTRACTING
       await this.updateJob(jobId, 'EXTRACTING', 0, 0);
 
       const extracted = await this.materialsService.getExtractedMaterials(
@@ -82,11 +81,11 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'EXTRACTING', 10, 0);
 
-      // ── Step 1: ANALYZING_CONCEPTS ───────────────────────────────────────
+      // Step 1: ANALYZING_CONCEPTS
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
       const rawConceptsData = await this.aiService.completeJson<unknown>(
-        this.systemPromptConcepts(),
+        this.systemPromptConcepts(resolvedLang),
         this.userMessageConcepts(combinedText),
       );
 
@@ -117,11 +116,11 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 40, 1);
 
-      // ── Step 2: ANALYZING_DEPENDENCIES → session grouping ────────────────
+      // Step 2: ANALYZING_DEPENDENCIES -> session grouping
       await this.updateJob(jobId, 'ANALYZING_DEPENDENCIES', 50, 2);
 
       const rawSessionsData = await this.aiService.completeJson<unknown>(
-        this.systemPromptSessions(),
+        this.systemPromptSessions(resolvedLang),
         this.userMessageSessions(rawConcepts, combinedText),
       );
 
@@ -138,10 +137,10 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'ANALYZING_DEPENDENCIES', 60, 2);
 
-      // ── Step 3: BUILDING_PATH → persist sessions + concepts + quizzes ────
+      // Step 3: BUILDING_PATH -> persist sessions + concepts + quizzes
       await this.updateJob(jobId, 'BUILDING_PATH', 65, 3);
 
-      // Map concept name → persisted Concept id
+      // Map concept name -> persisted Concept id
       const conceptIdByName = new Map<string, string>();
 
       for (const rawSession of rawSessions) {
@@ -184,7 +183,7 @@ export class GenerationPipelineService {
         // Generate quiz for this session
         if (sessionConcepts.length > 0) {
           const rawQuizData = await this.aiService.completeJson<unknown>(
-            this.systemPromptQuiz(),
+            this.systemPromptQuiz(resolvedLang),
             this.userMessageQuiz(rawSession, sessionConcepts),
           );
 
@@ -223,7 +222,7 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'BUILDING_PATH', 85, 3);
 
-      // ── Step 4: Generate final exam ───────────────────────────────────────
+      // Step 4: Generate final exam
       const allConcepts = rawConcepts.filter((c) =>
         conceptIdByName.has(c.name),
       );
@@ -235,7 +234,7 @@ export class GenerationPipelineService {
       }
 
       const rawExamData = await this.aiService.completeJson<unknown>(
-        this.systemPromptFinalExam(),
+        this.systemPromptFinalExam(resolvedLang),
         this.userMessageFinalExam(allConcepts),
       );
 
@@ -276,11 +275,14 @@ export class GenerationPipelineService {
       }
 
       if (questionsAdded === 0 && fallbackConceptId) {
+        const isEn = resolvedLang === 'en';
         await this.finalExamRepository.addQuestion({
           examId: exam.id,
           conceptId: fallbackConceptId,
           type: 'MULTIPLE_CHOICE',
-          prompt: `¿Cuál es el propósito fundamental de ${allConcepts[0]?.name || 'los conceptos vistos en el curso'}?`,
+          prompt: isEn
+            ? `What is the fundamental purpose of ${allConcepts[0]?.name || 'the concepts covered in the course'}?`
+            : `¿Cuál es el propósito fundamental de ${allConcepts[0]?.name || 'los conceptos vistos en el curso'}?`,
           context: null,
           payload: {
             type: 'MULTIPLE_CHOICE',
@@ -289,22 +291,28 @@ export class GenerationPipelineService {
                 id: 'opt-1',
                 text:
                   allConcepts[0]?.summary ||
-                  'Aplicar el principio de diseño modular.',
+                  (isEn
+                    ? 'Apply the modular design principle.'
+                    : 'Aplicar el principio de diseño modular.'),
                 isCorrect: true,
               },
               {
                 id: 'opt-2',
-                text: 'Generar redundancia en el código.',
+                text: isEn
+                  ? 'Generate redundancy in the code.'
+                  : 'Generar redundancia en el código.',
                 isCorrect: false,
               },
             ],
             correctOptionId: 'opt-1',
           },
-          explanation: 'Evalúa la comprensión del concepto central del curso.',
+          explanation: isEn
+            ? 'Evaluates comprehension of the core concept of the course.'
+            : 'Evalúa la comprensión del concepto central del curso.',
         });
       }
 
-      // ── Finish ────────────────────────────────────────────────────────────
+      // Finish
       await this.updateJob(jobId, 'COMPLETED', 100, 4);
       await this.courseRepository.update(courseId, { status: 'READY' });
       this.logger.log(`Pipeline completed (course=${courseId}, job=${jobId})`);
@@ -334,16 +342,16 @@ export class GenerationPipelineService {
     }
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  // Private helpers
 
   private async updateJob(
     jobId: string,
-    status: string,
+    status: GenerationJobStatus,
     progress: number,
     currentStepIndex: number,
   ): Promise<void> {
     await this.courseRepository.updateGenerationJob(jobId, {
-      status: status as any,
+      status,
       progress,
       currentStepIndex,
     });
@@ -375,17 +383,26 @@ export class GenerationPipelineService {
     }
   }
 
-  // ── Prompt builders ───────────────────────────────────────────────────────
+  // Prompt builders
 
-  private systemPromptConcepts(): string {
+  private languageInstruction(language: CourseGenerationLanguage): string {
+    return language === 'en'
+      ? 'IMPORTANT: Generate ALL content (summaries, titles, explanations, exercises, questions, options, and feedback) in English.'
+      : 'IMPORTANTE: Genera TODO el contenido (resúmenes, títulos, explicaciones, ejercicios, preguntas, opciones y retroalimentación) en Español.';
+  }
+
+  private systemPromptConcepts(
+    language: CourseGenerationLanguage = 'es',
+  ): string {
     return `You are an expert academic curriculum designer.
+${this.languageInstruction(language)}
 Your task is to analyze the provided study material and extract:
 1. A concise (1-2 sentences) course summary capturing the essence and key topics of the material (e.g., "Curso estructurado de Programación Orientada a Objetos enfocado en clases, objetos, encapsulamiento, herencia y polimorfismo.").
 2. The key concepts from the material.
 Return ONLY a JSON object with two keys:
   "courseSummary": a string with the 1-2 sentence overview of the course based on the material,
   "concepts": an array of concept objects.
-Each concept must have: name (string ≤80 chars), summary (one sentence), detail (1-2 paragraphs), example (optional string).
+Each concept must have: name (string <=80 chars), summary (one sentence), detail (1-2 paragraphs), example (optional string).
 Extract between 5 and 30 concepts. Focus on the most important ideas.`;
   }
 
@@ -398,8 +415,11 @@ Extract between 5 and 30 concepts. Focus on the most important ideas.`;
     return `Study material:\n\n${truncated}`;
   }
 
-  private systemPromptSessions(): string {
+  private systemPromptSessions(
+    language: CourseGenerationLanguage = 'es',
+  ): string {
     return `You are an expert academic curriculum designer.
+${this.languageInstruction(language)}
 Given a list of concepts extracted from study material, organize them into logical learning sessions.
 Return ONLY a JSON object with key "sessions" containing an array of session objects.
 Each session must have:
@@ -427,8 +447,9 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
     return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${truncated}`;
   }
 
-  private systemPromptQuiz(): string {
+  private systemPromptQuiz(language: CourseGenerationLanguage = 'es'): string {
     return `You are an academic quiz designer.
+${this.languageInstruction(language)}
 Create a high-quality multiple-choice quiz for the provided learning session.
 Return ONLY a JSON object with:
   passingThreshold (integer 60-80, percentage needed to pass),
@@ -458,8 +479,11 @@ Create 3-5 questions, one per concept if possible.`;
     return `Session: "${session.title}"\nLearning objective: ${session.learningObjective}\n\nConcepts to test:\n${conceptDetails}`;
   }
 
-  private systemPromptFinalExam(): string {
+  private systemPromptFinalExam(
+    language: CourseGenerationLanguage = 'es',
+  ): string {
     return `You are an academic exam designer.
+${this.languageInstruction(language)}
 Create a final exam covering all the provided concepts.
 Return ONLY a JSON object with:
   estimatedMinutes (integer, 20-60),
@@ -482,3 +506,4 @@ Create one question per concept (min 5, max 20 total).`;
     return `All course concepts:\n${conceptDetails}`;
   }
 }
+

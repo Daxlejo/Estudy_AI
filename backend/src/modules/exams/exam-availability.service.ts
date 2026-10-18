@@ -36,8 +36,10 @@ export class ExamAvailabilityService {
     customNow?: Date,
   ): Promise<ExamAvailabilityResult> {
     const now = customNow ?? this.getNow();
-    const sessions = await this.sessionRepository.findByCourseId(courseId);
-    sessions.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    const rawSessions = await this.sessionRepository.findByCourseId(courseId);
+    const sessions = (Array.isArray(rawSessions) ? [...rawSessions] : []).sort(
+      (a, b) => a.sequenceOrder - b.sequenceOrder,
+    );
 
     let completedSessionsCount = 0;
 
@@ -54,7 +56,7 @@ export class ExamAvailabilityService {
         );
         // A session without a quiz is completed only if the next session exists and is unlocked.
         // The last session without a quiz is never marked as completed; AI generation must create a quiz for every session.
-        isCompleted = nextSession ? nextSession.isUnlocked : false;
+        isCompleted = nextSession ? Boolean(nextSession.isUnlocked) : false;
       }
 
       if (isCompleted) {
@@ -66,25 +68,26 @@ export class ExamAvailabilityService {
     const pendingSessionsCount = totalSessions - completedSessionsCount;
     const exam = await this.finalExamRepository.findByCourseId(courseId);
 
-    if (totalSessions === 0 || pendingSessionsCount > 0) {
+    const rawCooldown = exam?.cooldownUntil
+      ? new Date(exam.cooldownUntil)
+      : null;
+    const cooldownUntil =
+      rawCooldown && !Number.isNaN(rawCooldown.getTime()) ? rawCooldown : null;
+
+    if (!exam || totalSessions === 0 || pendingSessionsCount > 0) {
       return {
         status: 'LOCKED',
         pendingSessionsCount,
-        cooldownUntil: exam?.cooldownUntil
-          ? new Date(exam.cooldownUntil)
-          : null,
-        exam,
+        cooldownUntil,
+        exam: exam ?? null,
       };
     }
 
-    if (
-      exam?.cooldownUntil &&
-      new Date(exam.cooldownUntil).getTime() > now.getTime()
-    ) {
+    if (cooldownUntil && cooldownUntil.getTime() > now.getTime()) {
       return {
         status: 'COOLDOWN',
         pendingSessionsCount: 0,
-        cooldownUntil: new Date(exam.cooldownUntil),
+        cooldownUntil,
         exam,
       };
     }

@@ -7,13 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courses   Course[]
+}
+
 model Course {
   id          String   @id @default(uuid())
   name        String
   description String?
+  bannerKey   String?
   status      String   @default("CREATED")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   materials         Material[]
   generationJobs    GenerationJob[]
@@ -21,6 +36,8 @@ model Course {
   finalExam         FinalExam?
   quizAttempts      QuizAttempt[]
   finalExamAttempts FinalExamAttempt[]
+
+  @@index([userId])
 }
 
 model Material {

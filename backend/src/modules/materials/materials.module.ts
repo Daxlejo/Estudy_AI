@@ -9,6 +9,6 @@ import { TextExtractionService } from './text-extraction.service';
   imports: [DatabaseModule],
   controllers: [MaterialsController],
   providers: [MaterialsService, MaterialStorageService, TextExtractionService],
-  exports: [MaterialsService, TextExtractionService],
+  exports: [MaterialsService, TextExtractionService, MaterialStorageService],
 })
 export class MaterialsModule {}

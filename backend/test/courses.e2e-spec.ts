@@ -4,6 +4,7 @@ import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/app.config';
 import { PrismaService } from './../src/database/prisma.service';
+import { JwtAuthGuard } from './../src/modules/auth/guards/jwt-auth.guard';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -31,11 +32,39 @@ describe('CoursesController (e2e)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (context: any) => {
+          const req = context.switchToHttp().getRequest();
+          const userId = req.headers['x-test-user-id'] || 'test-user-id';
+          req.user = { id: userId, sub: userId };
+          return true;
+        },
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     configureApp(app);
     await app.init();
+
+    const prisma = app.get(PrismaService);
+    await prisma.user.create({
+      data: {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        password: 'hashedpassword',
+        name: 'Test User',
+      },
+    });
+    await prisma.user.create({
+      data: {
+        id: 'second-user-id',
+        email: 'second@example.com',
+        password: 'hashedpassword',
+        name: 'Second User',
+      },
+    });
   }, 60000);
 
   afterAll(async () => {
@@ -590,5 +619,383 @@ describe('CoursesController (e2e)', () => {
     expect(storedMaterials).toHaveLength(2);
     expect(storedMaterials[0].name).toBe('algorithms.md');
     expect(storedMaterials[1].name).toBe('trees.txt');
+  });
+
+  it('Course update and safe deletion lifecycle (e2e)', async () => {
+    const prisma = app.get(PrismaService);
+
+    // 1. Create a course
+    const courseRes = await request(app.getHttpServer())
+      .post('/api/courses')
+      .send({
+        name: 'Original Course Name',
+        description: 'Original Description',
+      })
+      .expect(201);
+    const courseId = courseRes.body.id;
+
+    // 2. Update course metadata (PATCH)
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/api/courses/${courseId}`)
+      .send({
+        name: 'Updated Course Name',
+        description: 'Updated Description',
+      })
+      .expect(200);
+
+    expect(patchRes.body.id).toBe(courseId);
+    expect(patchRes.body.name).toBe('Updated Course Name');
+    expect(patchRes.body.description).toBe('Updated Description');
+
+    // 3. Verify get returns updated metadata
+    const getRes = await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}`)
+      .expect(200);
+    expect(getRes.body.name).toBe('Updated Course Name');
+    expect(getRes.body.description).toBe('Updated Description');
+
+    // 4. Seed session, concept, quiz, quiz question (with Restrict)
+    const session = await prisma.session.create({
+      data: {
+        courseId,
+        sequenceOrder: 1,
+        title: 'Session For Delete Test',
+        learningObjective: 'Test Cascade Delete',
+        durationMinutes: 15,
+        isUnlocked: true,
+        introTitle: 'Intro',
+        introContent: 'Content',
+        introKeyTakeaway: 'Key',
+        guidedPractice: 'Practice',
+        challenge: 'Challenge',
+      },
+    });
+
+    const concept = await prisma.concept.create({
+      data: {
+        sessionId: session.id,
+        name: 'Restricted Concept',
+        summary: 'Concept with Restrict relation',
+        detail: 'Detail',
+      },
+    });
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        sessionId: session.id,
+        passingThreshold: 100,
+      },
+    });
+
+    await prisma.quizQuestion.create({
+      data: {
+        quizId: quiz.id,
+        conceptId: concept.id,
+        prompt: 'Restricted question?',
+        optionsPayload: JSON.stringify([
+          { id: 'o1', text: 'Ans', isCorrect: true },
+        ]),
+        explanation: 'Exp',
+      },
+    });
+
+    // 5. Upload a material to verify filesystem directory exists
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .attach('file', Buffer.from('# Storage File Test', 'utf-8'), 'notes.md')
+      .expect(201);
+
+    // 6. Test conflict prevention when PROCESSING
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { status: 'PROCESSING' },
+    });
+
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .expect(409);
+
+    // Reset status to READY
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { status: 'READY' },
+    });
+
+    // 7. Delete course -> should execute ordered cascade without hitting onDelete: Restrict
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .expect(200);
+
+    // 8. Verify course and all related records are completely gone
+    const courseInDb = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    expect(courseInDb).toBeNull();
+
+    const sessionsInDb = await prisma.session.findMany({
+      where: { courseId },
+    });
+    expect(sessionsInDb).toHaveLength(0);
+
+    const questionsInDb = await prisma.quizQuestion.findMany({
+      where: { conceptId: concept.id },
+    });
+    expect(questionsInDb).toHaveLength(0);
+
+    // 9. Deleting already-deleted course returns 404
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .expect(404);
+  });
+
+  it('Multi-user isolation: second account cannot read, mutate, generate, or delete first account course', async () => {
+    // 1. First account creates a private course
+    const courseRes = await request(app.getHttpServer())
+      .post('/api/courses')
+      .send({ name: 'Private User 1 Course', description: 'Confidential' })
+      .expect(201);
+
+    const courseId = courseRes.body.id;
+    expect(courseId).toBeDefined();
+
+    // 2. Second account listing courses: should NOT include first account's course
+    await request(app.getHttpServer())
+      .get('/api/courses')
+      .set('x-test-user-id', 'second-user-id')
+      .expect(200)
+      .expect((res) => {
+        expect(Array.isArray(res.body)).toBe(true);
+        const ids = res.body.map((c: any) => c.id);
+        expect(ids).not.toContain(courseId);
+      });
+
+    // 3. Second account GET course detail: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    // 4. Second account GET course progress: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/progress`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    // 5. Second account POST generate: 403 Forbidden
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/generate`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    // 6. Second account PATCH update: 403 Forbidden
+    await request(app.getHttpServer())
+      .patch(`/api/courses/${courseId}`)
+      .set('x-test-user-id', 'second-user-id')
+      .send({ name: 'Malicious Rename' })
+      .expect(403);
+
+    // 7. Second account DELETE: 403 Forbidden
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    // 8. Second account POST upload material: 403 Forbidden
+    await request(app.getHttpServer())
+      .post(`/api/courses/${courseId}/materials`)
+      .set('x-test-user-id', 'second-user-id')
+      .attach('file', Buffer.from('test content'), 'test.txt')
+      .expect(403);
+
+    // 9. First account CAN update and delete their own course
+    await request(app.getHttpServer())
+      .patch(`/api/courses/${courseId}`)
+      .send({ name: 'Updated by Owner' })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.name).toBe('Updated by Owner');
+      });
+
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .expect(200);
+  });
+
+  it('Multi-user IDOR isolation: child resources (sessions, quizzes, exams, attempts) reject cross-user access', async () => {
+    const prisma = app.get(PrismaService);
+
+    // 1. First account creates a course
+    const courseRes = await request(app.getHttpServer())
+      .post('/api/courses')
+      .send({
+        name: 'User 1 Protected Course',
+        description: 'Deep security test',
+      })
+      .expect(201);
+
+    const courseId = courseRes.body.id;
+
+    // 2. Seed child resources for this course
+    const session = await prisma.session.create({
+      data: {
+        id: 'session-idor-1',
+        courseId,
+        sequenceOrder: 1,
+        title: 'IDOR Session 1',
+        learningObjective: 'Security validation',
+        durationMinutes: 10,
+        xpReward: 50,
+        isUnlocked: true,
+        introTitle: 'Intro',
+        introContent: 'Content',
+        introKeyTakeaway: 'Takeaway',
+        guidedPractice: 'Practice',
+        challenge: 'Challenge',
+      },
+    });
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        id: 'quiz-idor-1',
+        sessionId: session.id,
+        passingThreshold: 70,
+        xpReward: 100,
+      },
+    });
+
+    const exam = await prisma.finalExam.create({
+      data: {
+        id: 'exam-idor-1',
+        courseId,
+        passingScorePct: 70,
+        estimatedMinutes: 20,
+      },
+    });
+
+    // 3. Second account attempting to access sessions: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/sessions`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/api/sessions/${session.id}`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/sessions/${session.id}/complete`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    // 4. Second account attempting to access quizzes: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/sessions/${session.id}/quiz`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/api/quizzes/${quiz.id}`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/api/quizzes/${quiz.id}/attempts`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/quizzes/${quiz.id}/attempts`)
+      .set('x-test-user-id', 'second-user-id')
+      .send({ answers: [] })
+      .expect(403);
+
+    // 5. Second account attempting to access final exam: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/exam`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get(`/api/exams/${exam.id}/attempts`)
+      .set('x-test-user-id', 'second-user-id')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/exams/${exam.id}/attempts`)
+      .set('x-test-user-id', 'second-user-id')
+      .send({ answers: [] })
+      .expect(403);
+
+    // Verify course status was not mutated
+    const refreshedCourse = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    expect(refreshedCourse?.status).not.toBe('COMPLETED');
+
+    // 6. First account CAN access their own child resources
+    await request(app.getHttpServer())
+      .get(`/api/courses/${courseId}/sessions`)
+      .expect(200)
+      .expect((res) => {
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body.length).toBeGreaterThan(0);
+      });
+
+    await request(app.getHttpServer())
+      .get(`/api/sessions/${session.id}`)
+      .expect(200);
+
+    // Cleanup
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${courseId}`)
+      .expect(200);
+  });
+
+  it('Legacy unowned courses (userId: null) are inaccessible and protected from modification', async () => {
+    const prisma = app.get(PrismaService);
+
+    // 1. Create an unowned legacy course directly in DB
+    const legacyCourse = await prisma.course.create({
+      data: {
+        id: 'legacy-unowned-e2e',
+        name: 'Legacy Unowned Course',
+        description: 'Orphaned from previous version',
+        status: 'READY',
+        userId: null,
+      },
+    });
+
+    // 2. Any user attempting GET course: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${legacyCourse.id}`)
+      .expect(403);
+
+    // 3. Any user attempting GET progress: 403 Forbidden
+    await request(app.getHttpServer())
+      .get(`/api/courses/${legacyCourse.id}/progress`)
+      .expect(403);
+
+    // 4. Any user attempting PATCH update: 403 Forbidden
+    await request(app.getHttpServer())
+      .patch(`/api/courses/${legacyCourse.id}`)
+      .send({ name: 'Malicious Hijack' })
+      .expect(403);
+
+    // 5. Any user attempting DELETE: 403 Forbidden
+    await request(app.getHttpServer())
+      .delete(`/api/courses/${legacyCourse.id}`)
+      .expect(403);
+
+    // 6. Verify course still exists in DB untouched
+    const stillExists = await prisma.course.findUnique({
+      where: { id: legacyCourse.id },
+    });
+    expect(stillExists).not.toBeNull();
+    expect(stillExists?.name).toBe('Legacy Unowned Course');
+    expect(stillExists?.userId).toBeNull();
+
+    // Clean up test record directly
+    await prisma.course.delete({ where: { id: legacyCourse.id } });
   });
 });

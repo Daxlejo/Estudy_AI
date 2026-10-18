@@ -1,12 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CoursesService } from './courses.service';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { FinalExamRepository } from '../../domain/repositories/final-exam.repository';
 import { ExamAvailabilityService } from '../exams/exam-availability.service';
 import { GenerationPipelineService } from './generation-pipeline.service';
+import { MaterialStorageService } from '../materials/material-storage.service';
 
 describe('CoursesService', () => {
   let service: CoursesService;
@@ -16,11 +23,14 @@ describe('CoursesService', () => {
   let finalExamRepository: jest.Mocked<FinalExamRepository>;
   let examAvailabilityService: jest.Mocked<ExamAvailabilityService>;
   let generationPipelineService: jest.Mocked<GenerationPipelineService>;
+  let materialStorageService: jest.Mocked<MaterialStorageService>;
 
   beforeEach(async () => {
     courseRepository = {
       findAll: jest.fn(),
       findById: jest.fn(),
+      findByUserId: jest.fn(),
+      claimLegacyCourses: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -60,6 +70,10 @@ describe('CoursesService', () => {
       run: jest.fn().mockResolvedValue(undefined),
     } as any;
 
+    materialStorageService = {
+      removeCourseDirectory: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CoursesService,
@@ -74,6 +88,10 @@ describe('CoursesService', () => {
         {
           provide: GenerationPipelineService,
           useValue: generationPipelineService,
+        },
+        {
+          provide: MaterialStorageService,
+          useValue: materialStorageService,
         },
       ],
     }).compile();
@@ -178,10 +196,11 @@ describe('CoursesService', () => {
   });
 
   describe('create', () => {
-    it('should create a course with CREATED status', async () => {
+    it('should create a course with CREATED status and a randomly assigned bannerKey', async () => {
       courseRepository.create.mockResolvedValue({
         id: '1',
         name: 'New Course',
+        bannerKey: 'deep-space',
         status: 'CREATED',
       } as any);
 
@@ -193,30 +212,149 @@ describe('CoursesService', () => {
       expect(result).toEqual({
         id: '1',
         name: 'New Course',
+        bannerKey: 'deep-space',
         status: 'CREATED',
       });
       expect(courseRepository.create).toHaveBeenCalledWith({
         name: 'New Course',
         description: 'Desc',
+        bannerKey: expect.any(String),
         status: 'CREATED',
+        userId: null,
       });
     });
   });
 
-  describe('delete', () => {
-    it('should delete a course if it exists', async () => {
-      courseRepository.findById.mockResolvedValue({ id: '1' } as any);
-      courseRepository.delete.mockResolvedValue(undefined);
+  describe('update', () => {
+    it('should update course name, description, and bannerKey', async () => {
+      const existing = {
+        id: '1',
+        name: 'Old Name',
+        description: 'Old Desc',
+        bannerKey: 'deep-space',
+        userId: 'user-1',
+      } as any;
+      courseRepository.findById.mockResolvedValue(existing);
+      courseRepository.update.mockResolvedValue({
+        ...existing,
+        name: 'New Name',
+        description: 'New Desc',
+        bannerKey: 'ocean-focus',
+      });
 
-      await service.delete('1');
+      const result = await service.update(
+        '1',
+        { name: 'New Name', description: 'New Desc', bannerKey: 'ocean-focus' },
+        'user-1',
+      );
+
+      expect(courseRepository.update).toHaveBeenCalledWith('1', {
+        name: 'New Name',
+        description: 'New Desc',
+        bannerKey: 'ocean-focus',
+      });
+      expect(result.name).toBe('New Name');
+      expect(result.bannerKey).toBe('ocean-focus');
+    });
+
+    it('should throw NotFoundException if course not found', async () => {
+      courseRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.update('999', { name: 'Name' }, 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if user does not own the course', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        name: 'Course',
+        userId: 'owner-id',
+      } as any);
+
+      await expect(
+        service.update('1', { name: 'Updated' }, 'different-user'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('delete', () => {
+    it('should delete a course and clean up storage if it exists', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'READY',
+        userId: 'user-1',
+      } as any);
+      courseRepository.getLatestGenerationJob.mockResolvedValue({
+        status: 'COMPLETED',
+      } as any);
+      courseRepository.delete.mockResolvedValue(undefined);
+      materialStorageService.removeCourseDirectory.mockResolvedValue(undefined);
+
+      await service.delete('1', 'user-1');
 
       expect(courseRepository.delete).toHaveBeenCalledWith('1');
+      expect(materialStorageService.removeCourseDirectory).toHaveBeenCalledWith(
+        '1',
+      );
     });
 
     it('should throw NotFoundException if course to delete is not found', async () => {
       courseRepository.findById.mockResolvedValue(null);
 
       await expect(service.delete('1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if user does not own the course', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'READY',
+        userId: 'owner-id',
+      } as any);
+
+      await expect(service.delete('1', 'other-user')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ConflictException if course is in PROCESSING status', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'PROCESSING',
+      } as any);
+
+      await expect(service.delete('1')).rejects.toThrow(ConflictException);
+      expect(courseRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException if active generation job is in progress', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'READY',
+      } as any);
+      courseRepository.getLatestGenerationJob.mockResolvedValue({
+        status: 'ANALYZING_CONCEPTS',
+      } as any);
+
+      await expect(service.delete('1')).rejects.toThrow(ConflictException);
+      expect(courseRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw InternalServerErrorException if storage cleanup fails', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'READY',
+      } as any);
+      courseRepository.getLatestGenerationJob.mockResolvedValue(null);
+      courseRepository.delete.mockResolvedValue(undefined);
+      materialStorageService.removeCourseDirectory.mockRejectedValue(
+        new Error('Disk failure'),
+      );
+
+      await expect(service.delete('1')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(courseRepository.delete).toHaveBeenCalledWith('1');
     });
   });
 
@@ -500,6 +638,158 @@ describe('CoursesService', () => {
       const result = await service.getJobById('job-5');
       expect(result.id).toBe('job-5');
       expect(result.status).toBe('PENDING');
+    });
+
+    it('should allow course owner to retrieve generation job', async () => {
+      const now = new Date();
+      courseRepository.findGenerationJobById.mockResolvedValue({
+        id: 'job-1',
+        courseId: 'c1',
+        status: 'PENDING',
+        progress: 0,
+        currentStepIndex: null,
+        errorMessage: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+
+      const result = await service.getJobById('job-1', 'owner-1');
+      expect(result.id).toBe('job-1');
+      expect(courseRepository.findById).toHaveBeenCalledWith('c1');
+    });
+
+    it('should throw ForbiddenException when intruder retrieves generation job', async () => {
+      const now = new Date();
+      courseRepository.findGenerationJobById.mockResolvedValue({
+        id: 'job-1',
+        courseId: 'c1',
+        status: 'PENDING',
+        progress: 0,
+        currentStepIndex: null,
+        errorMessage: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.getJobById('job-1', 'intruder')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException when job belongs to an unowned course', async () => {
+      const now = new Date();
+      courseRepository.findGenerationJobById.mockResolvedValue({
+        id: 'job-1',
+        courseId: 'c1',
+        status: 'PENDING',
+        progress: 0,
+        currentStepIndex: null,
+        errorMessage: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: null,
+      } as any);
+
+      await expect(service.getJobById('job-1', 'user-any')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('Course ownership and scoping', () => {
+    it('should return empty list when userId is omitted in list', async () => {
+      const result = await service.list();
+      expect(result).toEqual([]);
+      expect(courseRepository.findAll).not.toHaveBeenCalled();
+    });
+
+    it('should list only user courses when userId is provided', async () => {
+      const userCourses = [
+        {
+          id: 'c1',
+          name: 'User Course',
+          status: 'READY',
+          userId: 'user-1',
+          createdAt: new Date(),
+        },
+      ];
+      courseRepository.findByUserId.mockResolvedValue(userCourses as any);
+
+      const result = await service.list('user-1');
+      expect(courseRepository.findByUserId).toHaveBeenCalledWith('user-1');
+      expect(result).toEqual(userCourses);
+    });
+
+    it('should allow access to course owned by user', async () => {
+      const course = {
+        id: 'c1',
+        name: 'My Course',
+        status: 'READY',
+        userId: 'user-1',
+        createdAt: new Date(),
+      };
+      courseRepository.findById.mockResolvedValue(course as any);
+      sessionRepository.findByCourseId.mockResolvedValue([]);
+
+      const result = await service.getById('c1', 'user-1');
+      expect(result.id).toBe('c1');
+    });
+
+    it('should throw ForbiddenException for legacy unowned course (userId: null)', async () => {
+      const course = {
+        id: 'c-legacy',
+        name: 'Legacy Course',
+        status: 'READY',
+        userId: null,
+        createdAt: new Date(),
+      };
+      courseRepository.findById.mockResolvedValue(course as any);
+
+      await expect(service.getById('c-legacy', 'user-any')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException when user tries to access another users course', async () => {
+      const course = {
+        id: 'c2',
+        name: 'Other Course',
+        status: 'READY',
+        userId: 'other-user',
+        createdAt: new Date(),
+      };
+      courseRepository.findById.mockResolvedValue(course as any);
+
+      await expect(service.getById('c2', 'user-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException when user tries to delete another users course', async () => {
+      const course = {
+        id: 'c2',
+        name: 'Other Course',
+        status: 'READY',
+        userId: 'other-user',
+        createdAt: new Date(),
+      };
+      courseRepository.findById.mockResolvedValue(course as any);
+
+      await expect(service.delete('c2', 'user-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(courseRepository.delete).not.toHaveBeenCalled();
     });
   });
 });
