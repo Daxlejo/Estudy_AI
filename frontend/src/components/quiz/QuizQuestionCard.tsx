@@ -5,6 +5,7 @@ import {
   IconBrain,
 } from '@tabler/icons-react'
 import type { QuizQuestion } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface QuizQuestionCardProps {
   question: QuizQuestion
@@ -46,11 +47,11 @@ export function QuizQuestionCard({
 
       {/* Tarjeta principal con el enunciado de la pregunta */}
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm md:p-8">
-        <h2 className="font-heading text-xl font-bold tracking-tight text-text-primary md:text-2xl">
-          {question.prompt}
-        </h2>
+        <div className="font-heading text-lg font-bold tracking-tight text-text-primary md:text-xl">
+          <MarkdownRenderer content={question.prompt} />
+        </div>
 
-        <p className="mt-2 text-xs text-text-secondary md:text-sm">
+        <p className="mt-3 text-xs text-text-secondary md:text-sm border-t border-border/60 pt-3">
           Elige la opción que mejor responda al planteamiento. Las respuestas se calificarán al completar todas las preguntas.
         </p>
 
@@ -85,15 +86,15 @@ export function QuizQuestionCard({
                 </div>
 
                 <div className="min-w-0 flex-1 pt-1">
-                  <p
+                  <div
                     className={`text-sm md:text-base leading-relaxed ${
                       isSelected
                         ? 'font-semibold text-text-primary'
                         : 'text-text-primary group-hover:text-text-primary'
                     }`}
                   >
-                    {option.text}
-                  </p>
+                    <MarkdownRenderer content={option.text} inline />
+                  </div>
                 </div>
               </button>
             )

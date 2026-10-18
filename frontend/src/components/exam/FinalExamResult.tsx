@@ -12,6 +12,7 @@ import {
 } from '@tabler/icons-react'
 import type { FinalExamResult as FinalExamResultType } from '../../types/exam'
 import { FinalExamCooldown } from './FinalExamCooldown'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface FinalExamResultProps {
   result: FinalExamResultType
@@ -286,9 +287,9 @@ export function FinalExamResult({
                     <span className="size-1 rounded-full bg-text-secondary/50" />
                     <span className="text-xs text-text-secondary">{ev.conceptName}</span>
                   </div>
-                  <h4 className="font-heading text-sm font-semibold text-text-primary">
-                    {ev.prompt}
-                  </h4>
+                  <div className="font-heading text-sm font-semibold text-text-primary">
+                    <MarkdownRenderer content={ev.prompt} />
+                  </div>
                 </div>
 
                 <div className="shrink-0">
@@ -314,22 +315,22 @@ export function FinalExamResult({
                       <span className="font-semibold text-text-secondary">
                         Tu respuesta:
                       </span>
-                      <p
+                      <div
                         className={`font-medium ${
                           ev.isCorrect ? 'text-secondary' : 'text-red-400'
                         }`}
                       >
-                        {ev.selectedOptionText}
-                      </p>
+                        <MarkdownRenderer content={ev.selectedOptionText ?? ''} inline />
+                      </div>
                     </div>
                     {!ev.isCorrect && (
                       <div className="space-y-1">
                         <span className="font-semibold text-secondary">
                           Respuesta correcta:
                         </span>
-                        <p className="font-medium text-secondary">
-                          {ev.correctOptionText}
-                        </p>
+                        <div className="font-medium text-secondary">
+                          <MarkdownRenderer content={ev.correctOptionText ?? ''} inline />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -405,12 +406,10 @@ export function FinalExamResult({
 
                 {/* Explicación pedagógica */}
                 <div className="border-t border-border/60 pt-3">
-                  <span className="font-semibold text-text-primary">
+                  <span className="font-semibold text-text-primary block mb-1">
                     Explicación técnica:
                   </span>
-                  <p className="mt-1 leading-relaxed text-text-secondary">
-                    {ev.explanation}
-                  </p>
+                  <MarkdownRenderer content={ev.explanation} />
                 </div>
               </div>
             </article>

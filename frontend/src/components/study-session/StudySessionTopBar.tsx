@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { IconArrowLeft, IconSparkles } from '@tabler/icons-react'
 import type { StudySession } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 interface StudySessionTopBarProps {
   session: StudySession
@@ -9,20 +10,31 @@ interface StudySessionTopBarProps {
   progressPercent: number
 }
 
-const STEP_LABELS: Record<number, string> = {
-  1: 'Introducción',
-  2: 'Conceptos clave',
-  3: 'Práctica guiada',
-  4: 'Desafío aplicado',
-  5: 'Consolidación',
-}
-
 export function StudySessionTopBar({
   session,
   currentStep,
   totalSteps,
   progressPercent,
 }: StudySessionTopBarProps) {
+  const { t } = useTranslation()
+
+  const getStepLabel = (step: number): string => {
+    switch (step) {
+      case 1:
+        return t('studySession.stepIntro')
+      case 2:
+        return t('studySession.stepConcepts')
+      case 3:
+        return t('studySession.stepPractice')
+      case 4:
+        return t('studySession.stepChallenge')
+      case 5:
+        return t('studySession.stepConsolidation')
+      default:
+        return t('studySession.stepNumber', { number: step })
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 md:px-8">
@@ -31,8 +43,8 @@ export function StudySessionTopBar({
           <Link
             to={`/cursos/${session.courseId}/ruta`}
             className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition-colors duration-150 hover:border-primary/50 hover:bg-surface-high hover:text-text-primary focus-visible:outline-2 focus-visible:outline-primary"
-            aria-label="Salir de la sesión y volver a la ruta"
-            title="Volver a la ruta del curso"
+            aria-label={t('studySession.exitTooltip')}
+            title={t('studySession.exitTooltip')}
           >
             <IconArrowLeft className="size-4.5" />
           </Link>
@@ -44,7 +56,7 @@ export function StudySessionTopBar({
               </span>
               <span className="hidden size-1 rounded-full bg-text-secondary/50 sm:inline-block" />
               <span className="hidden text-xs font-medium text-primary sm:inline-block">
-                Sesión {session.sessionNumber} de {session.totalSessions}
+                {t('studySession.sessionOf', { current: session.sessionNumber, total: session.totalSessions })}
               </span>
             </div>
             <h1 className="truncate font-heading text-sm font-bold text-text-primary md:text-base">
@@ -59,7 +71,7 @@ export function StudySessionTopBar({
           <div className="hidden flex-col items-end gap-1 md:flex">
             <div className="flex items-center gap-2 text-xs">
               <span className="font-semibold text-text-primary">
-                {STEP_LABELS[currentStep] || `Paso ${currentStep}`}
+                {getStepLabel(currentStep)}
               </span>
               <span className="text-text-secondary">
                 ({currentStep}/{totalSteps})
@@ -67,7 +79,7 @@ export function StudySessionTopBar({
             </div>
             <div
               role="progressbar"
-              aria-label="Progreso de la sesión de estudio"
+              aria-label={t('studySession.progressAria')}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progressPercent}
@@ -83,7 +95,7 @@ export function StudySessionTopBar({
           {/* Indicador sutil de recompensa de XP */}
           <div
             className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold text-primary shadow-sm"
-            title="Experiencia que obtendrás al consolidar esta sesión"
+            title={t('studySession.xpTooltip')}
           >
             <IconSparkles className="size-3.5 text-primary" />
             <span>+{session.xpReward} XP</span>

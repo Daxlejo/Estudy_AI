@@ -9,6 +9,7 @@ import {
 import type { CurrentSession } from '../../types/course'
 import ProgressBar from '../ui/ProgressBar'
 import ProgressPath, { type PathNode } from './ProgressPath'
+import { useTranslation } from '../../i18n'
 
 interface CurrentSessionCardProps {
   session: CurrentSession
@@ -27,6 +28,7 @@ function buildPreviewNodes(sessionNumber: number): PathNode[] {
 }
 
 function CurrentSessionCard({ session }: CurrentSessionCardProps) {
+  const { t, formatNumber } = useTranslation()
   const nodes = buildPreviewNodes(session.sessionNumber)
 
   return (
@@ -63,21 +65,21 @@ function CurrentSessionCard({ session }: CurrentSessionCardProps) {
           id="current-session-title"
           className="mt-2 pr-12 font-heading text-xl font-bold tracking-tight text-text-primary md:text-2xl"
         >
-          Sesión {session.sessionNumber} — {session.title}
+          {t('learningPath.session', { number: formatNumber(session.sessionNumber) })} — {session.title}
         </h2>
 
         <ul className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-text-secondary">
           <li className="flex items-center gap-1.5">
             <IconClock className="size-4" />
-            {session.durationMinutes} min
+            {t('common.minutes', { count: formatNumber(session.durationMinutes) })}
           </li>
           <li className="flex items-center gap-1.5">
             <IconLayersLinked className="size-4" />
-            {session.concepts} conceptos
+            {t('common.conceptsCount', { count: formatNumber(session.concepts) })}
           </li>
           <li className="flex items-center gap-1.5">
             <IconFlame className="size-4 text-tertiary" />
-            {session.streakDays} días
+            {t('common.days', { count: formatNumber(session.streakDays) })}
           </li>
         </ul>
 
@@ -85,15 +87,18 @@ function CurrentSessionCard({ session }: CurrentSessionCardProps) {
           <div className="min-w-0">
             <div className="mb-2 flex items-baseline justify-between gap-4">
               <span className="text-sm text-text-secondary">
-                {session.completedSessions} / {session.totalSessions} sesiones
+                {t('common.sessionsCount', {
+                  completed: formatNumber(session.completedSessions),
+                  total: formatNumber(session.totalSessions),
+                })}
               </span>
               <span className="font-heading text-lg font-bold text-text-primary">
-                {session.progressPercent}%
+                {t('common.percent', { percent: formatNumber(session.progressPercent) })}
               </span>
             </div>
             <ProgressBar
               value={session.progressPercent}
-              label={`Progreso de ${session.courseTitle}`}
+              label={`${t('learningPath.pathProgress')}: ${session.courseTitle}`}
             />
 
             <ProgressPath nodes={nodes} showLabels className="mt-6" />
@@ -103,7 +108,7 @@ function CurrentSessionCard({ session }: CurrentSessionCardProps) {
             to={`/sesion/${session.sessionId}`}
             className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-primary px-7 py-4 font-heading text-base font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.03] hover:shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_55%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99]"
           >
-            Continuar aprendiendo
+            {t('home.continueSession')}
             <IconArrowRight className="size-5 transition-transform duration-200 group-hover:translate-x-1" />
           </Link>
         </div>

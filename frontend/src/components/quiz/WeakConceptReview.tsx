@@ -7,6 +7,7 @@ import {
   IconRefresh,
 } from '@tabler/icons-react'
 import type { QuizReviewConcept } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface WeakConceptReviewProps {
   concepts: QuizReviewConcept[]
@@ -78,16 +79,24 @@ export function WeakConceptReview({
                 <IconInfoCircle className="size-4 text-primary shrink-0" />
                 <span>Regla clave y principio técnico</span>
               </div>
-              <p className="text-sm leading-relaxed text-text-primary">
-                {concept.detail}
-              </p>
+              <div className="text-sm leading-relaxed text-text-primary">
+                <MarkdownRenderer content={concept.detail} />
+              </div>
             </div>
 
             {concept.example && (
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-high px-3.5 py-2 font-mono text-xs text-text-primary">
-                <IconCode className="size-4 shrink-0 text-secondary" />
-                <span className="font-semibold text-text-secondary">Ejemplo aplicado:</span>
-                <code className="text-primary font-bold">{concept.example}</code>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
+                  <IconCode className="size-4 shrink-0 text-secondary" />
+                  <span>Ejemplo aplicado:</span>
+                </div>
+                <MarkdownRenderer
+                  content={
+                    concept.example.trim().startsWith('```')
+                      ? concept.example
+                      : `\`\`\`python\n${concept.example}\n\`\`\``
+                  }
+                />
               </div>
             )}
           </div>

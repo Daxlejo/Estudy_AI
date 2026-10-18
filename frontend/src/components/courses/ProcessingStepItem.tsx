@@ -1,5 +1,6 @@
 import { IconCheck, IconLoader2, IconCircle, IconAlertCircle } from '@tabler/icons-react'
 import type { ProcessingStep } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 interface ProcessingStepItemProps {
   step: ProcessingStep
@@ -7,6 +8,7 @@ interface ProcessingStepItemProps {
 }
 
 export function ProcessingStepItem({ step, index }: ProcessingStepItemProps) {
+  const { t } = useTranslation()
   const isCompleted = step.status === 'completed'
   const isInProgress = step.status === 'in_progress'
   const isError = step.status === 'error'
@@ -58,7 +60,7 @@ export function ProcessingStepItem({ step, index }: ProcessingStepItemProps) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-text-secondary/70">
-            Paso {index + 1}
+            {t('studySession.stepNumber', { number: index + 1 })}
           </span>
           {isInProgress && (
             <span className="inline-block size-1.5 rounded-full bg-primary animate-pulse" />

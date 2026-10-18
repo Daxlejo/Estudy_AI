@@ -3,6 +3,7 @@ import type {
   FinalExamAnswer,
   FinalExamQuestion,
 } from '../../types/exam'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 import { MultipleChoiceQuestion } from './MultipleChoiceQuestion'
 import { MatchingQuestion } from './MatchingQuestion'
 import { OrderingQuestion } from './OrderingQuestion'
@@ -55,9 +56,9 @@ export function FinalExamQuestionCard({
       </div>
 
       {/* Enunciado principal de la pregunta */}
-      <h2 className="mt-5 font-heading text-base font-bold leading-relaxed text-text-primary md:text-lg">
-        {question.prompt}
-      </h2>
+      <div className="mt-5 font-heading text-base font-bold leading-relaxed text-text-primary md:text-lg">
+        <MarkdownRenderer content={question.prompt} />
+      </div>
 
       {/* Renderizado dinámico según el tipo discriminado de pregunta */}
       <div className="mt-6">

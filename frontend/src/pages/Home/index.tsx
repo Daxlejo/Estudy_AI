@@ -5,8 +5,10 @@ import CourseCard from '../../components/courses/CourseCard'
 import CurrentSessionCard from '../../components/courses/CurrentSessionCard'
 import { courseService } from '../../services/course.service'
 import type { Course, CurrentSession } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 function Home() {
+  const { t } = useTranslation()
   const [courses, setCourses] = useState<Course[]>([])
   const [session, setSession] = useState<CurrentSession | null>(null)
 
@@ -40,9 +42,9 @@ function Home() {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8 md:py-10">
       <header>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Continúa construyendo tu conocimiento
+          {t('home.title')}
         </h1>
-        <p className="mt-1.5 text-text-secondary">Tu siguiente paso está listo.</p>
+        <p className="mt-1.5 text-text-secondary">{t('home.subtitle')}</p>
       </header>
 
       {session && (
@@ -57,7 +59,7 @@ function Home() {
             id="my-courses-title"
             className="font-heading text-lg font-bold tracking-tight text-text-primary"
           >
-            Mis cursos
+            {t('home.myCourses')}
           </h2>
 
           <Link
@@ -65,13 +67,25 @@ function Home() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3.5 py-2 text-sm font-semibold text-text-secondary transition-colors duration-200 hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <IconPlus className="size-4" />
-            Nuevo curso
+            {t('home.newCourse')}
           </Link>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
           {courses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+            <CourseCard
+              key={course.id}
+              course={course}
+              onCourseUpdated={(updated) => {
+                setCourses((prev) =>
+                  prev.map((c) => (c.id === updated.id ? updated : c)),
+                )
+              }}
+              onCourseDeleted={(deletedId) => {
+                setCourses((prev) => prev.filter((c) => c.id !== deletedId))
+                setSession((prev) => (prev?.courseId === deletedId ? null : prev))
+              }}
+            />
           ))}
         </div>
       </section>

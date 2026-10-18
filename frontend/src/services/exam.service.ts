@@ -8,6 +8,7 @@ import type {
 import { apiClient } from './api'
 
 const localExamResultsStore = new Map<string, FinalExamResult>()
+const localExamsStore = new Map<string, FinalExam>()
 
 interface SanitizedBackendExam {
   id: string
@@ -34,6 +35,22 @@ interface SanitizedBackendExam {
   }>
 }
 
+interface BackendExamFeedbackPayload {
+  selectedOptionId?: string
+  pairs?: Record<string, string>
+  orderedIds?: string[]
+}
+
+interface BackendExamEvalPayload {
+  answered?: boolean
+  selectedOptionId?: string
+  correctOptionId?: string
+  studentPairs?: Record<string, string>
+  correctPairs?: Record<string, string>
+  studentOrder?: string[]
+  correctOrder?: string[]
+}
+
 interface BackendExamAttemptResult {
   score: number
   isPassed: boolean
@@ -43,10 +60,17 @@ interface BackendExamAttemptResult {
     questionId: string
     type: 'MULTIPLE_CHOICE' | 'MATCHING' | 'ORDERING'
     isCorrect: boolean
+    studentPayload?: BackendExamFeedbackPayload | null
     explanation: string
     correctAnswer: unknown
+    evalPayload?: BackendExamEvalPayload | null
   }>
 }
+
+export type ExamSubmissionContext = Pick<
+  FinalExam,
+  'courseId' | 'questions' | 'passingThreshold' | 'passingScorePercent'
+>
 
 export class ExamService {
   /**
@@ -60,7 +84,7 @@ export class ExamService {
     if (res.status === 'LOCKED') {
       const total = res.totalQuestions || 0
       const passingPct = res.passingScorePct || 70
-      return {
+      const lockedExam: FinalExam & { status?: string } = {
         id: res.id,
         courseId: res.courseId,
         courseTitle: 'Evaluación Final del Curso',
@@ -72,6 +96,10 @@ export class ExamService {
         questions: [],
         status: 'LOCKED',
       }
+      localExamsStore.set(res.id, lockedExam)
+      localExamsStore.set(res.courseId, lockedExam)
+      localExamsStore.set(cleanCourseId, lockedExam)
+      return lockedExam
     }
 
     const questions: FinalExamQuestion[] = (res.questions || []).map((q) => {
@@ -113,7 +141,7 @@ export class ExamService {
     const passingPct = res.passingScorePct || 70
     const passingThreshold = Math.ceil((passingPct / 100) * total)
 
-    return {
+    const exam: FinalExam & { status?: string } = {
       id: res.id,
       courseId: res.courseId,
       courseTitle: 'Evaluación Final del Curso',
@@ -125,6 +153,18 @@ export class ExamService {
       questions,
       status: res.status,
     }
+
+    const previousCached = localExamsStore.get(res.id)
+    const cachedSnapshot: FinalExam =
+      questions.length === 0 && previousCached && previousCached.questions.length > 0
+        ? { ...exam, questions: previousCached.questions }
+        : exam
+
+    localExamsStore.set(res.id, cachedSnapshot)
+    localExamsStore.set(res.courseId, cachedSnapshot)
+    localExamsStore.set(cleanCourseId, cachedSnapshot)
+
+    return exam
   }
 
   /**
@@ -133,21 +173,44 @@ export class ExamService {
   async submitFinalExam(
     examId: string,
     answers: FinalExamAnswer[],
+    examContext?: Partial<ExamSubmissionContext>,
   ): Promise<FinalExamResult> {
     try {
+      const cachedExam = localExamsStore.get(examId)
+      const effectiveCourseId = examContext?.courseId || cachedExam?.courseId || ''
+      const effectiveQuestions = examContext?.questions ?? cachedExam?.questions ?? []
+      const effectivePassingPct =
+        examContext?.passingScorePercent ?? cachedExam?.passingScorePercent ?? 70
+
       const payloadAnswers = answers.map((a) => {
         if (a.type === 'MULTIPLE_CHOICE') {
-          return { questionId: a.questionId, payload: { selectedOptionId: a.selectedOptionId } }
+          return {
+            questionId: a.questionId,
+            studentPayload: { selectedOptionId: a.selectedOptionId },
+          }
         }
         if (a.type === 'MATCHING') {
-          return { questionId: a.questionId, payload: { pairs: a.pairs } }
+          return {
+            questionId: a.questionId,
+            studentPayload: { pairs: a.pairs },
+          }
         }
-        return { questionId: a.questionId, payload: { orderedIds: a.orderedIds } }
+        return {
+          questionId: a.questionId,
+          studentPayload: { orderedIds: a.orderedIds },
+        }
       })
 
       const res = await apiClient.post<BackendExamAttemptResult>(
         `/exams/${examId}/attempts`,
         { answers: payloadAnswers },
+      )
+
+      const questionMap = new Map<string, FinalExamQuestion>(
+        effectiveQuestions.map((q) => [q.id, q]),
+      )
+      const answersByQuestionId = new Map<string, FinalExamAnswer>(
+        answers.map((a) => [a.questionId, a]),
       )
 
       const totalQuestions = res.feedback.length
@@ -156,29 +219,123 @@ export class ExamService {
       const weakConceptIds: string[] = []
 
       const evals: FinalExamAnswerEvaluation[] = res.feedback.map((f) => {
-        if (!f.isCorrect) {
-          weakConceptIds.push(f.questionId)
+        const matchedQuestion = questionMap.get(f.questionId)
+        const studentAnswer = answersByQuestionId.get(f.questionId)
+        const conceptId = matchedQuestion?.conceptId || f.questionId
+        const conceptName = matchedQuestion?.conceptName || 'Concepto evaluado'
+        const prompt = matchedQuestion?.prompt || ''
+
+        if (!f.isCorrect && !weakConceptIds.includes(conceptId)) {
+          weakConceptIds.push(conceptId)
         }
-        return {
+
+        const baseEvaluation: FinalExamAnswerEvaluation = {
           questionId: f.questionId,
           type: f.type,
-          prompt: '',
-          conceptId: f.questionId,
-          conceptName: 'Concepto evaluado',
+          prompt,
+          conceptId,
+          conceptName,
           isCorrect: f.isCorrect,
           explanation: f.explanation,
         }
+
+        if (f.type === 'MULTIPLE_CHOICE') {
+          const selectedOptionId =
+            (studentAnswer?.type === 'MULTIPLE_CHOICE'
+              ? studentAnswer.selectedOptionId
+              : undefined) ??
+            f.studentPayload?.selectedOptionId ??
+            f.evalPayload?.selectedOptionId
+          const correctOptionId =
+            (typeof f.correctAnswer === 'string' ? f.correctAnswer : undefined) ??
+            f.evalPayload?.correctOptionId
+          const options =
+            matchedQuestion?.type === 'MULTIPLE_CHOICE' ? matchedQuestion.options : []
+
+          return {
+            ...baseEvaluation,
+            selectedOptionText:
+              options.find((o) => o.id === selectedOptionId)?.text ||
+              (selectedOptionId ? selectedOptionId : 'Sin respuesta seleccionada'),
+            correctOptionText:
+              options.find((o) => o.id === correctOptionId)?.text ||
+              (correctOptionId ?? ''),
+          }
+        }
+
+        if (f.type === 'MATCHING') {
+          const studentPairs =
+            (studentAnswer?.type === 'MATCHING' ? studentAnswer.pairs : undefined) ??
+            f.studentPayload?.pairs ??
+            f.evalPayload?.studentPairs ??
+            {}
+          const correctPairs =
+            (f.correctAnswer &&
+            typeof f.correctAnswer === 'object' &&
+            !Array.isArray(f.correctAnswer)
+              ? (f.correctAnswer as Record<string, string>)
+              : undefined) ??
+            f.evalPayload?.correctPairs ??
+            {}
+          const leftMap = new Map(
+            matchedQuestion?.type === 'MATCHING'
+              ? matchedQuestion.leftItems.map((item) => [item.id, item.text])
+              : [],
+          )
+          const rightMap = new Map(
+            matchedQuestion?.type === 'MATCHING'
+              ? matchedQuestion.rightItems.map((item) => [item.id, item.text])
+              : [],
+          )
+
+          return {
+            ...baseEvaluation,
+            studentPairsDisplay: Object.entries(studentPairs).map(([lId, rId]) => ({
+              left: leftMap.get(lId) || lId,
+              right: rightMap.get(rId) || rId,
+            })),
+            correctPairsDisplay: Object.entries(correctPairs).map(([lId, rId]) => ({
+              left: leftMap.get(lId) || lId,
+              right: rightMap.get(rId) || rId,
+            })),
+          }
+        }
+
+        const studentOrder =
+          (studentAnswer?.type === 'ORDERING' ? studentAnswer.orderedIds : undefined) ??
+          f.studentPayload?.orderedIds ??
+          f.evalPayload?.studentOrder ??
+          []
+        const correctOrder =
+          (Array.isArray(f.correctAnswer) ? (f.correctAnswer as string[]) : undefined) ??
+          f.evalPayload?.correctOrder ??
+          []
+        const itemMap = new Map(
+          matchedQuestion?.type === 'ORDERING'
+            ? matchedQuestion.items.map((item) => [item.id, item.text])
+            : [],
+        )
+
+        return {
+          ...baseEvaluation,
+          studentOrderDisplay: studentOrder.map((id) => itemMap.get(id) || id),
+          correctOrderDisplay: correctOrder.map((id) => itemMap.get(id) || id),
+        }
       })
+
+      const passingThreshold =
+        examContext?.passingThreshold ??
+        Math.ceil((effectivePassingPct / 100) * totalQuestions)
 
       const result: FinalExamResult = {
         examId,
-        courseId: '',
+        courseId: effectiveCourseId,
         totalQuestions,
         correctAnswers,
         incorrectAnswers,
         scorePercent: res.score,
         passed: res.isPassed,
-        passingThreshold: Math.ceil(totalQuestions * 0.7),
+        passingThreshold,
         weakConceptIds,
         evaluations: evals,
         attemptNumber: res.attemptNumber,
@@ -186,6 +343,9 @@ export class ExamService {
       }
 
       localExamResultsStore.set(examId, result)
+      if (effectiveCourseId) {
+        localExamResultsStore.set(effectiveCourseId, result)
+      }
       return result
     } catch (err) {
       console.error('[ExamService] Error al evaluar examen final en backend:', err)
@@ -210,6 +370,9 @@ export class ExamService {
   }> {
     try {
       const cleanCourseId = courseId.replace(/-exam$/, '')
+      if (!cleanCourseId) {
+        return { inCooldown: false, remainingSeconds: 0 }
+      }
       const res = await apiClient.get<SanitizedBackendExam>(`/courses/${cleanCourseId}/exam`)
       if (res && res.status === 'COOLDOWN' && res.cooldownUntil) {
         const remaining = Math.max(
@@ -241,7 +404,15 @@ export class ExamService {
    * Inicia el reintento del examen final tras cumplirse el periodo de enfriamiento.
    */
   async startFinalExamRetry(courseId: string): Promise<FinalExam> {
-    return this.getFinalExam(courseId)
+    const cleanCourseId = courseId.replace(/-exam$/, '')
+    const cachedExam = localExamsStore.get(cleanCourseId)
+    if (cachedExam) {
+      localExamResultsStore.delete(cachedExam.id)
+    }
+    localExamResultsStore.delete(cleanCourseId)
+    const exam = await this.getFinalExam(cleanCourseId)
+    localExamResultsStore.delete(exam.id)
+    return exam
   }
 
   /**

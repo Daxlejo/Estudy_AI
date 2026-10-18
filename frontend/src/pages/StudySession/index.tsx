@@ -66,35 +66,48 @@ function StudySession() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-8 text-center">
-        <IconLoader2 className="size-8 animate-spin text-primary" />
-        <p className="font-heading text-sm font-semibold text-text-secondary">
-          Preparando tu sesión de estudio...
-        </p>
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="flex max-w-md flex-col items-center gap-4 rounded-3xl border border-border bg-surface p-8 text-center shadow-lg animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary shadow-sm">
+            <IconLoader2 className="size-8 animate-spin" />
+          </div>
+          <div>
+            <h2 className="font-heading text-lg font-bold text-text-primary">
+              Preparando tu sesión de estudio
+            </h2>
+            <p className="mt-1.5 text-xs leading-relaxed text-text-secondary md:text-sm">
+              Cargando conceptos pedagógicos, bloques interactivos y desafíos aplicados...
+            </p>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!session) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16 text-center">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-danger/10 text-danger">
-          <IconAlertCircle className="size-8" />
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="flex max-w-md flex-col items-center gap-4 rounded-3xl border border-border bg-surface p-8 text-center shadow-lg animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex size-16 items-center justify-center rounded-2xl border border-danger/30 bg-danger/10 text-danger">
+            <IconAlertCircle className="size-8" />
+          </div>
+          <h1 className="font-heading text-xl font-bold text-text-primary">
+            Sesión de estudio no encontrada
+          </h1>
+          <p className="text-xs leading-relaxed text-text-secondary md:text-sm">
+            No pudimos localizar la sesión solicitada. Verifica el identificador o regresa al catálogo
+            de cursos para continuar tu ruta.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/cursos"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-heading text-sm font-bold text-on-primary shadow-sm transition-transform hover:scale-[1.02]"
+            >
+              <IconArrowLeft className="size-4" />
+              Volver a mis cursos
+            </Link>
+          </div>
         </div>
-        <h1 className="mt-4 font-heading text-2xl font-bold text-text-primary">
-          Sesión de estudio no encontrada
-        </h1>
-        <p className="mt-2 max-w-md text-sm text-text-secondary">
-          No pudimos localizar la sesión solicitada. Verifica el identificador o regresa al catálogo
-          de cursos.
-        </p>
-        <Link
-          to="/cursos"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-heading text-sm font-bold text-on-primary shadow-sm transition-transform hover:scale-[1.02]"
-        >
-          <IconArrowLeft className="size-4" />
-          Volver a mis cursos
-        </Link>
       </div>
     )
   }

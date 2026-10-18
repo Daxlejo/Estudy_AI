@@ -6,6 +6,18 @@ export type CourseStatus =
   | 'COMPLETED'
   | 'ERROR'
 
+export type CourseBannerKey =
+  | 'deep-space'
+  | 'forest-notebook'
+  | 'sunset-study'
+  | 'ocean-focus'
+  | 'minimal-paper'
+  | 'neon-lab'
+  | 'golden-hour'
+  | 'rainy-window'
+  | 'cherry-blossom'
+  | 'midnight-ink'
+
 export interface CourseMaterial {
   id: string
   name: string
@@ -29,6 +41,7 @@ export interface Course {
   id: string
   name: string
   description?: string
+  bannerKey?: CourseBannerKey | string | null
   status: CourseStatus
   progress: CourseProgress
   materials: CourseMaterial[]
@@ -62,6 +75,7 @@ export interface ProcessingStep {
 export interface CourseProcessingState {
   courseId: string
   courseName: string
+  bannerKey?: CourseBannerKey | string | null
   status: ProcessingStatus
   progressPercent: number
   currentStepIndex: number
@@ -77,6 +91,8 @@ export interface CourseProcessingState {
 export interface CreateCourseDto {
   name: string
   description?: string
+  bannerKey?: CourseBannerKey | string
+  language?: 'es' | 'en'
   materials: Array<{
     name: string
     sizeBytes: number
@@ -132,6 +148,10 @@ export interface SessionConcept {
   example?: string
 }
 
+import type { LearningActivity } from './activity'
+
+export type { LearningActivity } from './activity'
+
 export interface PracticeOption {
   id: string
   text: string
@@ -144,6 +164,7 @@ export interface PracticeExercise {
   prompt: string
   context?: string
   options: PracticeOption[]
+  activity?: LearningActivity
 }
 
 export interface StudySession {
@@ -166,6 +187,8 @@ export interface StudySession {
   guidedPractice: PracticeExercise
   challenge: PracticeExercise
   quizId: string
+  guidedPracticeActivity?: LearningActivity
+  challengeActivity?: LearningActivity
 }
 
 /**

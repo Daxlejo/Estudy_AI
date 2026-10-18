@@ -15,6 +15,7 @@ import type {
 import { examService } from './exam.service'
 import type { FinalExamAnswer } from '../types/exam'
 import { apiClient, ApiError } from './api'
+import { getInitialLanguage } from '../i18n/languageStorage'
 import {
   type BackendCourse,
   type BackendSession,
@@ -29,6 +30,7 @@ import {
   mapBackendStudySession,
   mapBackendQuiz,
   mapBackendQuizResult,
+  buildCurrentSessionForCourse,
 } from './course.mapper'
 
 export { formatFileSize }
@@ -73,9 +75,7 @@ export function getMinimumCorrectAnswers(totalQuestions: number): number {
 const localQuizAttemptStore = new Map<string, number>()
 
 class CourseService {
-  /**
-   * Obtiene la lista completa de cursos del usuario desde el backend real.
-   */
+  // Obtiene la lista completa de cursos del usuario desde el backend real.
   async getCourses(): Promise<Course[]> {
     try {
       const backendCourses = await apiClient.get<BackendCourse[]>('/courses')
@@ -99,9 +99,7 @@ class CourseService {
     }
   }
 
-  /**
-   * Obtiene el detalle de un curso por ID desde el backend real.
-   */
+  // Obtiene el detalle de un curso por ID desde el backend real.
   async getCourse(courseId: string): Promise<Course | null> {
     try {
       const c = await apiClient.get<BackendCourse>(`/courses/${courseId}`)
@@ -121,9 +119,7 @@ class CourseService {
     return null
   }
 
-  /**
-   * Obtiene la ruta de aprendizaje estructurada de un curso desde el backend real.
-   */
+  // Obtiene la ruta de aprendizaje estructurada de un curso desde el backend real.
   async getLearningPath(courseId: string): Promise<LearningPath | null> {
     try {
       const [course, sessions, progress] = await Promise.all([
@@ -159,45 +155,45 @@ class CourseService {
     return null
   }
 
-  /**
-   * Obtiene la sesión de estudio actual sugerida para el usuario desde cursos y sesiones reales.
-   */
+  // Obtiene la sesión de estudio actual sugerida para el usuario desde cursos y sesiones reales.
   async getCurrentSession(): Promise<CurrentSession | null> {
     const courses = await this.getCourses()
-    if (!courses || courses.length === 0) return null
+    if (!Array.isArray(courses) || courses.length === 0) return null
 
-    const activeCourse =
-      courses.find((c) => c.status === 'IN_PROGRESS' || c.status === 'READY') || courses[0]
-    if (!activeCourse) return null
+    const candidateCourses = [
+      ...courses.filter(
+        (c) =>
+          c &&
+          (c.status === 'IN_PROGRESS' ||
+            (c.status === 'READY' &&
+              (c.progress?.completedSessions ?? 0) > 0 &&
+              (c.progress?.completedSessions ?? 0) < (c.progress?.totalSessions ?? 0))),
+      ),
+      ...courses.filter(
+        (c) =>
+          c &&
+          c.status === 'READY' &&
+          !((c.progress?.completedSessions ?? 0) > 0 && (c.progress?.completedSessions ?? 0) < (c.progress?.totalSessions ?? 0)),
+      ),
+    ]
 
-    try {
-      const sessions = await apiClient.get<BackendSession[]>(`/courses/${activeCourse.id}/sessions`)
-      if (sessions && sessions.length > 0) {
-        const currentSession = sessions[0]
-        return {
-          courseId: activeCourse.id,
-          courseTitle: activeCourse.name,
-          sessionId: currentSession.id,
-          sessionNumber: currentSession.sequenceOrder,
-          title: currentSession.title,
-          completedSessions: activeCourse.progress?.completedSessions || 0,
-          totalSessions: sessions.length,
-          progressPercent: activeCourse.progress?.progressPercent || 0,
-          durationMinutes: currentSession.durationMinutes || 15,
-          concepts: 3,
-          streakDays: 1,
-        }
+    for (const course of candidateCourses) {
+      try {
+        const [sessions, progress] = await Promise.all([
+          apiClient.get<BackendSession[]>(`/courses/${course.id}/sessions`),
+          apiClient.get<CourseProgressResult>(`/courses/${course.id}/progress`).catch(() => null),
+        ])
+        const current = buildCurrentSessionForCourse(course, sessions, progress)
+        if (current) return current
+      } catch {
+        // continuar con el siguiente curso elegible
       }
-    } catch {
-      // Sin sesiones activas
     }
 
     return null
   }
 
-  /**
-   * Obtiene una sesión de estudio completa con su material didáctico desde el backend real.
-   */
+  // Obtiene una sesión de estudio completa con su material didáctico desde el backend real.
   async getStudySession(sessionId: string): Promise<StudySession | null> {
     try {
       const session = await apiClient.get<BackendSession & { concepts: BackendConcept[] }>(
@@ -225,16 +221,12 @@ class CourseService {
     return null
   }
 
-  /**
-   * Calcula el umbral mínimo determinista de respuestas correctas.
-   */
+  // Calcula el umbral mínimo determinista de respuestas correctas.
   getMinimumCorrectAnswers(totalQuestions: number): number {
     return getMinimumCorrectAnswers(totalQuestions)
   }
 
-  /**
-   * Obtiene la estructura completa de un miniquiz correspondiente a una sesión o ID.
-   */
+  // Obtiene la estructura completa de un miniquiz correspondiente a una sesión o ID.
   async getQuiz(quizOrSessionId: string): Promise<Quiz | null> {
     let data: BackendQuizResponse | null
     try {
@@ -266,9 +258,7 @@ class CourseService {
     }
   }
 
-  /**
-   * Evalúa las respuestas del estudiante en el miniquiz usando el backend real.
-   */
+  // Evalúa las respuestas del estudiante en el miniquiz usando el backend real.
   async submitQuiz(quizId: string, answers: QuizAnswer[]): Promise<QuizResult> {
     const currentQuiz = await this.getQuiz(quizId).catch(() => null)
     const response = await apiClient.post<BackendSubmitQuizResponse>(
@@ -283,9 +273,7 @@ class CourseService {
     return mapBackendQuizResult(quizId, response, currentQuiz)
   }
 
-  /**
-   * Obtiene la explicación y reglas pedagógicas asociadas a los conceptos débiles detectados.
-   */
+  // Obtiene la explicación y reglas pedagógicas asociadas a los conceptos débiles detectados.
   async getReviewConcepts(quizId: string, weakConceptIds: string[]): Promise<QuizReviewConcept[]> {
     const results: QuizReviewConcept[] = []
     let sessionConcepts: BackendConcept[] = []
@@ -326,9 +314,7 @@ class CourseService {
     return results
   }
 
-  /**
-   * Genera un nuevo intento de miniquiz preservando la identidad del curso y sesión activa.
-   */
+  // Genera un nuevo intento de miniquiz preservando la identidad del curso y sesión activa.
   async retryQuiz(quizId: string, weakConceptIds?: string[]): Promise<Quiz> {
     void weakConceptIds
     const quiz = await this.getQuiz(quizId)
@@ -350,14 +336,13 @@ class CourseService {
     }
   }
 
-  /**
-   * Crea un nuevo curso y sube los materiales al backend real, disparando el pipeline de IA.
-   */
+  // Crea un nuevo curso y sube los materiales al backend real, disparando el pipeline de IA con el idioma elegido.
   async createCourse(dto: CreateCourseDto): Promise<Course> {
     try {
       const created = await apiClient.post<BackendCourse>('/courses', {
         name: dto.name.trim(),
         description: dto.description?.trim() || undefined,
+        ...(dto.bannerKey ? { bannerKey: dto.bannerKey } : {}),
       })
 
       const uploadedMaterialIds: string[] = []
@@ -376,14 +361,17 @@ class CourseService {
         }
       }
 
+      const targetLanguage = dto.language || getInitialLanguage()
       await apiClient.post(`/courses/${created.id}/generate`, {
         materialIds: uploadedMaterialIds.length > 0 ? uploadedMaterialIds : undefined,
+        language: targetLanguage,
       })
 
       return {
         id: created.id,
         name: created.name,
         description: created.description || undefined,
+        ...(created.bannerKey ? { bannerKey: created.bannerKey } : {}),
         status: 'PROCESSING',
         progress: {
           completedSessions: 0,
@@ -406,9 +394,7 @@ class CourseService {
     }
   }
 
-  /**
-   * Obtiene el estado actual de procesamiento de un curso desde el backend real.
-   */
+  // Obtiene el estado actual de procesamiento de un curso desde el backend real.
   async getCourseProcessingStatus(courseId: string): Promise<CourseProcessingState | null> {
     try {
       const res = await apiClient.get<GenerationStatusResponse>(
@@ -433,6 +419,7 @@ class CourseService {
         return {
           courseId: res.courseId,
           courseName: res.courseName,
+          bannerKey: res.bannerKey ?? undefined,
           status,
           progressPercent: res.progressPercent ?? 0,
           currentStepIndex: res.currentStepIndex ?? 0,
@@ -460,6 +447,7 @@ class CourseService {
       return {
         courseId,
         courseName: course.name,
+        bannerKey: course.bannerKey,
         status: 'COMPLETED',
         progressPercent: 100,
         currentStepIndex: completedSteps.length,
@@ -475,12 +463,12 @@ class CourseService {
     return null
   }
 
-  /**
-   * Reinicia la generación tras un error.
-   */
+  // Reinicia la generación tras un error.
   async retryCourseProcessing(courseId: string): Promise<CourseProcessingState> {
     try {
-      await apiClient.post(`/courses/${courseId}/generate`)
+      await apiClient.post(`/courses/${courseId}/generate`, {
+        language: getInitialLanguage(),
+      })
       const updated = await this.getCourseProcessingStatus(courseId)
       if (updated) return updated
     } catch (error) {
@@ -496,6 +484,7 @@ class CourseService {
     return {
       courseId,
       courseName: course?.name ?? 'Curso',
+      bannerKey: course?.bannerKey,
       status: 'EXTRACTING',
       progressPercent: 15,
       currentStepIndex: 0,
@@ -508,10 +497,7 @@ class CourseService {
     }
   }
 
-  /**
-   * Sondea en vivo el estado real de procesamiento del backend y notifica a la UI.
-   * Cancela el polling cuando finaliza (COMPLETED o ERROR) o si el componente se desmonta.
-   */
+  // Sondea en vivo el estado real de procesamiento del backend y notifica a la UI.
   subscribeToProcessing(
     courseId: string,
     onUpdate: (state: CourseProcessingState) => void,
@@ -550,10 +536,6 @@ class CourseService {
     }
   }
 
-  // ============================================================
-  // FINAL EXAM DELEGATIONS
-  // ============================================================
-
   async getFinalExam(examIdOrCourseId: string) {
     return examService.getFinalExam(examIdOrCourseId)
   }
@@ -576,6 +558,38 @@ class CourseService {
 
   async startFinalExamRetry(courseId: string) {
     return examService.startFinalExamRetry(courseId)
+  }
+
+  // Actualiza los metadatos de un curso (nombre, descripción y/o bannerKey) en el backend.
+  async updateCourse(
+    courseId: string,
+    data: { name?: string; description?: string | null; bannerKey?: string | null },
+  ): Promise<Course> {
+    const payload: { name?: string; description?: string | null; bannerKey?: string | null } = {}
+    if (data.name !== undefined) {
+      payload.name = data.name.trim()
+    }
+    if (data.description !== undefined) {
+      payload.description =
+        data.description === null ? null : data.description.trim() || null
+    }
+    if (data.bannerKey !== undefined) {
+      payload.bannerKey = data.bannerKey
+    }
+
+    const updated = await apiClient.patch<BackendCourse>(`/courses/${courseId}`, payload)
+    let prog: CourseProgressResult | undefined
+    try {
+      prog = await apiClient.get<CourseProgressResult>(`/courses/${updated.id}/progress`)
+    } catch {
+      // sin progreso disponible
+    }
+    return mapBackendCourseToFrontend(updated, prog)
+  }
+
+  // Elimina un curso y todos sus datos relacionados de forma segura en el backend.
+  async deleteCourse(courseId: string): Promise<void> {
+    await apiClient.delete<void>(`/courses/${courseId}`)
   }
 }
 
