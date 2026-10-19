@@ -383,7 +383,7 @@ export function buildOrderingActivityFromContent(
         : 'Desafío Aplicado: Orden de Ejecución',
     instructions,
     context: `Objetivo: ${context.learningObjective}`,
-    hint: `El primer paso esencial comienza con: "${steps[0]}".`,
+    hint: 'Piensa en la secuencia lógica del proceso.',
     orderingHint: 'Desplaza cada elemento con los botones ▲ y ▼ para establecer el orden lógico.',
     explanation:
       '¡Secuencia correcta! Seguir este orden secuencial garantiza la correcta aplicación de los conceptos.',

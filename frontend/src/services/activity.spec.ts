@@ -279,6 +279,8 @@ test('Course-Specific Content Generation (No Hardcoded Domain Examples)', async 
     assert.strictEqual(act.type, 'ordering')
     assert.strictEqual(act.items.length, 3)
     assert.strictEqual(act.instructions, 'Instrucción explícita de despliegue')
+    // La pista no debe revelar ningún paso
+    assert.ok(!act.hint?.includes('Configurar entorno'))
   })
 
   await t.test('parseOrBuildActivity gracefully handles empty or malformed inputs without crashing', () => {
