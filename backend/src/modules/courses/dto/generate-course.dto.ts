@@ -11,4 +11,3 @@ export class GenerateCourseDto {
   @IsIn(['es', 'en'])
   language?: 'es' | 'en';
 }
-
