@@ -48,6 +48,24 @@ export function MatchingActivityView({
   const { t } = useTranslation()
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null)
   const [sequentialIndex, setSequentialIndex] = useState(0)
+  const [selectedSequentialOptionId, setSelectedSequentialOptionId] = useState<string | null>(null)
+  const [sequentialFeedbackVisible, setSequentialFeedbackVisible] = useState<boolean>(
+    Boolean(evaluation),
+  )
+  const [verifiedSequentialPairs, setVerifiedSequentialPairs] = useState<Record<string, string>>(
+    () => (evaluation ? { ...pairs } : {}),
+  )
+  const [prevEvaluation, setPrevEvaluation] = useState<MatchingEvaluation | null>(evaluation)
+  if (prevEvaluation !== evaluation) {
+    setPrevEvaluation(evaluation)
+    if (evaluation !== null) {
+      setVerifiedSequentialPairs({ ...pairs })
+      setSequentialFeedbackVisible(true)
+    } else {
+      setVerifiedSequentialPairs({})
+      setSequentialFeedbackVisible(false)
+    }
+  }
   const [manualModeOverride, setManualModeOverride] = useState<MatchingInteractionMode | null>(null)
   const [measuredWidth, setMeasuredWidth] = useState<number>(() => {
     if (typeof viewportWidth === 'number') return viewportWidth
@@ -273,9 +291,25 @@ export function MatchingActivityView({
   }
 
   const handleSequentialSelect = (leftId: string, rightId: string) => {
-    if (isLocked) return
+    if (disabled) return
+    // Guardar opción seleccionada y limpiar cualquier retroalimentación previa
+    setSelectedSequentialOptionId(rightId)
+    setSequentialFeedbackVisible(false)
+    setVerifiedSequentialPairs((prev) => {
+      if (!(leftId in prev)) return prev
+      const next = { ...prev }
+      delete next[leftId]
+      return next
+    })
     const updated = { ...pairs, [leftId]: rightId }
     onChangePairs(updated)
+  }
+
+  const handleSequentialNavigate = (nextIndex: number) => {
+    // Limpiar retroalimentación y selección activa antes de avanzar al siguiente concepto
+    setSequentialFeedbackVisible(false)
+    setSelectedSequentialOptionId(null)
+    setSequentialIndex(nextIndex)
   }
 
   const getPairEvaluation = (leftId: string) => {
@@ -729,6 +763,10 @@ export function MatchingActivityView({
                   const isAnsweredItem = Boolean(pairs[item.id])
                   const isActiveItem = idx === safeSequentialIndex
                   const itemEval = getPairEvaluation(item.id)
+                  const isItemVerified =
+                    evaluation !== null &&
+                    Boolean(pairs[item.id]) &&
+                    verifiedSequentialPairs[item.id] === pairs[item.id]
 
                   return (
                     <button
@@ -736,11 +774,11 @@ export function MatchingActivityView({
                       type="button"
                       role="tab"
                       aria-selected={isActiveItem}
-                      onClick={() => setSequentialIndex(idx)}
+                      onClick={() => handleSequentialNavigate(idx)}
                       className={`inline-flex size-8 items-center justify-center rounded-lg border font-mono text-xs font-bold transition-all ${
                         isActiveItem
                           ? 'border-primary bg-primary text-on-primary shadow-xs'
-                          : itemEval
+                          : isItemVerified && itemEval
                             ? itemEval.isCorrect
                               ? 'border-secondary/60 bg-secondary/15 text-secondary'
                               : 'border-danger/60 bg-danger/15 text-danger'
@@ -784,17 +822,29 @@ export function MatchingActivityView({
                 aria-label={currentLeftItem.text}
               >
                 {sequentialOptions.map((option, optIdx) => {
-                  const selectedRightId = pairs[currentLeftItem.id]
+                  const selectedRightId =
+                    selectedSequentialOptionId ?? pairs[currentLeftItem.id] ?? null
                   const isSelectedOption = selectedRightId === option.id
+                  const isCurrentSelectionVerified =
+                    sequentialFeedbackVisible &&
+                    evaluation !== null &&
+                    Boolean(selectedRightId) &&
+                    verifiedSequentialPairs[currentLeftItem.id] === selectedRightId
                   const isOptionCorrectForCurrent = option.id === currentLeftItem.id
                   const optionLetter = String.fromCharCode(65 + optIdx)
 
                   let optionClasses =
                     'border-border bg-surface hover:border-primary/40 text-text-primary'
                   if (isSelectedOption) {
-                    optionClasses = isOptionCorrectForCurrent
-                      ? 'border-secondary/70 bg-secondary/10 ring-2 ring-secondary/25'
-                      : 'border-danger/70 bg-danger/10 ring-2 ring-danger/25 activity-shake-error'
+                    if (isCurrentSelectionVerified) {
+                      optionClasses = isOptionCorrectForCurrent
+                        ? 'border-secondary/70 bg-secondary/10 ring-2 ring-secondary/25'
+                        : 'border-danger/70 bg-danger/10 ring-2 ring-danger/25 activity-shake-error'
+                    } else {
+                      // Resaltado neutro antes de verificar o tras cambiar de opción
+                      optionClasses =
+                        'border-primary bg-primary/10 ring-2 ring-primary/25 text-text-primary'
+                    }
                   }
 
                   return (
@@ -803,20 +853,22 @@ export function MatchingActivityView({
                       type="button"
                       role="radio"
                       aria-checked={isSelectedOption}
-                      disabled={isLocked}
+                      disabled={disabled}
                       onClick={() => handleSequentialSelect(currentLeftItem.id, option.id)}
                       className={`flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-all focus-visible:outline-2 focus-visible:outline-primary ${optionClasses}`}
                     >
                       <span
                         className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md font-heading text-xs font-bold ${
                           isSelectedOption
-                            ? isOptionCorrectForCurrent
-                              ? 'bg-secondary text-on-primary'
-                              : 'bg-danger text-on-primary'
+                            ? isCurrentSelectionVerified
+                              ? isOptionCorrectForCurrent
+                                ? 'bg-secondary text-on-primary'
+                                : 'bg-danger text-on-primary'
+                              : 'bg-primary text-on-primary'
                             : 'border border-border bg-surface-high text-text-secondary'
                         }`}
                       >
-                        {isSelectedOption ? (
+                        {isSelectedOption && isCurrentSelectionVerified ? (
                           isOptionCorrectForCurrent ? (
                             <IconCheck className="size-3.5" />
                           ) : (
@@ -834,46 +886,56 @@ export function MatchingActivityView({
                 })}
               </div>
 
-              {/* Retroalimentación inmediata por selección en modo secuencial */}
-              {pairs[currentLeftItem.id] && (
-                <div
-                  className={`mt-4 flex items-start gap-2.5 rounded-xl border p-3 text-xs ${
-                    pairs[currentLeftItem.id] === currentLeftItem.id
-                      ? 'border-secondary/40 bg-secondary/10 text-secondary'
-                      : 'border-danger/40 bg-danger/10 text-danger'
-                  }`}
-                >
-                  {pairs[currentLeftItem.id] === currentLeftItem.id ? (
-                    <IconCircleCheckFilled className="size-4 shrink-0 text-secondary" />
-                  ) : (
-                    <IconAlertCircleFilled className="size-4 shrink-0 text-danger" />
-                  )}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="font-bold">
-                      {pairs[currentLeftItem.id] === currentLeftItem.id
-                        ? t('activity.matching.immediateCorrect')
-                        : t('activity.matching.immediateIncorrect')}
-                    </p>
-                    {showSolution && pairs[currentLeftItem.id] !== currentLeftItem.id && (
-                      <p className="text-text-primary">
-                        <span className="font-semibold">
-                          {t('activity.matching.correctMatch')}{' '}
-                        </span>
-                        {
-                          referencePairs.find((p) => p.id === currentLeftItem.id)?.right
-                        }
-                      </p>
+              {/* Retroalimentación mostrada únicamente después de verificar la solución */}
+              {(() => {
+                const activeSelectedRightId =
+                  selectedSequentialOptionId ?? pairs[currentLeftItem.id] ?? null
+                const isVerifiedForCurrent =
+                  sequentialFeedbackVisible &&
+                  evaluation !== null &&
+                  Boolean(activeSelectedRightId) &&
+                  verifiedSequentialPairs[currentLeftItem.id] === activeSelectedRightId
+                if (!isVerifiedForCurrent || !activeSelectedRightId) return null
+                const isCurrentCorrect = activeSelectedRightId === currentLeftItem.id
+
+                return (
+                  <div
+                    className={`mt-4 flex items-start gap-2.5 rounded-xl border p-3 text-xs ${
+                      isCurrentCorrect
+                        ? 'border-secondary/40 bg-secondary/10 text-secondary'
+                        : 'border-danger/40 bg-danger/10 text-danger'
+                    }`}
+                  >
+                    {isCurrentCorrect ? (
+                      <IconCircleCheckFilled className="size-4 shrink-0 text-secondary" />
+                    ) : (
+                      <IconAlertCircleFilled className="size-4 shrink-0 text-danger" />
                     )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="font-bold">
+                        {isCurrentCorrect
+                          ? t('activity.matching.immediateCorrect')
+                          : t('activity.matching.immediateIncorrect')}
+                      </p>
+                      {showSolution && !isCurrentCorrect && (
+                        <p className="text-text-primary">
+                          <span className="font-semibold">
+                            {t('activity.matching.correctMatch')}{' '}
+                          </span>
+                          {referencePairs.find((p) => p.id === currentLeftItem.id)?.right}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Controles de avance entre conceptos del modo secuencial */}
               <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
                 <button
                   type="button"
                   disabled={safeSequentialIndex === 0}
-                  onClick={() => setSequentialIndex((i) => Math.max(0, i - 1))}
+                  onClick={() => handleSequentialNavigate(Math.max(0, safeSequentialIndex - 1))}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <IconArrowLeft className="size-3.5" />
@@ -884,7 +946,9 @@ export function MatchingActivityView({
                   type="button"
                   disabled={safeSequentialIndex >= leftItems.length - 1}
                   onClick={() =>
-                    setSequentialIndex((i) => Math.min(leftItems.length - 1, i + 1))
+                    handleSequentialNavigate(
+                      Math.min(leftItems.length - 1, safeSequentialIndex + 1),
+                    )
                   }
                   className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
