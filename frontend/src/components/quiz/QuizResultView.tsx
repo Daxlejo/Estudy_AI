@@ -29,7 +29,39 @@ export function QuizResultView({
   const [showAllQuestions, setShowAllQuestions] = useState(false)
   const incorrectAnswers = result.answers.filter((a) => !a.isCorrect)
 
-  if (result.passed) {
+  // Estado seguro cuando no hay preguntas evaluables para evitar división por cero
+  if (result.totalQuestions === 0) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-300">
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-surface p-8 text-center shadow-lg md:p-10">
+          <h2 className="font-heading text-xl font-bold text-text-primary md:text-2xl">
+            Resultado indeterminado
+          </h2>
+          <p className="mt-2 text-sm text-text-secondary md:text-base">
+            No se registraron preguntas en esta evaluación para calcular una calificación.
+          </p>
+          <div className="mt-6 flex items-center justify-center">
+            <Link
+              to={`/cursos/${result.courseId}/ruta`}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary"
+            >
+              <IconBook className="size-4" />
+              Ver ruta de aprendizaje
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const isPassed =
+    (result.correctAnswers / result.totalQuestions) * 100 >= result.passingThreshold
+  const missingAnswers = Math.max(
+    1,
+    Math.ceil((result.passingThreshold / 100) * result.totalQuestions) - result.correctAnswers,
+  )
+
+  if (isPassed) {
     return (
       <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
         {/* Banner de Felicitación / Aprobación */}
@@ -64,7 +96,7 @@ export function QuizResultView({
                   {result.correctAnswers} / {result.totalQuestions}
                 </span>
                 <span className="text-[11px] text-text-secondary">
-                  mín. {result.passingThreshold} requeridas
+                  mín. {result.passingThreshold}% de aciertos
                 </span>
               </div>
 
@@ -197,7 +229,7 @@ export function QuizResultView({
           </h2>
 
           <p className="mt-2 max-w-xl text-sm text-text-secondary md:text-base">
-            Obtuviste <span className="font-bold text-text-primary">{result.correctAnswers} de {result.totalQuestions} aciertos</span> ({result.scorePercent}%). Para desbloquear la siguiente sesión se requieren al menos <span className="font-semibold text-text-primary">{result.passingThreshold} aciertos</span>.
+            Obtuviste <span className="font-bold text-text-primary">{result.correctAnswers} de {result.totalQuestions} aciertos</span> ({result.scorePercent}%). Para desbloquear la siguiente sesión se requiere <span className="font-semibold text-text-primary">mín. {result.passingThreshold}% de aciertos</span>.
           </p>
 
           {/* Tarjeta de Métricas */}
@@ -213,10 +245,10 @@ export function QuizResultView({
             <div className="flex flex-col items-center border-l border-border">
               <span className="text-xs font-medium text-text-secondary">Mínimo para aprobar</span>
               <span className="mt-0.5 font-heading text-xl font-bold text-text-primary md:text-2xl">
-                {result.passingThreshold} aciertos
+                mín. {result.passingThreshold}% de aciertos
               </span>
               <span className="text-[11px] text-text-secondary">
-                Faltaron {result.passingThreshold - result.correctAnswers} respuesta(s)
+                Faltaron {missingAnswers} respuesta(s)
               </span>
             </div>
           </div>
