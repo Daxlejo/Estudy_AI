@@ -519,4 +519,3 @@ Create one question per concept (min 5, max 20 total).`;
     return `All course concepts:\n${conceptDetails}`;
   }
 }
-
