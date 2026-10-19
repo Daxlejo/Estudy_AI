@@ -13,6 +13,7 @@ import {
 } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { Quiz, QuizResult } from '../../types/course'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface QuizResultViewProps {
   result: QuizResult
@@ -150,12 +151,18 @@ export function QuizResultView({
                       {ans.isCorrect ? 'Correcta' : 'Incorrecta'}
                     </span>
                   </div>
-                  <p className="text-sm font-medium text-text-primary">{ans.prompt}</p>
+                  <div className="text-sm font-medium text-text-primary">
+                    <MarkdownRenderer content={ans.prompt} />
+                  </div>
                   <div className="text-xs text-text-secondary">
-                    <span className="font-semibold text-text-primary">Tu respuesta:</span> {ans.selectedOptionText}
+                    <span className="font-semibold text-text-primary">Tu respuesta:</span>{' '}
+                    <span className="text-text-primary font-medium">
+                      <MarkdownRenderer content={ans.selectedOptionText} inline />
+                    </span>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-surface-high/40 p-3 text-xs text-text-secondary">
-                    <span className="font-semibold text-text-primary">Explicación:</span> {ans.explanation}
+                    <span className="font-semibold text-text-primary block mb-1">Explicación:</span>
+                    <MarkdownRenderer content={ans.explanation} />
                   </div>
                 </div>
               ))}
@@ -278,9 +285,9 @@ export function QuizResultView({
               </div>
 
               {/* Enunciado */}
-              <h4 className="font-heading text-base font-bold text-text-primary">
-                {ans.prompt}
-              </h4>
+              <div className="font-heading text-base font-bold text-text-primary">
+                <MarkdownRenderer content={ans.prompt} />
+              </div>
 
               {/* Respuestas contrastadas */}
               <div className="space-y-2.5 pt-1">
@@ -290,9 +297,9 @@ export function QuizResultView({
                     <IconX className="size-4 shrink-0" />
                     <span>Tu respuesta (Incorrecta):</span>
                   </div>
-                  <p className="mt-1 pl-6 text-text-primary">
-                    {ans.selectedOptionText}
-                  </p>
+                  <div className="mt-1 pl-6 text-text-primary">
+                    <MarkdownRenderer content={ans.selectedOptionText} inline />
+                  </div>
                 </div>
 
                 {/* Respuesta correcta */}
@@ -301,16 +308,16 @@ export function QuizResultView({
                     <IconCheck className="size-4 shrink-0" />
                     <span>Respuesta correcta:</span>
                   </div>
-                  <p className="mt-1 pl-6 font-medium text-text-primary">
-                    {ans.correctOptionText}
-                  </p>
+                  <div className="mt-1 pl-6 font-medium text-text-primary">
+                    <MarkdownRenderer content={ans.correctOptionText} inline />
+                  </div>
                 </div>
               </div>
 
               {/* Justificación pedagógica */}
               <div className="rounded-xl border border-border/80 bg-surface-high/50 p-4 text-xs md:text-sm text-text-secondary">
-                <span className="font-bold text-text-primary">¿Por qué es correcta?</span>
-                <p className="mt-1 leading-relaxed">{ans.explanation}</p>
+                <span className="font-bold text-text-primary block mb-1">¿Por qué es correcta?</span>
+                <MarkdownRenderer content={ans.explanation} />
               </div>
             </div>
           ))}

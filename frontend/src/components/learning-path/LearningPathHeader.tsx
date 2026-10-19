@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import { IconArrowLeft, IconSparkles, IconLayersLinked, IconCheck, IconTarget } from '@tabler/icons-react'
 import type { LearningPath } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 interface LearningPathHeaderProps {
   learningPath: LearningPath
 }
 
 export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
+  const { t, formatNumber } = useTranslation()
   const { courseId, courseName, completedCount, totalCount, progressPercent, nodes } = learningPath
   const currentNode = nodes.find((n) => n.status === 'CURRENT')
 
@@ -19,7 +21,7 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
           className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-primary"
         >
           <IconArrowLeft className="size-4" />
-          Volver al detalle del curso
+          {t('learningPath.backToCourse')}
         </Link>
       </div>
 
@@ -28,20 +30,20 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
         <div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
             <IconLayersLinked className="size-3.5" />
-            Ruta de Aprendizaje
+            {t('learningPath.tag')}
           </div>
           <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
             {courseName}
           </h1>
           <p className="mt-1 text-sm text-text-secondary md:text-base">
-            Secuencia estructurada de sesiones de estudio, miniquizzes de consolidación y evaluación final.
+            {t('learningPath.subtitle')}
           </p>
         </div>
 
         {currentNode && (
           <div className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-surface-high/60 px-3.5 py-2 text-xs font-medium text-text-primary">
             <IconTarget className="size-4 text-primary" />
-            <span>Siguiente meta:</span>
+            <span>{t('learningPath.nextGoal')}</span>
             <span className="font-semibold text-primary">{currentNode.title}</span>
           </div>
         )}
@@ -52,14 +54,17 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-              Progreso de la ruta
+              {t('learningPath.pathProgress')}
             </span>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-heading text-3xl font-extrabold text-primary">
-                {progressPercent}%
+                {t('common.percent', { percent: formatNumber(progressPercent) })}
               </span>
               <span className="text-sm font-medium text-text-secondary">
-                ({completedCount} de {totalCount} sesiones completadas)
+                ({t('common.sessionsCompleted', {
+                  completed: formatNumber(completedCount),
+                  total: formatNumber(totalCount),
+                })})
               </span>
             </div>
           </div>
@@ -67,11 +72,15 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-high px-3 py-1.5 text-xs font-semibold text-text-secondary">
               <IconCheck className="size-3.5 text-secondary" />
-              <span>{completedCount} superadas</span>
+              <span>{t('learningPath.passedCount', { count: formatNumber(completedCount) })}</span>
             </div>
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-high px-3 py-1.5 text-xs font-semibold text-text-secondary">
               <IconSparkles className="size-3.5 text-primary" />
-              <span>{totalCount - completedCount} restantes</span>
+              <span>
+                {t('learningPath.remainingCount', {
+                  count: formatNumber(totalCount - completedCount),
+                })}
+              </span>
             </div>
           </div>
         </div>
@@ -80,7 +89,7 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
         <div className="mt-4">
           <div
             role="progressbar"
-            aria-label={`Progreso del curso ${courseName}`}
+            aria-label={`${t('learningPath.pathProgress')}: ${courseName}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progressPercent}

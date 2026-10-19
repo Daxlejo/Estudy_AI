@@ -5,9 +5,11 @@ import { courseService, formatFileSize } from '../../services/course.service'
 import FileUploadArea from './FileUploadArea'
 import MaterialList from './MaterialList'
 import type { SelectedFile } from './MaterialItem'
+import { useTranslation } from '../../i18n'
 
 export function CourseCreationForm() {
   const navigate = useNavigate()
+  const { language, t } = useTranslation()
   const [courseName, setCourseName] = useState('')
   const [courseDescription, setCourseDescription] = useState('')
   const [materials, setMaterials] = useState<SelectedFile[]>([])
@@ -55,6 +57,7 @@ export function CourseCreationForm() {
       const created = await courseService.createCourse({
         name: courseName.trim(),
         description: courseDescription.trim() || undefined,
+        language,
         materials: materials.map((m) => ({
           name: m.name,
           sizeBytes: m.sizeBytes,
@@ -69,7 +72,7 @@ export function CourseCreationForm() {
       setSubmitError(
         err instanceof Error
           ? err.message
-          : 'No se pudo iniciar la creación del curso. Intenta nuevamente.',
+          : t('createCourse.submitErrorDefault'),
       )
     }
   }
@@ -84,7 +87,7 @@ export function CourseCreationForm() {
           className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-primary"
         >
           <IconArrowLeft className="size-4" />
-          Volver al panel principal
+          {t('createCourse.backToDashboard')}
         </button>
       </div>
 
@@ -92,13 +95,13 @@ export function CourseCreationForm() {
       <div>
         <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
           <IconSparkles className="size-3.5" />
-          Constructor inteligente
+          {t('createCourse.tag')}
         </div>
         <h1 className="mt-3 font-heading text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Crear nuevo curso
+          {t('createCourse.title')}
         </h1>
         <p className="mt-2 text-sm text-text-secondary md:text-base">
-          Sube tus notas, lecturas o diapositivas. EstudyAI estructurará una ruta de aprendizaje por niveles y sesiones guiadas.
+          {t('createCourse.subtitle')}
         </p>
       </div>
 
@@ -112,7 +115,7 @@ export function CourseCreationForm() {
       {/* Campo: Nombre del curso */}
       <div className="space-y-2">
         <label htmlFor="course-name" className="block text-sm font-semibold text-text-primary">
-          Nombre del curso <span className="text-danger">*</span>
+          {t('createCourse.nameLabel')} <span className="text-danger">*</span>
         </label>
         <input
           id="course-name"
@@ -120,7 +123,7 @@ export function CourseCreationForm() {
           value={courseName}
           onChange={(e) => setCourseName(e.target.value)}
           onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-          placeholder="Ej. Programación Orientada a Objetos, Álgebra Lineal..."
+          placeholder={t('createCourse.namePlaceholder')}
           disabled={isSubmitting}
           className={`w-full rounded-xl border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary/50 transition-all duration-150 focus:outline-none focus:ring-4 ${
             touched.name && !isNameValid
@@ -131,7 +134,7 @@ export function CourseCreationForm() {
         {touched.name && !isNameValid && (
           <p className="flex items-center gap-1.5 text-xs text-danger">
             <IconAlertCircle className="size-3.5 shrink-0" />
-            Por favor ingresa un nombre para identificar el curso.
+            {t('createCourse.nameError')}
           </p>
         )}
       </div>
@@ -139,13 +142,14 @@ export function CourseCreationForm() {
       {/* Campo: Descripción del curso (opcional) */}
       <div className="space-y-2">
         <label htmlFor="course-description" className="block text-sm font-semibold text-text-primary">
-          Descripción del curso <span className="text-xs font-normal text-text-secondary">(opcional)</span>
+          {t('createCourse.descLabel')}{' '}
+          <span className="text-xs font-normal text-text-secondary">({t('common.optional')})</span>
         </label>
         <textarea
           id="course-description"
           value={courseDescription}
           onChange={(e) => setCourseDescription(e.target.value)}
-          placeholder="Añade una descripción o déjalo en blanco para que la IA la genere a partir de tus materiales..."
+          placeholder={t('createCourse.descPlaceholder')}
           rows={3}
           disabled={isSubmitting}
           className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary/50 transition-all duration-150 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20"
@@ -156,10 +160,10 @@ export function CourseCreationForm() {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-text-primary">
-            Materiales de estudio <span className="text-danger">*</span>
+            {t('createCourse.materialsLabel')} <span className="text-danger">*</span>
           </label>
           <p className="mt-1 text-xs text-text-secondary">
-            Formatos recomendados: PDF, DOCX, PPTX o TXT con el contenido del temario o clases.
+            {t('createCourse.materialsSubtitle')}
           </p>
         </div>
 
@@ -168,7 +172,7 @@ export function CourseCreationForm() {
         {touched.materials && !hasMaterials && (
           <p className="flex items-center gap-1.5 text-xs text-danger">
             <IconAlertCircle className="size-3.5 shrink-0" />
-            Debes agregar al menos un archivo para comenzar la construcción de tu ruta.
+            {t('createCourse.materialsError')}
           </p>
         )}
 
@@ -183,7 +187,7 @@ export function CourseCreationForm() {
           disabled={isSubmitting}
           className="w-full rounded-xl border border-border bg-surface px-5 py-3 text-sm font-semibold text-text-secondary transition-colors duration-150 hover:bg-surface-high hover:text-text-primary sm:w-auto"
         >
-          Cancelar
+          {t('createCourse.cancel')}
         </button>
 
         <button
@@ -192,7 +196,7 @@ export function CourseCreationForm() {
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_55%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none sm:w-auto"
         >
           <IconSparkles className="size-4" />
-          {isSubmitting ? 'Iniciando construcción...' : 'Crear curso y construir ruta'}
+          {isSubmitting ? t('createCourse.submitting') : t('createCourse.submit')}
         </button>
       </div>
     </form>

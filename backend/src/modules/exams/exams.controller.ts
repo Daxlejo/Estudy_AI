@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   InternalServerErrorException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ExamsService,
@@ -17,7 +18,13 @@ import {
   FinalExamAttemptAnswer,
 } from '../../domain/models/final-exam';
 import { DatabaseError } from '../../database/errors/database-error';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  CurrentUser,
+  CurrentUserPayload,
+} from '../auth/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class ExamsController {
   constructor(private readonly examsService: ExamsService) {}
@@ -32,9 +39,14 @@ export class ExamsController {
   @Get('courses/:courseId/exam')
   async getExamByCourse(
     @Param('courseId') courseId: string,
+    @CurrentUser() user?: CurrentUserPayload,
   ): Promise<SanitizedExamResponse> {
     try {
-      return await this.examsService.getExamByCourse(courseId);
+      return await this.examsService.getExamByCourse(
+        courseId,
+        undefined,
+        user?.sub,
+      );
     } catch (e) {
       this.handleError(e);
     }
@@ -44,9 +56,15 @@ export class ExamsController {
   async submitAttempt(
     @Param('examId') examId: string,
     @Body() dto: SubmitExamAttemptDto,
+    @CurrentUser() user?: CurrentUserPayload,
   ): Promise<SubmitExamAttemptResult> {
     try {
-      return await this.examsService.submitAttempt(examId, dto.answers);
+      return await this.examsService.submitAttempt(
+        examId,
+        dto.answers,
+        undefined,
+        user?.sub,
+      );
     } catch (e) {
       this.handleError(e);
     }
@@ -55,9 +73,10 @@ export class ExamsController {
   @Get('exams/:examId/attempts')
   async listAttempts(
     @Param('examId') examId: string,
+    @CurrentUser() user?: CurrentUserPayload,
   ): Promise<FinalExamAttempt[]> {
     try {
-      return await this.examsService.listAttempts(examId);
+      return await this.examsService.listAttempts(examId, user?.sub);
     } catch (e) {
       this.handleError(e);
     }
@@ -67,9 +86,10 @@ export class ExamsController {
   async getAttempt(
     @Param('examId') examId: string,
     @Param('attemptId') attemptId: string,
+    @CurrentUser() user?: CurrentUserPayload,
   ): Promise<FinalExamAttempt & { answers: FinalExamAttemptAnswer[] }> {
     try {
-      return await this.examsService.getAttempt(examId, attemptId);
+      return await this.examsService.getAttempt(examId, attemptId, user?.sub);
     } catch (e) {
       this.handleError(e);
     }

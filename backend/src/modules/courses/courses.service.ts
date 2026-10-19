@@ -4,6 +4,9 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
@@ -11,7 +14,9 @@ import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { FinalExamRepository } from '../../domain/repositories/final-exam.repository';
 import { ExamAvailabilityService } from '../exams/exam-availability.service';
 import { GenerationPipelineService } from './generation-pipeline.service';
+import { MaterialStorageService } from '../materials/material-storage.service';
 import { CreateCourseDto } from './dto/create-course.dto';
+import { UpdateCourseDto } from './dto/update-course.dto';
 import { GenerateCourseDto } from './dto/generate-course.dto';
 import {
   GenerationStatusResponseDto,
@@ -20,7 +25,7 @@ import {
   ProcessingStepKey,
   ProcessingStepStatus,
 } from './dto/generation-status-response.dto';
-import { Course } from '../../domain/models/course';
+import { Course, getRandomCourseBannerKey } from '../../domain/models/course';
 import { Session } from '../../domain/models/session';
 import { QuizAttempt } from '../../domain/models/quiz';
 
@@ -63,26 +68,47 @@ export class CoursesService {
     private readonly finalExamRepository: FinalExamRepository,
     private readonly examAvailabilityService: ExamAvailabilityService,
     private readonly generationPipelineService: GenerationPipelineService,
+    private readonly materialStorageService: MaterialStorageService,
   ) {}
 
-  async list(): Promise<Course[]> {
-    return this.courseRepository.findAll();
+  private validateOwnership(course: Course, userId?: string): void {
+    if (!userId) return;
+    if (!course.userId || course.userId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this course',
+      );
+    }
   }
 
-  async getById(id: string): Promise<Course & { sessions: Session[] }> {
+  async list(userId?: string): Promise<Course[]> {
+    if (userId) {
+      return this.courseRepository.findByUserId(userId);
+    }
+    return [];
+  }
+
+  async getById(
+    id: string,
+    userId?: string,
+  ): Promise<Course & { sessions: Session[] }> {
     const course = await this.courseRepository.findById(id);
     if (!course) {
       throw new NotFoundException(`Course with id ${id} not found`);
     }
+    this.validateOwnership(course, userId);
     const sessions = await this.sessionRepository.findByCourseId(id);
     return { ...course, sessions };
   }
 
-  async getCourseProgress(id: string): Promise<CourseProgressResult> {
+  async getCourseProgress(
+    id: string,
+    userId?: string,
+  ): Promise<CourseProgressResult> {
     const course = await this.courseRepository.findById(id);
     if (!course) {
       throw new NotFoundException(`Course with id ${id} not found`);
     }
+    this.validateOwnership(course, userId);
 
     const sessions = await this.sessionRepository.findByCourseId(id);
     sessions.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
@@ -158,30 +184,95 @@ export class CoursesService {
     };
   }
 
-  async create(createCourseDto: CreateCourseDto): Promise<Course> {
-    return this.courseRepository.create({
+  async create(
+    createCourseDto: CreateCourseDto,
+    userId?: string,
+  ): Promise<Course> {
+    const payload: Omit<Course, 'id' | 'createdAt' | 'updatedAt'> = {
       name: createCourseDto.name,
       description: createCourseDto.description ?? null,
+      bannerKey: createCourseDto.bannerKey ?? getRandomCourseBannerKey(),
       status: 'CREATED',
-    });
+      userId: userId ?? null,
+    };
+    return this.courseRepository.create(payload);
   }
 
-  async delete(id: string): Promise<void> {
+  async update(
+    id: string,
+    updateCourseDto: UpdateCourseDto,
+    userId?: string,
+  ): Promise<Course> {
     const course = await this.courseRepository.findById(id);
     if (!course) {
       throw new NotFoundException(`Course with id ${id} not found`);
     }
+    this.validateOwnership(course, userId);
+
+    const updateData: Partial<Omit<Course, 'id' | 'createdAt' | 'updatedAt'>> =
+      {};
+    if (updateCourseDto.name !== undefined) {
+      updateData.name = updateCourseDto.name;
+    }
+    if (updateCourseDto.description !== undefined) {
+      updateData.description = updateCourseDto.description;
+    }
+    if (updateCourseDto.bannerKey !== undefined) {
+      updateData.bannerKey = updateCourseDto.bannerKey;
+    }
+
+    return this.courseRepository.update(id, updateData);
+  }
+
+  async delete(id: string, userId?: string): Promise<void> {
+    const course = await this.courseRepository.findById(id);
+    if (!course) {
+      throw new NotFoundException(`Course with id ${id} not found`);
+    }
+    this.validateOwnership(course, userId);
+
+    if (course.status === 'PROCESSING') {
+      throw new ConflictException(
+        'Cannot delete course while generation is in progress',
+      );
+    }
+    const latestJob = await this.courseRepository.getLatestGenerationJob(id);
+    if (latestJob && !['COMPLETED', 'ERROR'].includes(latestJob.status)) {
+      throw new ConflictException(
+        'Cannot delete course while generation is in progress',
+      );
+    }
+
     await this.courseRepository.delete(id);
+
+    try {
+      await this.materialStorageService.removeCourseDirectory(id);
+    } catch (err) {
+      this.logger.error(
+        `Failed to clean up storage directory for course ${id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new InternalServerErrorException(
+        'Course was deleted from database, but storage files cleanup failed',
+      );
+    }
   }
 
   async startGeneration(
     courseId: string,
-    dto?: GenerateCourseDto,
+    userIdOrDto?: string | GenerateCourseDto,
+    maybeDto?: GenerateCourseDto,
   ): Promise<GenerationJobResponseDto> {
+    const userId = typeof userIdOrDto === 'string' ? userIdOrDto : undefined;
+    const dto =
+      typeof userIdOrDto === 'object' && userIdOrDto !== null
+        ? userIdOrDto
+        : maybeDto;
+
     const course = await this.courseRepository.findById(courseId);
     if (!course) {
       throw new NotFoundException(`Course with id ${courseId} not found`);
     }
+    this.validateOwnership(course, userId);
 
     if (dto?.materialIds && dto.materialIds.length > 0) {
       const courseMaterials =
@@ -208,7 +299,7 @@ export class CoursesService {
     // Fire-and-forget: pipeline runs asynchronously after response is sent.
     setImmediate(() => {
       this.generationPipelineService
-        .run(courseId, job.id, dto?.materialIds)
+        .run(courseId, job.id, dto?.materialIds, dto?.language)
         .catch((err) => {
           this.logger.error(
             `Unhandled pipeline error (course=${courseId}, job=${job.id}): ${String(err)}`,
@@ -230,11 +321,13 @@ export class CoursesService {
 
   async getGenerationStatus(
     courseId: string,
+    userId?: string,
   ): Promise<GenerationStatusResponseDto> {
     const course = await this.courseRepository.findById(courseId);
     if (!course) {
       throw new NotFoundException(`Course with id ${courseId} not found`);
     }
+    this.validateOwnership(course, userId);
 
     const job = await this.courseRepository.getLatestGenerationJob(courseId);
     if (!job) {
@@ -261,6 +354,7 @@ export class CoursesService {
       jobId: job.id,
       courseId: course.id,
       courseName: course.name,
+      bannerKey: course.bannerKey ?? null,
       status: job.status as GenerationStatusResponseDto['status'],
       progressPercent: job.progress,
       currentStepIndex: job.currentStepIndex ?? 0,
@@ -276,10 +370,20 @@ export class CoursesService {
     };
   }
 
-  async getJobById(jobId: string): Promise<GenerationJobResponseDto> {
+  async getJobById(
+    jobId: string,
+    userId?: string,
+  ): Promise<GenerationJobResponseDto> {
     const job = await this.courseRepository.findGenerationJobById(jobId);
     if (!job) {
       throw new NotFoundException(`Generation job with id ${jobId} not found`);
+    }
+    if (userId) {
+      const course = await this.courseRepository.findById(job.courseId);
+      if (!course) {
+        throw new NotFoundException(`Course with id ${job.courseId} not found`);
+      }
+      this.validateOwnership(course, userId);
     }
 
     return {

@@ -3,6 +3,8 @@ import { Course, Material, GenerationJob } from '../models/course';
 export interface CourseRepository {
   findById(id: string): Promise<Course | null>;
   findAll(): Promise<Course[]>;
+  findByUserId(userId: string): Promise<Course[]>;
+  claimLegacyCourses(userId: string): Promise<number>;
   create(data: Omit<Course, 'id' | 'createdAt' | 'updatedAt'>): Promise<Course>;
   update(
     id: string,

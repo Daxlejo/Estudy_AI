@@ -7,6 +7,7 @@ import {
 } from '@tabler/icons-react'
 import type { StudySession } from '../../types/course'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 
 interface SessionIntroBlockProps {
   session: StudySession
@@ -14,29 +15,40 @@ interface SessionIntroBlockProps {
 }
 
 export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProps) {
+  const { t } = useTranslation()
   const { introduction, learningObjective } = session
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Indicador de etapa */}
-      <div className="flex items-center gap-2">
+      {/* Indicador de etapa con insignia numerada compacta */}
+      <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
           <IconBook className="size-3.5" />
-          Fase 1: Explicación y Contexto
+          {t('studySession.concepts.phaseBadge')}
         </span>
-        <span className="text-xs text-text-secondary">Paso 1 de 5</span>
+
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-high px-2.5 py-1 text-xs font-semibold text-text-primary">
+          <span className="flex size-4 items-center justify-center rounded-full bg-primary font-mono text-[10px] font-bold text-on-primary">
+            1
+          </span>
+          <span>{t('activity.stepOf', { current: 1, total: 5 })}</span>
+        </span>
       </div>
 
-      {/* Tarjeta de objetivo de aprendizaje */}
-      <div className="flex items-start gap-3.5 rounded-2xl border border-secondary/30 bg-secondary/5 p-4 md:p-5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
+      {/* Tarjeta compacta de misión / objetivo de la sesión */}
+      <div
+        role="region"
+        aria-label={t('studySession.objectiveTitle')}
+        className="flex items-start gap-3.5 rounded-2xl border border-l-4 border-primary/30 border-l-primary bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_10%,var(--surface)),color-mix(in_srgb,var(--secondary)_6%,var(--surface)))] p-4 shadow-xs md:p-5"
+      >
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/15 text-primary shadow-2xs">
           <IconTarget className="size-5" />
         </div>
-        <div className="space-y-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-secondary">
-            Objetivo de la sesión
+        <div className="min-w-0 flex-1 space-y-1">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-primary">
+            {t('studySession.objectiveTitle')}
           </h2>
-          <p className="text-sm font-medium text-text-primary md:text-base">
+          <p className="break-words text-sm font-medium leading-relaxed text-text-primary md:text-base">
             {learningObjective}
           </p>
         </div>
@@ -57,11 +69,11 @@ export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProp
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
             <IconBulb className="size-4.5" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <span className="text-xs font-bold tracking-wider text-primary uppercase">
-              Premisa fundamental
+              {t('studySession.keyTakeawayTitle')}
             </span>
-            <p className="mt-1 text-sm font-semibold text-text-primary md:text-base">
+            <p className="mt-1 break-words text-sm font-semibold text-text-primary md:text-base">
               {introduction.keyTakeaway}
             </p>
           </div>
@@ -72,7 +84,7 @@ export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProp
           <div className="mt-6 space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
               <IconCode className="size-3.5" />
-              <span>Ejemplo representativo:</span>
+              <span>{t('studySession.concepts.exampleLabel')}:</span>
             </div>
             <MarkdownRenderer
               content={

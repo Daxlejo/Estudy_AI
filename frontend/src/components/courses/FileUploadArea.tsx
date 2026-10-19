@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from 'react'
 import { IconUpload, IconFileTypePdf, IconFileTypeDocx, IconFileTypePpt, IconFileText } from '@tabler/icons-react'
+import { useTranslation } from '../../i18n'
 
 interface FileUploadAreaProps {
   onFilesSelected: (files: File[]) => void
@@ -9,6 +10,7 @@ interface FileUploadAreaProps {
 const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.txt']
 
 export function FileUploadArea({ onFilesSelected, disabled = false }: FileUploadAreaProps) {
+  const { t, language } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -84,7 +86,7 @@ export function FileUploadArea({ onFilesSelected, disabled = false }: FileUpload
         onChange={handleFileInputChange}
         disabled={disabled}
         className="hidden"
-        aria-label="Seleccionar materiales de estudio"
+        aria-label={t('createCourse.materialsLabel')}
       />
 
       <div
@@ -98,11 +100,15 @@ export function FileUploadArea({ onFilesSelected, disabled = false }: FileUpload
       </div>
 
       <h3 className="font-heading text-base font-bold text-text-primary md:text-lg">
-        {isDragging ? 'Suelta tus archivos aquí' : 'Arrastra y suelta tus materiales aquí'}
+        {isDragging
+          ? language === 'en'
+            ? 'Drop your files here'
+            : 'Suelta tus archivos aquí'
+          : t('fileUpload.dropzoneTitle')}
       </h3>
 
       <p className="mt-1 text-sm text-text-secondary">
-        o <span className="font-semibold text-primary underline underline-offset-4">explora tus archivos</span> en tu equipo
+        {t('fileUpload.dropzoneSubtitle')}
       </p>
 
       {/* Formatos admitidos */}

@@ -8,12 +8,14 @@ import {
   IconClock,
 } from '@tabler/icons-react'
 import type { LearningPathNode } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 interface FinalExamNodeProps {
   node: LearningPathNode
 }
 
 export function FinalExamNode({ node }: FinalExamNodeProps) {
+  const { t, formatNumber, language } = useTranslation()
   const isCompleted = node.status === 'COMPLETED'
   const isCurrent = node.status === 'CURRENT'
   const isLocked = node.status === 'LOCKED'
@@ -65,13 +67,13 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
                 }`}
               >
                 <IconCertificate className="size-3.5" />
-                Hito de Certificación
+                {t('learningPath.certificationMilestone')}
               </span>
 
               {node.durationMinutes && (
                 <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
                   <IconClock className="size-3.5" />
-                  ~{node.durationMinutes} min
+                  ~{t('common.minutes', { count: formatNumber(node.durationMinutes) })}
                 </span>
               )}
             </div>
@@ -81,13 +83,13 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
             </h3>
 
             <p className="text-sm text-text-secondary">
-              {node.description || 'Evaluación integral de todos los conceptos y sesiones del curso.'}
+              {node.description || t('learningPath.finalExamDesc')}
             </p>
 
             {isLocked && (
               <p className="flex items-center gap-1.5 pt-1 text-xs font-medium text-text-secondary/80">
                 <IconLock className="size-3.5 shrink-0" />
-                Disponible únicamente tras completar todas las sesiones del curso.
+                {t('learningPath.finalExamLockedNotice')}
               </p>
             )}
           </div>
@@ -100,7 +102,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
               to={`/examen/${courseId}`}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-tertiary px-6 py-3 font-heading text-sm font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:brightness-110 sm:w-auto"
             >
-              Comenzar examen final
+              {t('learningPath.takeFinalExam')}
               <IconArrowRight className="size-4" />
             </Link>
           )}
@@ -110,7 +112,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
               to={`/examen/${courseId}`}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-high px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:border-secondary hover:text-secondary sm:w-auto"
             >
-              Ver resultados del examen
+              {language === 'en' ? 'View exam results' : 'Ver resultados del examen'}
               <IconArrowRight className="size-3.5" />
             </Link>
           )}
@@ -118,7 +120,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
           {isLocked && (
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface-high/40 px-4 py-2 text-xs font-medium text-text-secondary/60">
               <IconLock className="size-3.5" />
-              Bloqueado
+              {language === 'en' ? 'Locked' : 'Bloqueado'}
             </span>
           )}
         </div>

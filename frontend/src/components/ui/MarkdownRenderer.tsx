@@ -1,125 +1,92 @@
-import { useMemo } from 'react'
+import { isValidElement, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import CodeBlock from './CodeBlock'
+import { normalizeMarkdownContent, sanitizeHref } from './markdownUtils'
 
 interface MarkdownRendererProps {
-  content: string
+  content?: string | null
   className?: string
+  inline?: boolean
 }
 
-function tokenizeLine(line: string): React.ReactNode[] {
-  // Check for comment
-  const commentIdx = line.indexOf('#') !== -1 ? line.indexOf('#') : line.indexOf('//')
-  let codePart = line
-  let commentPart = ''
+function nodeToText(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(nodeToText).join('')
+  if (isValidElement<{ children?: ReactNode }>(node)) return nodeToText(node.props.children)
+  return ''
+}
 
-  if (commentIdx !== -1) {
-    const before = line.slice(0, commentIdx)
-    const singleQuotes = (before.match(/'/g) || []).length
-    const doubleQuotes = (before.match(/"/g) || []).length
-    if (singleQuotes % 2 === 0 && doubleQuotes % 2 === 0) {
-      codePart = line.slice(0, commentIdx)
-      commentPart = line.slice(commentIdx)
-    }
-  }
+/**
+ * Renderiza Markdown generado por IA de manera segura y enriquecida.
+ * No se habilita HTML crudo (sin rehype-raw), evitando vulnerabilidades XSS.
+ * Soporta tablas GFM, bloques de código interactivos, listas, citas y jerarquía tipográfica.
+ */
+export function MarkdownRenderer({ content, className = '', inline = false }: MarkdownRendererProps) {
+  if (!content) return null
 
-  const regex =
-    /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:def|class|return|import|from|as|if|elif|else|for|while|try|except|finally|with|in|is|not|and|or|lambda|pass|break|continue|self|True|False|None|function|const|let|var|async|await|new|type|interface)\b|\b(?:print|len|range|str|int|float|list|dict|super)\b|\b\d+(?:\.\d+)?\b|[a-zA-Z_]\w*|[^\s\w'"]+|\s+)/g
-
-  const nodes: React.ReactNode[] = []
-  let match: RegExpExecArray | null
-  let key = 0
-
-  while ((match = regex.exec(codePart)) !== null) {
-    const token = match[0]
-    if (token.startsWith('"') || token.startsWith("'")) {
-      nodes.push(
-        <span key={key++} className="text-emerald-400">
-          {token}
-        </span>,
-      )
-    } else if (
-      /^(def|class|return|import|from|as|if|elif|else|for|while|try|except|finally|with|in|is|not|and|or|lambda|pass|break|continue|self|True|False|None|function|const|let|var|async|await|new|type|interface)$/.test(
-        token,
-      )
-    ) {
-      nodes.push(
-        <span key={key++} className="font-semibold text-purple-400">
-          {token}
-        </span>,
-      )
-    } else if (/^(print|len|range|str|int|float|list|dict|super)$/.test(token)) {
-      nodes.push(
-        <span key={key++} className="text-amber-400">
-          {token}
-        </span>,
-      )
-    } else if (/^\d+(?:\.\d+)?$/.test(token)) {
-      nodes.push(
-        <span key={key++} className="text-cyan-400">
-          {token}
-        </span>,
-      )
-    } else {
-      nodes.push(<span key={key++}>{token}</span>)
-    }
-  }
-
-  if (commentPart) {
-    nodes.push(
-      <span key={key} className="italic text-zinc-500">
-        {commentPart}
-      </span>,
+  if (inline) {
+    return (
+      <span className={`inline min-w-0 max-w-full break-words text-inherit ${className}`}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            p({ children }) {
+              return <span className="inline leading-relaxed">{children}</span>
+            },
+            code({ children }) {
+              return (
+                <code className="rounded border border-border bg-surface-high px-1.5 py-0.5 font-mono text-[0.85em] font-semibold text-primary [overflow-wrap:anywhere]">
+                  {children}
+                </code>
+              )
+            },
+            a({ href, children }) {
+              const safeHref = sanitizeHref(href)
+              if (!safeHref) return <span>{children}</span>
+              return (
+                <a
+                  href={safeHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  {children}
+                </a>
+              )
+            },
+            strong({ children }) {
+              return <strong className="font-semibold text-text-primary">{children}</strong>
+            },
+            em({ children }) {
+              return <em className="italic">{children}</em>
+            },
+          }}
+        >
+          {normalizeMarkdownContent(content)}
+        </ReactMarkdown>
+      </span>
     )
   }
 
-  return nodes
-}
-
-function CodeBlock({ code, language }: { code: string; language?: string }) {
-  const lines = useMemo(() => code.split('\n'), [code])
-
   return (
-    <div className="my-4 overflow-hidden rounded-xl border border-border bg-[#18181b] shadow-md text-left">
-      <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-2 text-xs font-mono text-zinc-400">
-        <span className="font-semibold tracking-wider text-primary">
-          {language ? language.toUpperCase() : 'CÓDIGO'}
-        </span>
-        <span className="text-[11px] text-zinc-500">Ejemplo de código</span>
-      </div>
-      <pre className="overflow-x-auto p-4 font-mono text-xs md:text-sm leading-relaxed text-zinc-100 whitespace-pre">
-        <code>
-          {lines.map((line, idx) => (
-            <div key={idx} className="table-row">
-              <span className="table-cell select-none pr-4 text-right text-[11px] text-zinc-600">
-                {idx + 1}
-              </span>
-              <span className="table-cell whitespace-pre">{tokenizeLine(line)}</span>
-            </div>
-          ))}
-        </code>
-      </pre>
-    </div>
-  )
-}
-
-export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
-  if (!content) return null
-
-  return (
-    <div className={`text-text-primary ${className}`}>
+    <div className={`min-w-0 max-w-full break-words text-text-primary ${className}`}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
-          code({ className: codeClassName, children }) {
-            const match = /language-(\w+)/.exec(codeClassName || '')
-            const codeString = String(children).replace(/\n$/, '')
-            const isMultiLine = codeString.includes('\n')
-
-            if (match || isMultiLine) {
-              return <CodeBlock code={codeString} language={match ? match[1] : undefined} />
+          pre({ children }) {
+            const child = Array.isArray(children) ? children[0] : children
+            if (isValidElement<{ className?: string; children?: ReactNode }>(child)) {
+              const match = /language-([\w+#-]+)/.exec(child.props.className || '')
+              const code = nodeToText(child.props.children).replace(/\n$/, '')
+              return <CodeBlock code={code} language={match ? match[1] : undefined} />
             }
-
+            return <CodeBlock code={nodeToText(children).replace(/\n$/, '')} />
+          },
+          code({ children }) {
             return (
-              <code className="rounded border border-border bg-surface-high px-1.5 py-0.5 font-mono text-xs font-semibold text-primary">
+              <code className="rounded border border-border bg-surface-high px-1.5 py-0.5 font-mono text-[0.85em] font-semibold text-primary [overflow-wrap:anywhere]">
                 {children}
               </code>
             )
@@ -152,6 +119,27 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
               </h3>
             )
           },
+          h4({ children }) {
+            return (
+              <h4 className="mb-1 mt-2 font-heading text-xs font-bold text-text-primary md:text-sm">
+                {children}
+              </h4>
+            )
+          },
+          h5({ children }) {
+            return (
+              <h5 className="mb-1 mt-1.5 font-heading text-xs font-bold uppercase tracking-wider text-text-secondary">
+                {children}
+              </h5>
+            )
+          },
+          h6({ children }) {
+            return (
+              <h6 className="mb-1 mt-1.5 font-heading text-xs font-semibold text-text-secondary">
+                {children}
+              </h6>
+            )
+          },
           ul({ children }) {
             return (
               <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-text-secondary md:text-base">
@@ -169,12 +157,74 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
           li({ children }) {
             return <li className="leading-relaxed">{children}</li>
           },
+          blockquote({ children }) {
+            return (
+              <blockquote className="my-3 border-l-4 border-primary/40 bg-primary/5 py-1.5 pl-4 pr-3 italic text-text-secondary">
+                {children}
+              </blockquote>
+            )
+          },
+          table({ children }) {
+            return (
+              <div className="my-4 w-full overflow-x-auto rounded-xl border border-border bg-surface shadow-xs">
+                <table className="w-full min-w-full divide-y divide-border text-left text-sm text-text-secondary">
+                  {children}
+                </table>
+              </div>
+            )
+          },
+          thead({ children }) {
+            return <thead className="bg-surface-high/70 text-text-primary">{children}</thead>
+          },
+          tbody({ children }) {
+            return <tbody className="divide-y divide-border/60">{children}</tbody>
+          },
+          tr({ children }) {
+            return <tr className="transition-colors hover:bg-surface-high/30">{children}</tr>
+          },
+          th({ children, style }) {
+            return (
+              <th
+                style={style}
+                className="px-4 py-2.5 font-heading text-xs font-bold uppercase tracking-wider text-text-primary"
+              >
+                {children}
+              </th>
+            )
+          },
+          td({ children, style }) {
+            return (
+              <td style={style} className="px-4 py-2.5 text-sm leading-relaxed text-text-secondary">
+                {children}
+              </td>
+            )
+          },
+          a({ href, children }) {
+            const safeHref = sanitizeHref(href)
+            if (!safeHref) return <span>{children}</span>
+            return (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {children}
+              </a>
+            )
+          },
+          hr() {
+            return <hr className="my-4 border-border" />
+          },
           strong({ children }) {
             return <strong className="font-semibold text-text-primary">{children}</strong>
           },
+          em({ children }) {
+            return <em className="italic">{children}</em>
+          },
         }}
       >
-        {content}
+        {normalizeMarkdownContent(content)}
       </ReactMarkdown>
     </div>
   )

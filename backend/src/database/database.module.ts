@@ -4,6 +4,7 @@ import { PrismaCourseRepository } from './repositories/prisma-course.repository'
 import { PrismaSessionRepository } from './repositories/prisma-session.repository';
 import { PrismaQuizRepository } from './repositories/prisma-quiz.repository';
 import { PrismaFinalExamRepository } from './repositories/prisma-final-exam.repository';
+import { PrismaUserRepository } from './repositories/prisma-user.repository';
 
 @Module({
   providers: [
@@ -24,6 +25,10 @@ import { PrismaFinalExamRepository } from './repositories/prisma-final-exam.repo
       provide: 'FinalExamRepository',
       useClass: PrismaFinalExamRepository,
     },
+    {
+      provide: 'UserRepository',
+      useClass: PrismaUserRepository,
+    },
   ],
   exports: [
     PrismaService,
@@ -31,6 +36,7 @@ import { PrismaFinalExamRepository } from './repositories/prisma-final-exam.repo
     'SessionRepository',
     'QuizRepository',
     'FinalExamRepository',
+    'UserRepository',
   ],
 })
 export class DatabaseModule {}

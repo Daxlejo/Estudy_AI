@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   InternalServerErrorException,
+  ForbiddenException,
   Optional,
 } from '@nestjs/common';
 import { z } from 'zod';
@@ -103,10 +104,25 @@ export class ExamsService {
     return this.timeProvider ? this.timeProvider() : new Date();
   }
 
+  private async validateExamCourseOwnership(
+    courseId: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+    const course = await this.courseRepository.findById(courseId);
+    if (!course || !course.userId || course.userId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to access this exam',
+      );
+    }
+  }
+
   async getExamByCourse(
     courseId: string,
     customNow?: Date,
+    userId?: string,
   ): Promise<SanitizedExamResponse> {
+    await this.validateExamCourseOwnership(courseId, userId);
     const now = customNow ?? this.getNow();
     const exam =
       await this.finalExamRepository.findByCourseIdWithQuestions(courseId);
@@ -195,12 +211,14 @@ export class ExamsService {
     examId: string,
     answersDto: ExamAnswerDto[],
     customNow?: Date,
+    userId?: string,
   ): Promise<SubmitExamAttemptResult> {
     const now = customNow ?? this.getNow();
     const exam = await this.finalExamRepository.findById(examId);
     if (!exam) {
       throw new NotFoundException(`Final exam ${examId} not found`);
     }
+    await this.validateExamCourseOwnership(exam.courseId, userId);
 
     // Availability gate: 409 Conflict if not AVAILABLE
     const availability = await this.examAvailabilityService.checkAvailability(
@@ -436,17 +454,22 @@ export class ExamsService {
     };
   }
 
-  async listAttempts(examId: string): Promise<FinalExamAttempt[]> {
+  async listAttempts(
+    examId: string,
+    userId?: string,
+  ): Promise<FinalExamAttempt[]> {
     const exam = await this.finalExamRepository.findById(examId);
     if (!exam) {
       throw new NotFoundException(`Final exam ${examId} not found`);
     }
+    await this.validateExamCourseOwnership(exam.courseId, userId);
     return this.finalExamRepository.getAttemptsByExamId(examId);
   }
 
   async getAttempt(
     examId: string,
     attemptId: string,
+    userId?: string,
   ): Promise<FinalExamAttempt & { answers: FinalExamAttemptAnswer[] }> {
     const attempt = await this.finalExamRepository.getAttemptById(attemptId);
     if (!attempt || attempt.examId !== examId) {
@@ -454,6 +477,7 @@ export class ExamsService {
         `Attempt ${attemptId} not found for exam ${examId}`,
       );
     }
+    await this.validateExamCourseOwnership(attempt.courseId, userId);
     return attempt;
   }
 }

@@ -26,6 +26,8 @@
   --color-secondary: var(--secondary);
   --color-tertiary: var(--tertiary);
   --color-danger: var(--danger);
+  --color-error: var(--error);
+  --color-success: var(--success);
 
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -79,6 +81,8 @@
   --secondary: #22aaa2;
   --tertiary: #e49a00;
   --danger: #d95c50;
+  --error: var(--danger);
+  --success: #2f9e6b;
 
   --text-primary: #24232a;
   --text-secondary: #62606c;
@@ -130,6 +134,8 @@
   --secondary: #5dd9d0;
   --tertiary: #fcbb36;
   --danger: #ffb4ab;
+  --error: var(--danger);
+  --success: #7ddc9f;
 
   --text-primary: #e4e1e7;
   --text-secondary: #c8c4d7;

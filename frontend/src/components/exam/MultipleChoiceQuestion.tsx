@@ -1,4 +1,5 @@
 import type { MultipleChoiceQuestion as MultipleChoiceQuestionType } from '../../types/exam'
+import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 interface MultipleChoiceQuestionProps {
   question: MultipleChoiceQuestionType
@@ -17,8 +18,14 @@ export function MultipleChoiceQuestion({
     <div className="space-y-6">
       {/* Contexto técnico adicional si existe */}
       {question.context && (
-        <div className="rounded-xl border border-border/80 bg-background/80 p-4 font-mono text-xs leading-relaxed text-text-secondary">
-          <pre className="whitespace-pre-wrap">{question.context}</pre>
+        <div className="my-3">
+          <MarkdownRenderer
+            content={
+              question.context.trim().startsWith('```')
+                ? question.context
+                : `\`\`\`python\n${question.context}\n\`\`\``
+            }
+          />
         </div>
       )}
 
@@ -54,7 +61,7 @@ export function MultipleChoiceQuestion({
 
               {/* Texto de la opción */}
               <div className="flex-1 pt-1 text-sm leading-relaxed text-text-primary">
-                {option.text}
+                <MarkdownRenderer content={option.text} inline />
               </div>
             </button>
           )

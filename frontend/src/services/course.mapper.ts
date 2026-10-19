@@ -1,5 +1,6 @@
 import type {
   Course,
+  CurrentSession,
   LearningPath,
   LearningPathNode,
   PracticeExercise,
@@ -7,12 +8,16 @@ import type {
   Quiz,
   QuizResult,
   QuizAnswerEvaluation,
+  SessionConcept,
+  LearningActivity,
 } from '../types/course'
+import { parseOrBuildActivity, validateActivity } from './activity.parser.ts'
 
 export interface BackendCourse {
   id: string
   name: string
   description: string | null
+  bannerKey?: string | null
   status: string
   createdAt: string
   updatedAt: string
@@ -55,8 +60,10 @@ export interface SessionProgressItem {
   attemptsCount: number
 }
 
+export type BackendExamStatus = 'LOCKED' | 'COOLDOWN' | 'AVAILABLE'
+
 export interface FinalExamProgressItem {
-  status: 'LOCKED' | 'AVAILABLE' | 'COOLDOWN' | 'COMPLETED'
+  status: BackendExamStatus
   bestScorePercent: number | null
   attemptsCount: number
   cooldownUntil?: string | null
@@ -69,10 +76,116 @@ export interface CourseProgressResult {
   finalExam?: FinalExamProgressItem
 }
 
+export function isValidBackendSession(s: unknown): s is BackendSession {
+  if (!s || typeof s !== 'object') return false
+  const candidate = s as Partial<BackendSession>
+  return (
+    typeof candidate.id === 'string' &&
+    candidate.id.trim().length > 0 &&
+    typeof candidate.title === 'string' &&
+    candidate.title.trim().length > 0 &&
+    typeof candidate.sequenceOrder === 'number' &&
+    Number.isFinite(candidate.sequenceOrder) &&
+    candidate.sequenceOrder >= 1
+  )
+}
+
+export function selectEligibleSession(
+  sessions: BackendSession[] | null | undefined,
+  progress?: CourseProgressResult | null,
+): BackendSession | null {
+  if (!Array.isArray(sessions) || sessions.length === 0) return null
+
+  const sortedSessions = sessions
+    .filter(isValidBackendSession)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+
+  if (sortedSessions.length === 0) return null
+
+  const progressSessions = Array.isArray(progress?.sessions) ? progress.sessions : null
+
+  for (const s of sortedSessions) {
+    const sp = progressSessions?.find(
+      (item) => item.id === s.id || (item as { sessionId?: string }).sessionId === s.id,
+    )
+    const explicitCompleted = (s as BackendSession & { isCompleted?: boolean }).isCompleted
+
+    let isCompleted: boolean
+    if (sp) {
+      isCompleted = Boolean(sp.isCompleted)
+    } else if (typeof explicitCompleted === 'boolean') {
+      isCompleted = explicitCompleted
+    } else {
+      const nextSession = sortedSessions.find((ns) => ns.sequenceOrder === s.sequenceOrder + 1)
+      isCompleted = nextSession ? Boolean(nextSession.isUnlocked) : false
+    }
+
+    const isUnlocked = sp ? Boolean(sp.isUnlocked || s.isUnlocked) : Boolean(s.isUnlocked)
+
+    if (!isCompleted && isUnlocked) {
+      return s
+    }
+  }
+
+  return null
+}
+
+export function buildCurrentSessionForCourse(
+  course: Course | null | undefined,
+  sessions: BackendSession[] | null | undefined,
+  progress?: CourseProgressResult | null,
+): CurrentSession | null {
+  if (!course || !course.id || !course.name) return null
+  if (
+    course.status === 'COMPLETED' ||
+    course.status === 'PROCESSING' ||
+    course.status === 'ERROR' ||
+    course.status === 'CREATED'
+  ) {
+    return null
+  }
+
+  const validSessions = (Array.isArray(sessions) ? sessions : []).filter(isValidBackendSession)
+  if (validSessions.length === 0) return null
+
+  const currentSession = selectEligibleSession(validSessions, progress)
+  if (!currentSession) return null
+
+  const totalSessions = validSessions.length
+  const inferredCompleted = validSessions.filter(
+    (s) => s.sequenceOrder < currentSession.sequenceOrder,
+  ).length
+  const completedSessions =
+    typeof progress?.completedSessions === 'number'
+      ? progress.completedSessions
+      : typeof course.progress?.completedSessions === 'number' &&
+          course.progress.completedSessions > 0
+        ? course.progress.completedSessions
+        : inferredCompleted
+
+  const progressPercent =
+    totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0
+
+  return {
+    courseId: course.id,
+    courseTitle: course.name,
+    sessionId: currentSession.id,
+    sessionNumber: currentSession.sequenceOrder,
+    title: currentSession.title,
+    completedSessions,
+    totalSessions,
+    progressPercent,
+    durationMinutes: currentSession.durationMinutes || 15,
+    concepts: 3,
+    streakDays: completedSessions > 0 ? 1 : 0,
+  }
+}
+
 export interface GenerationStatusResponse {
   jobId: string
   courseId: string
   courseName: string
+  bannerKey?: string | null
   status: string
   progressPercent: number
   currentStepIndex: number
@@ -126,9 +239,27 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function parsePracticeExercise(raw: string, fallbackPrompt: string): PracticeExercise {
+export function parsePracticeExercise(
+  raw: string,
+  fallbackPrompt: string,
+  activity?: LearningActivity,
+): PracticeExercise {
   const trimmed = raw?.trim() || ''
   const jsonContent = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim()
+
+  let embeddedActivity = activity
+  if (!embeddedActivity && jsonContent.startsWith('{') && jsonContent.endsWith('}')) {
+    try {
+      const parsedJson = JSON.parse(jsonContent)
+      const validated = validateActivity(parsedJson)
+      if (validated) {
+        embeddedActivity = validated
+      }
+    } catch {
+      // not JSON or invalid activity
+    }
+  }
+
   try {
     const parsed = JSON.parse(jsonContent)
     if (parsed && typeof parsed === 'object') {
@@ -148,6 +279,7 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
           prompt,
           context: parsed.context,
           options: parsed.options,
+          activity: embeddedActivity,
         }
       }
       return {
@@ -168,6 +300,7 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
             feedback: 'Recuerda revisar los conceptos clave de la sesión antes de avanzar.',
           },
         ],
+        activity: embeddedActivity,
       }
     }
   } catch {
@@ -190,6 +323,7 @@ export function parsePracticeExercise(raw: string, fallbackPrompt: string): Prac
         feedback: 'Recuerda revisar los conceptos clave de la sesión antes de avanzar.',
       },
     ],
+    activity: embeddedActivity,
   }
 }
 
@@ -203,6 +337,7 @@ export function mapBackendCourseToFrontend(
     id: course.id,
     name: course.name,
     description: course.description || undefined,
+    ...(course.bannerKey ? { bannerKey: course.bannerKey } : {}),
     status: (course.status === 'GENERATING' ? 'PROCESSING' : course.status) as Course['status'],
     progress: {
       completedSessions,
@@ -221,14 +356,18 @@ export function mapBackendLearningPath(
   progress: CourseProgressResult,
   conceptsBySessionId: Map<string, string[]>,
 ): LearningPath {
-  const sortedSessions = [...sessions].sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+  const sortedSessions = (Array.isArray(sessions) ? sessions : [])
+    .filter(isValidBackendSession)
+    .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+  const progressSessions = Array.isArray(progress?.sessions) ? progress.sessions : []
+
   const nodes: LearningPathNode[] = sortedSessions.map((s) => {
     const conceptNames = conceptsBySessionId.get(s.id) || []
-    const sp = progress.sessions.find((item) => item.id === s.id)
+    const sp = progressSessions.find((item) => item.id === s.id)
     let nodeStatus: LearningPathNode['status'] = 'LOCKED'
     if (sp?.isCompleted) {
       nodeStatus = 'COMPLETED'
-    } else if (sp?.isUnlocked || s.isUnlocked) {
+    } else if (sp ? Boolean(sp.isUnlocked || s.isUnlocked) : Boolean(s.isUnlocked)) {
       nodeStatus = 'CURRENT'
     }
 
@@ -257,16 +396,20 @@ export function mapBackendLearningPath(
     }
   }
 
-  // Agregar nodo de examen final
-  if (progress.finalExam) {
+  // Agregar nodo de examen final respetando restricciones de acceso, enfriamiento y completitud del curso
+  const allSessionsCompleted =
+    nodes.length > 0 && nodes.every((n) => n.status === 'COMPLETED')
+
+  if (progress?.finalExam) {
     let examStatus: LearningPathNode['status'] = 'LOCKED'
-    if (progress.finalExam.status === 'COMPLETED') {
-      examStatus = 'COMPLETED'
-    } else if (
-      progress.finalExam.status === 'AVAILABLE' ||
-      progress.finalExam.status === 'COOLDOWN'
-    ) {
-      examStatus = 'CURRENT'
+    const rawExamStatus = progress.finalExam.status as string | undefined
+
+    if (allSessionsCompleted) {
+      if (rawExamStatus === 'COOLDOWN') {
+        examStatus = 'CURRENT'
+      } else if (rawExamStatus === 'AVAILABLE') {
+        examStatus = course.status === 'COMPLETED' ? 'COMPLETED' : 'CURRENT'
+      }
     }
 
     nodes.push({
@@ -303,6 +446,50 @@ export function mapBackendStudySession(
   totalSessions: number,
   quizId: string,
 ): StudySession {
+  const sessionConcepts: SessionConcept[] = concepts.map((c) => ({
+    id: c.id,
+    name: c.name,
+    summary: c.summary,
+    detail: c.detail,
+    example: c.example || undefined,
+  }))
+
+  const guidedPracticeActivity = parseOrBuildActivity(
+    session.guidedPractice,
+    sessionConcepts,
+    {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      learningObjective: session.learningObjective,
+      phase: 'guidedPractice',
+    },
+    'practice',
+  )
+
+  const challengeActivity = parseOrBuildActivity(
+    session.challenge,
+    sessionConcepts,
+    {
+      sessionId: session.id,
+      sessionTitle: session.title,
+      learningObjective: session.learningObjective,
+      phase: 'challenge',
+    },
+    'challenge',
+  )
+
+  const guidedPractice = parsePracticeExercise(
+    session.guidedPractice,
+    `Práctica guiada para ${session.title}`,
+    guidedPracticeActivity,
+  )
+
+  const challenge = parsePracticeExercise(
+    session.challenge,
+    `Desafío conceptual de ${session.title}`,
+    challengeActivity,
+  )
+
   return {
     id: session.id,
     courseId: session.courseId,
@@ -319,21 +506,11 @@ export function mapBackendStudySession(
       keyTakeaway: session.introKeyTakeaway,
       codeSnippet: session.introCodeSnippet || undefined,
     },
-    concepts: concepts.map((c) => ({
-      id: c.id,
-      name: c.name,
-      summary: c.summary,
-      detail: c.detail,
-      example: c.example || undefined,
-    })),
-    guidedPractice: parsePracticeExercise(
-      session.guidedPractice,
-      `Práctica guiada para ${session.title}`,
-    ),
-    challenge: parsePracticeExercise(
-      session.challenge,
-      `Desafío conceptual de ${session.title}`,
-    ),
+    concepts: sessionConcepts,
+    guidedPractice,
+    challenge,
+    guidedPracticeActivity,
+    challengeActivity,
     quizId,
   }
 }

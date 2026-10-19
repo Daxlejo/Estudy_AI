@@ -7,6 +7,7 @@ import {
 import { QuizzesService } from './quizzes.service';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
+import { CourseRepository } from '../../domain/repositories/course.repository';
 import { Quiz, QuizQuestion } from '../../domain/models/quiz';
 import { Session } from '../../domain/models/session';
 
@@ -14,6 +15,7 @@ describe('QuizzesService', () => {
   let service: QuizzesService;
   let quizRepository: jest.Mocked<QuizRepository>;
   let sessionRepository: jest.Mocked<SessionRepository>;
+  let courseRepository: jest.Mocked<CourseRepository>;
 
   const mockSession: Session = {
     id: 'session-1',
@@ -95,11 +97,19 @@ describe('QuizzesService', () => {
       unlockNextSession: jest.fn(),
     } as any;
 
+    courseRepository = {
+      findById: jest.fn().mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      }),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         QuizzesService,
         { provide: 'QuizRepository', useValue: quizRepository },
         { provide: 'SessionRepository', useValue: sessionRepository },
+        { provide: 'CourseRepository', useValue: courseRepository },
       ],
     }).compile();
 
@@ -383,6 +393,100 @@ describe('QuizzesService', () => {
       await expect(service.listAttempts('quiz-999')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('Quiz ownership enforcement', () => {
+    it('should allow course owner to get quiz by session', async () => {
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+      quizRepository.findBySessionId.mockResolvedValue(mockQuiz);
+      quizRepository.getQuestionsByQuizId.mockResolvedValue(mockQuestions);
+
+      const result = await service.getQuizBySession('session-1', 'owner-1');
+      expect(result.id).toBe('quiz-1');
+    });
+
+    it('should throw ForbiddenException when intruder tries to get quiz by session', async () => {
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(
+        service.getQuizBySession('session-1', 'intruder'),
+      ).rejects.toThrow('You do not have permission to access this quiz');
+      expect(quizRepository.findBySessionId).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when accessing unowned course quiz by session', async () => {
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: null,
+      } as any);
+
+      await expect(
+        service.getQuizBySession('session-1', 'user-any'),
+      ).rejects.toThrow('You do not have permission to access this quiz');
+    });
+
+    it('should allow owner to get quiz by id', async () => {
+      quizRepository.findById.mockResolvedValue(mockQuiz);
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+      quizRepository.getQuestionsByQuizId.mockResolvedValue(mockQuestions);
+
+      const result = await service.getQuizById('quiz-1', 'owner-1');
+      expect(result.id).toBe('quiz-1');
+    });
+
+    it('should throw ForbiddenException when intruder accesses quiz by id', async () => {
+      quizRepository.findById.mockResolvedValue(mockQuiz);
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.getQuizById('quiz-1', 'intruder')).rejects.toThrow(
+        'You do not have permission to access this quiz',
+      );
+    });
+
+    it('should throw ForbiddenException when intruder lists quiz attempts', async () => {
+      quizRepository.findById.mockResolvedValue(mockQuiz);
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.listAttempts('quiz-1', 'intruder')).rejects.toThrow(
+        'You do not have permission to access this quiz',
+      );
+      expect(quizRepository.getAttemptsByQuizId).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException and NOT create attempt when intruder submits quiz attempt', async () => {
+      quizRepository.findById.mockResolvedValue(mockQuiz);
+      sessionRepository.findById.mockResolvedValue(mockSession);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(
+        service.submitAttempt('quiz-1', [], 'intruder'),
+      ).rejects.toThrow('You do not have permission to access this quiz');
+      expect(quizRepository.createAttempt).not.toHaveBeenCalled();
     });
   });
 });

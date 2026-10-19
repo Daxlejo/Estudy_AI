@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -48,10 +49,16 @@ export class MaterialsService {
   async upload(
     courseId: string,
     file: UploadedMaterialFile | undefined,
+    userId?: string,
   ): Promise<MaterialResponseDto> {
     const course = await this.courseRepository.findById(courseId);
     if (!course) {
       throw new NotFoundException(`Course with id ${courseId} not found`);
+    }
+    if (userId && (!course.userId || course.userId !== userId)) {
+      throw new ForbiddenException(
+        'You do not have permission to access this course',
+      );
     }
 
     if (!file || !Buffer.isBuffer(file.buffer)) {

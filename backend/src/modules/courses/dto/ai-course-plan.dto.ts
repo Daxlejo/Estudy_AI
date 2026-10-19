@@ -31,7 +31,22 @@ export type AiConceptsResponse = z.infer<typeof aiConceptsResponseSchema>;
 // Step 2: Session grouping
 // ---------------------------------------------------------------------------
 
-export const aiSessionSchema = z.object({
+// Acepta cadena JSON (o texto legado) o un objeto JSON estructurado que se serializa a texto para persistencia
+const serializedActivityJsonSchema = (
+  requiredMsg: string,
+  description: string,
+) =>
+  z
+    .union([
+      z.string().trim().min(1, requiredMsg),
+      z
+        .record(z.string(), z.unknown())
+        .refine((obj) => Object.keys(obj).length > 0, { message: requiredMsg })
+        .transform((obj) => JSON.stringify(obj)),
+    ])
+    .describe(description);
+
+export const AiSessionPlanItemSchema = z.object({
   sequenceOrder: z.number().int().min(1),
   title: z.string().trim().min(1, 'Session title is required'),
   learningObjective: z.string().trim().min(1, 'Learning objective is required'),
@@ -41,18 +56,32 @@ export const aiSessionSchema = z.object({
   introContent: z.string().trim().min(1, 'Intro content is required'),
   introKeyTakeaway: z.string().trim().min(1, 'Key takeaway is required'),
   introCodeSnippet: z.string().trim().optional().nullable(),
-  guidedPractice: z.string().trim().min(1, 'Guided practice is required'),
-  challenge: z.string().trim().min(1, 'Challenge is required'),
+  guidedPractice: serializedActivityJsonSchema(
+    'Guided practice is required',
+    'Structured JSON string describing a "matching" or "ordering" activity for reinforcement and procedural scaffolding. ' +
+      'For matching: {"type":"matching","title":"...","instructions":"...","hint":"...","explanation":"...","xpReward":20,"pairs":[{"id":"p1","left":"Concept","right":"Definition or example"}]}. ' +
+      'For ordering: {"type":"ordering","title":"...","instructions":"...","hint":"...","explanation":"...","xpReward":25,"items":[{"id":"s1","text":"Step 1"},{"id":"s2","text":"Step 2"}],"correctOrder":["s1","s2"]}.',
+  ),
+  challenge: serializedActivityJsonSchema(
+    'Challenge is required',
+    'Structured JSON string describing a scenario-based "multiple_choice" activity for applied problem-solving with plausible distractors and a diagnostic explanation: ' +
+      '{"type":"multiple_choice","title":"...","instructions":"Concrete problem-solving scenario and question","hint":"...","explanation":"Diagnostic explanation of why the correct option solves the scenario and why distractors fail","xpReward":30,"options":[{"id":"opt-1","text":"...","isCorrect":true,"feedback":"..."},{"id":"opt-2","text":"...","isCorrect":false,"feedback":"..."}]}.',
+  ),
   conceptNames: z
     .array(z.string().trim().min(1))
     .min(1, 'Session must include at least one concept'),
 });
 
+export const aiSessionSchema = AiSessionPlanItemSchema;
+
 export const aiSessionPlanResponseSchema = z.object({
-  sessions: z.array(aiSessionSchema).min(1, 'At least one session is required'),
+  sessions: z
+    .array(AiSessionPlanItemSchema)
+    .min(1, 'At least one session is required'),
 });
 
-export type AiSession = z.infer<typeof aiSessionSchema>;
+export type AiSessionPlanItem = z.infer<typeof AiSessionPlanItemSchema>;
+export type AiSession = AiSessionPlanItem;
 export type AiSessionPlanResponse = z.infer<typeof aiSessionPlanResponseSchema>;
 
 // ---------------------------------------------------------------------------

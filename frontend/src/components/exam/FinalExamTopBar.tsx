@@ -7,6 +7,7 @@ import {
   IconAlertTriangle,
 } from '@tabler/icons-react'
 import type { FinalExam } from '../../types/exam'
+import { useTranslation } from '../../i18n'
 
 interface FinalExamTopBarProps {
   exam: FinalExam
@@ -23,6 +24,7 @@ export function FinalExamTopBar({
   answeredCount,
   viewMode = 'answering',
 }: FinalExamTopBarProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [showExitModal, setShowExitModal] = useState(false)
 
@@ -46,8 +48,8 @@ export function FinalExamTopBar({
                 type="button"
                 onClick={() => setShowExitModal(true)}
                 className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition-colors duration-150 hover:border-tertiary/50 hover:bg-surface-high hover:text-text-primary focus-visible:outline-2 focus-visible:outline-tertiary"
-                aria-label="Salir del examen final"
-                title="Salir del examen final"
+                aria-label={t('finalExam.exitAria')}
+                title={t('finalExam.exitAria')}
               >
                 <IconArrowLeft className="size-4.5" />
               </button>
@@ -55,8 +57,8 @@ export function FinalExamTopBar({
               <Link
                 to={`/cursos/${exam.courseId}/ruta`}
                 className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition-colors duration-150 hover:border-secondary/50 hover:bg-surface-high hover:text-text-primary focus-visible:outline-2 focus-visible:outline-secondary"
-                aria-label="Volver a la ruta de aprendizaje"
-                title="Volver a la ruta de aprendizaje"
+                aria-label={t('finalExam.returnToPath')}
+                title={t('finalExam.returnToPath')}
               >
                 <IconArrowLeft className="size-4.5" />
               </Link>
@@ -70,11 +72,14 @@ export function FinalExamTopBar({
                 <span className="hidden size-1 rounded-full bg-text-secondary/50 sm:inline-block" />
                 <span className="inline-flex items-center gap-1 rounded-full border border-tertiary/40 bg-tertiary/10 px-2 py-0.5 text-[11px] font-bold text-tertiary">
                   <IconTrophy className="size-3" />
-                  Examen Final {exam.attemptNumber > 1 ? `(Intento ${exam.attemptNumber})` : ''}
+                  {exam.attemptNumber > 1
+                    ? t('finalExam.attemptBadge', { attempt: exam.attemptNumber })
+                    : t('finalExam.badge')}
                 </span>
               </div>
               <h1 className="truncate font-heading text-sm font-bold text-text-primary md:text-base">
-                Evaluación Integral del Curso {isAnswering ? `· Pregunta ${currentQuestionIndex + 1}/${totalQuestions}` : ''}
+                {t('finalExam.integralAssessment')}{' '}
+                {isAnswering ? `· ${t('finalExam.questionOf', { current: currentQuestionIndex + 1, total: totalQuestions })}` : ''}
               </h1>
             </div>
           </div>
@@ -84,12 +89,12 @@ export function FinalExamTopBar({
             <div className="flex shrink-0 items-center gap-4">
               <div className="hidden items-center gap-1.5 text-xs text-text-secondary md:flex">
                 <IconClock className="size-4 text-tertiary" />
-                <span>Estimado: ~{exam.estimatedMinutes} min</span>
+                <span>{t('finalExam.estimatedMinutes', { minutes: exam.estimatedMinutes })}</span>
               </div>
 
               <div className="flex flex-col items-end">
                 <div className="flex items-center gap-2 font-mono text-xs">
-                  <span className="text-text-secondary">Respondidas:</span>
+                  <span className="text-text-secondary">{t('finalExam.answered')}</span>
                   <span className="font-bold text-text-primary">
                     {answeredCount}/{totalQuestions}
                   </span>
@@ -115,13 +120,12 @@ export function FinalExamTopBar({
                 <IconAlertTriangle className="size-6 text-warning" />
               </div>
               <h3 className="font-heading text-lg font-bold text-text-primary">
-                ¿Abandonar el Examen Final?
+                {t('finalExam.abandonTitle')}
               </h3>
             </div>
 
             <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-              Si sales ahora, tus respuestas actuales en este intento no se enviarán para
-              calificación. Podrás reiniciar el intento cuando regreses.
+              {t('finalExam.abandonDesc')}
             </p>
 
             <div className="mt-6 flex items-center justify-end gap-3">
@@ -130,14 +134,14 @@ export function FinalExamTopBar({
                 onClick={() => setShowExitModal(false)}
                 className="rounded-xl border border-border bg-surface-high px-4 py-2 text-xs font-semibold text-text-primary transition hover:bg-surface"
               >
-                Continuar examen
+                {t('finalExam.continueExam')}
               </button>
               <button
                 type="button"
                 onClick={handleExitConfirm}
                 className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500"
               >
-                Salir de todas formas
+                {t('finalExam.confirmLeave')}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { IconArrowLeft, IconSparkles } from '@tabler/icons-react'
 import type { Quiz } from '../../types/course'
+import { useTranslation } from '../../i18n'
 
 interface QuizTopBarProps {
   quiz: Quiz
@@ -17,6 +18,7 @@ export function QuizTopBar({
   answeredCount,
   viewMode = 'answering',
 }: QuizTopBarProps) {
+  const { t } = useTranslation()
   const isEvaluatingOrReview = viewMode !== 'answering'
   const progressPercent = isEvaluatingOrReview
     ? 100
@@ -32,8 +34,8 @@ export function QuizTopBar({
           <Link
             to={`/sesion/${quiz.sessionId}`}
             className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary transition-colors duration-150 hover:border-primary/50 hover:bg-surface-high hover:text-text-primary focus-visible:outline-2 focus-visible:outline-primary"
-            aria-label="Salir del miniquiz y volver a la sesión de estudio"
-            title="Volver a la sesión de estudio"
+            aria-label={t('quiz.exitTooltip')}
+            title={t('quiz.exitTooltip')}
           >
             <IconArrowLeft className="size-4.5" />
           </Link>
@@ -45,11 +47,11 @@ export function QuizTopBar({
               </span>
               <span className="hidden size-1 rounded-full bg-text-secondary/50 sm:inline-block" />
               <span className="hidden text-xs font-medium text-text-secondary sm:inline-block">
-                Sesión {quiz.sessionNumber}
+                {t('quiz.sessionNumber', { number: quiz.sessionNumber })}
               </span>
               <span className="hidden size-1 rounded-full bg-text-secondary/50 sm:inline-block" />
               <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                Miniquiz {quiz.attemptNumber > 1 ? `(Intento ${quiz.attemptNumber})` : ''}
+                {quiz.attemptNumber > 1 ? t('quiz.miniquizAttempt', { attempt: quiz.attemptNumber }) : 'Miniquiz'}
               </span>
             </div>
             <h1 className="truncate font-heading text-sm font-bold text-text-primary md:text-base">
@@ -64,22 +66,22 @@ export function QuizTopBar({
             <div className="flex items-center gap-2 text-xs">
               <span className="font-semibold text-text-primary">
                 {viewMode === 'result'
-                  ? 'Resultados finales'
+                  ? t('quiz.finalResults')
                   : viewMode === 'reviewing'
-                    ? 'Refuerzo de conceptos'
-                    : `Pregunta ${currentQuestionIndex + 1} de ${totalQuestions}`}
+                    ? t('quiz.conceptReinforcement')
+                    : t('quiz.questionOf', { current: currentQuestionIndex + 1, total: totalQuestions })}
               </span>
               <span className="text-text-secondary">
                 {viewMode === 'result'
-                  ? 'Completado'
+                  ? t('quiz.completed')
                   : viewMode === 'reviewing'
-                    ? 'Paso previo al nuevo intento'
-                    : `(${answeredCount}/${totalQuestions} respondidas)`}
+                    ? t('quiz.priorStep')
+                    : t('quiz.answeredOf', { answered: answeredCount, total: totalQuestions })}
               </span>
             </div>
             <div
               role="progressbar"
-              aria-label="Progreso de respuestas del miniquiz"
+              aria-label={t('quiz.progressAria')}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progressPercent}
@@ -95,7 +97,7 @@ export function QuizTopBar({
           {/* Recompensa XP sutil */}
           <div
             className="hidden items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold text-primary sm:inline-flex"
-            title="Recompensa de experiencia al aprobar"
+            title={t('quiz.xpTooltip')}
           >
             <IconSparkles className="size-3.5 text-primary" />
             <span>+{quiz.xpReward} XP</span>

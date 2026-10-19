@@ -1,22 +1,32 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { applyTheme, getInitialTheme, type Theme } from './theme'
+import { applyTheme, getInitialTheme, saveTheme, type Theme } from './theme'
 import { ThemeContext } from './themeContext'
 
 function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme)
 
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme)
+    saveTheme(newTheme)
+    applyTheme(newTheme)
+  }, [])
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((current) => {
+      const next: Theme = current === 'light' ? 'dark' : 'light'
+      saveTheme(next)
+      applyTheme(next)
+      return next
+    })
+  }, [])
+
+  // Asegura sincronización del atributo data-theme en el documento
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
 
-  const toggleTheme = useCallback(() => {
-    setTheme((current) => (current === 'light' ? 'dark' : 'light'))
-  }, [])
-
-  // Solo desarrollo: Ctrl + Shift + L alterna entre claro y oscuro.
+  // Accesibilidad y atajo rápido: Ctrl + Shift + L alterna entre claro y oscuro
   useEffect(() => {
-    if (!import.meta.env.DEV) return
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'l') {
         event.preventDefault()
@@ -30,7 +40,7 @@ function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({ theme, setTheme, toggleTheme }),
-    [theme, toggleTheme],
+    [theme, setTheme, toggleTheme],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

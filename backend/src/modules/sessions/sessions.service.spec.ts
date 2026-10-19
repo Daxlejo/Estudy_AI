@@ -181,4 +181,117 @@ describe('SessionsService', () => {
       );
     });
   });
+
+  describe('Session ownership enforcement', () => {
+    it('should allow owner to list sessions', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+      sessionRepository.findByCourseId.mockResolvedValue([{ id: 's1' }] as any);
+
+      const result = await service.listByCourse('c1', 'owner-1');
+      expect(result).toEqual([{ id: 's1' }]);
+    });
+
+    it('should throw ForbiddenException when user does not own the course in listByCourse', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.listByCourse('c1', 'intruder')).rejects.toThrow(
+        'You do not have permission to access this course',
+      );
+      expect(sessionRepository.findByCourseId).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when course is unowned (userId: null) in listByCourse', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: null,
+      } as any);
+
+      await expect(service.listByCourse('c1', 'user-any')).rejects.toThrow(
+        'You do not have permission to access this course',
+      );
+    });
+
+    it('should allow owner to get session by id', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 's1',
+        courseId: 'c1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+      sessionRepository.getConceptsBySessionId.mockResolvedValue([]);
+
+      const result = await service.getById('s1', 'owner-1');
+      expect(result.id).toBe('s1');
+    });
+
+    it('should throw ForbiddenException when another user attempts getById', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 's1',
+        courseId: 'c1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.getById('s1', 'intruder')).rejects.toThrow(
+        'You do not have permission to access this resource',
+      );
+    });
+
+    it('should throw ForbiddenException when unowned course session attempts getById', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 's1',
+        courseId: 'c1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: null,
+      } as any);
+
+      await expect(service.getById('s1', 'user-any')).rejects.toThrow(
+        'You do not have permission to access this resource',
+      );
+    });
+
+    it('should throw ForbiddenException and NOT complete session for unauthorized user', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 's1',
+        courseId: 'c1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.completeSession('s1', 'intruder')).rejects.toThrow(
+        'You do not have permission to access this resource',
+      );
+      expect(sessionRepository.unlockNextSession).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException and NOT complete session for unowned course', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 's1',
+        courseId: 'c1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'c1',
+        userId: null,
+      } as any);
+
+      await expect(service.completeSession('s1', 'user-any')).rejects.toThrow(
+        'You do not have permission to access this resource',
+      );
+      expect(sessionRepository.unlockNextSession).not.toHaveBeenCalled();
+    });
+  });
 });

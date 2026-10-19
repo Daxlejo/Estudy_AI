@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ExamsService } from './exams.service';
 import { ExamAvailabilityService } from './exam-availability.service';
@@ -512,6 +513,111 @@ describe('ExamsService', () => {
       await expect(service.getAttempt('exam-1', 'att-1')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('Exam ownership enforcement', () => {
+    it('should allow course owner to get exam by course', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+      finalExamRepository.findByCourseIdWithQuestions.mockResolvedValue({
+        ...mockExam,
+        questions: allThreeQuestions,
+      } as any);
+      examAvailabilityService.checkAvailability.mockResolvedValue({
+        status: 'AVAILABLE',
+      } as any);
+
+      const result = await service.getExamByCourse(
+        'course-1',
+        undefined,
+        'owner-1',
+      );
+      expect(result.id).toBe('exam-1');
+    });
+
+    it('should throw ForbiddenException when intruder accesses exam by course', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(
+        service.getExamByCourse('course-1', undefined, 'intruder'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(
+        finalExamRepository.findByCourseIdWithQuestions,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when accessing unowned course exam', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: null,
+      } as any);
+
+      await expect(
+        service.getExamByCourse('course-1', undefined, 'user-any'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException and NOT evaluate or record attempt when intruder submits attempt', async () => {
+      finalExamRepository.findById.mockResolvedValue(mockExam);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(
+        service.submitAttempt('exam-1', [], undefined, 'intruder'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(finalExamRepository.createAttempt).not.toHaveBeenCalled();
+      expect(courseRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException and NOT evaluate or record attempt on unowned course exam', async () => {
+      finalExamRepository.findById.mockResolvedValue(mockExam);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: null,
+      } as any);
+
+      await expect(
+        service.submitAttempt('exam-1', [], undefined, 'user-any'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(finalExamRepository.createAttempt).not.toHaveBeenCalled();
+      expect(courseRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when intruder lists exam attempts', async () => {
+      finalExamRepository.findById.mockResolvedValue(mockExam);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(service.listAttempts('exam-1', 'intruder')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(finalExamRepository.getAttemptsByExamId).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when intruder gets specific attempt', async () => {
+      finalExamRepository.getAttemptById.mockResolvedValue({
+        id: 'att-1',
+        examId: 'exam-1',
+        courseId: 'course-1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'owner-1',
+      } as any);
+
+      await expect(
+        service.getAttempt('exam-1', 'att-1', 'intruder'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

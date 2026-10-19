@@ -29,6 +29,7 @@ export default function FinalExamPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answersMap, setAnswersMap] = useState<Map<string, FinalExamAnswer>>(new Map())
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<FinalExamResultType | null>(null)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
@@ -36,8 +37,10 @@ export default function FinalExamPage() {
   const loadExamData = async () => {
     setLoading(true)
     setError(null)
+    setSubmitError(null)
     try {
-      const data = await examService.getFinalExam(examId)
+      const targetCourseId = exam?.courseId || examId
+      const data = await examService.getFinalExam(targetCourseId)
       setExam(data)
 
       if (data.status !== 'LOCKED') {
@@ -59,6 +62,7 @@ export default function FinalExamPage() {
     async function init() {
       try {
         setError(null)
+        setSubmitError(null)
         const data = await examService.getFinalExam(examId)
         if (!isMounted) return
         setExam(data)
@@ -123,7 +127,7 @@ export default function FinalExamPage() {
               Reintentar
             </button>
             <Link
-              to={`/cursos/${examId}/ruta`}
+              to={`/cursos/${exam?.courseId || examId}/ruta`}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
             >
               Volver a la Ruta
@@ -134,7 +138,7 @@ export default function FinalExamPage() {
     )
   }
 
-  if (exam.status === 'LOCKED' || exam.questions.length === 0) {
+  if (exam.status === 'LOCKED') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
         <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 shadow-sm">
@@ -148,7 +152,7 @@ export default function FinalExamPage() {
             Debes completar y aprobar todas las sesiones de estudio y sus respectivos cuestionarios antes de rendir la evaluación final de este curso.
           </p>
           <Link
-            to={`/cursos/${examId}/ruta`}
+            to={`/cursos/${exam.courseId || examId}/ruta`}
             className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
           >
             Volver a la Ruta de Aprendizaje
@@ -180,6 +184,30 @@ export default function FinalExamPage() {
     )
   }
 
+  if (exam.questions.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
+        <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-8 shadow-sm">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-warning/15 text-warning">
+            <IconLock className="size-8" />
+          </div>
+          <h2 className="font-heading text-xl font-bold text-text-primary">
+            Evaluación Final Bloqueada
+          </h2>
+          <p className="text-sm leading-relaxed text-text-secondary">
+            Debes completar y aprobar todas las sesiones de estudio y sus respectivos cuestionarios antes de rendir la evaluación final de este curso.
+          </p>
+          <Link
+            to={`/cursos/${exam.courseId || examId}/ruta`}
+            className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+          >
+            Volver a la Ruta de Aprendizaje
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   const currentQuestion = exam.questions[currentQuestionIndex]
   const currentAnswer = answersMap.get(currentQuestion.id)
   const isFirstQuestion = currentQuestionIndex === 0
@@ -196,14 +224,25 @@ export default function FinalExamPage() {
   }
 
   const handleSubmitExam = async () => {
-    setShowSubmitModal(false)
+    setSubmitError(null)
     setIsSubmitting(true)
     try {
       const evaluatedResult = await examService.submitFinalExam(
         exam.id,
         Array.from(answersMap.values())
       )
-      setResult(evaluatedResult)
+      setShowSubmitModal(false)
+      setResult({
+        ...evaluatedResult,
+        courseId: evaluatedResult.courseId || exam.courseId,
+      })
+    } catch (err) {
+      setShowSubmitModal(false)
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo enviar la evaluación final. Inténtalo de nuevo.'
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -221,6 +260,16 @@ export default function FinalExamPage() {
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8 md:px-8">
+        {submitError && (
+          <div
+            role="alert"
+            className="mb-6 flex items-center gap-3 rounded-2xl border border-error/40 bg-error/10 p-4 text-sm text-error"
+          >
+            <IconAlertTriangle className="size-5 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           {/* Columna Principal: Tarjeta de la Pregunta */}
           <div className="lg:col-span-3 space-y-6">
