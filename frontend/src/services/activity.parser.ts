@@ -358,7 +358,7 @@ export function buildMatchingActivityFromConcepts(
 export function buildOrderingActivityFromContent(
   steps: string[],
   context: ActivityBuildContext,
-  rawInstructions?: string,
+  _rawInstructions?: string,
 ): OrderingActivity {
   const items: OrderingItem[] = steps.map((stepText, idx) => ({
     id: `step-${idx + 1}`,
@@ -369,10 +369,10 @@ export function buildOrderingActivityFromContent(
   const correctOrder = items.map((it) => it.id)
   const shuffledItems = shuffleArray(items)
 
-  const instructions =
-    rawInstructions && rawInstructions.trim().length > 20
-      ? rawInstructions.trim()
-      : `Ordena los pasos lógicos para cumplir el objetivo: "${context.learningObjective}".`
+  // Las instrucciones y la pista no deben revelar el orden correcto.
+  // rawInstructions se ignora a propósito (contiene el orden); se conserva por compatibilidad.
+  void _rawInstructions
+  const instructions = 'Ordena los siguientes pasos en el orden correcto.'
 
   return {
     id: `activity-order-${context.sessionId}-${context.phase}`,
