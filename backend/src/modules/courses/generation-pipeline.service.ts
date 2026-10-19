@@ -9,6 +9,7 @@ import { MaterialsService } from '../materials/materials.service';
 import { AiService } from '../ai/ai.service';
 import {
   aiConceptsResponseSchema,
+  AiSessionPlanItemSchema,
   aiSessionPlanResponseSchema,
   aiSessionQuizResponseSchema,
   aiFinalExamResponseSchema,
@@ -157,8 +158,15 @@ export class GenerationPipelineService {
           introContent: rawSession.introContent,
           introKeyTakeaway: rawSession.introKeyTakeaway,
           introCodeSnippet: rawSession.introCodeSnippet ?? null,
-          guidedPractice: rawSession.guidedPractice,
-          challenge: rawSession.challenge,
+          // Serializar el JSON estructurado en las columnas de texto existentes
+          guidedPractice:
+            typeof rawSession.guidedPractice === 'string'
+              ? rawSession.guidedPractice
+              : JSON.stringify(rawSession.guidedPractice),
+          challenge:
+            typeof rawSession.challenge === 'string'
+              ? rawSession.challenge
+              : JSON.stringify(rawSession.challenge),
         });
         createdSessionIds.push(session.id);
 
@@ -418,6 +426,11 @@ Extract between 5 and 30 concepts. Focus on the most important ideas.`;
   private systemPromptSessions(
     language: CourseGenerationLanguage = 'es',
   ): string {
+    const guidedPracticeDesc =
+      AiSessionPlanItemSchema.shape.guidedPractice.description ?? '';
+    const challengeDesc =
+      AiSessionPlanItemSchema.shape.challenge.description ?? '';
+
     return `You are an expert academic curriculum designer.
 ${this.languageInstruction(language)}
 Given a list of concepts extracted from study material, organize them into logical learning sessions.
@@ -426,10 +439,10 @@ Each session must have:
   sequenceOrder (integer starting at 1), title, learningObjective, durationMinutes (10-60),
   xpReward (50 or 100), introTitle, introContent (2-3 paragraphs), introKeyTakeaway (1 sentence),
   introCodeSnippet (optional markdown code block),
-  guidedPractice (a detailed, step-by-step practical exercise directly applying the session concepts from the material with clear instructions, concrete code examples to analyze or write, and actionable tasks for the student to complete),
-  challenge (a concrete coding or conceptual challenge presenting a specific scenario or problem with clear requirements and constraints, requiring the student to apply and synthesize the session concepts),
+  guidedPractice (${guidedPracticeDesc} Must be a valid JSON string with 3-4 pairs for "matching" or 3-5 sequential steps for "ordering"),
+  challenge (${challengeDesc} Must be a valid JSON string with type "multiple_choice", a realistic applied scenario in "instructions", 4 options where exactly one has "isCorrect": true and 3 are plausible distractors with individual "feedback", plus a diagnostic "explanation"),
   conceptNames (array of concept names from the provided list).
-Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic (e.g. for Object-Oriented Programming, include concrete classes, methods, inheritance hierarchies, and clear tasks to execute or solve).`;
+Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic, and serialized as a JSON string.`;
   }
 
   private userMessageSessions(

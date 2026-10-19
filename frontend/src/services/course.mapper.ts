@@ -463,6 +463,7 @@ export function mapBackendStudySession(
       learningObjective: session.learningObjective,
       phase: 'guidedPractice',
     },
+    'practice',
   )
 
   const challengeActivity = parseOrBuildActivity(
@@ -474,6 +475,7 @@ export function mapBackendStudySession(
       learningObjective: session.learningObjective,
       phase: 'challenge',
     },
+    'challenge',
   )
 
   const guidedPractice = parsePracticeExercise(

@@ -1,9 +1,11 @@
 import type {
+  ChoiceOption,
   LearningActivity,
   MatchingActivity,
   MatchingEvaluation,
   MatchingPair,
   MatchingPairResult,
+  MultipleChoiceActivity,
   OrderingActivity,
   OrderingEvaluation,
   OrderingItem,
@@ -140,6 +142,108 @@ export function validateOrderingActivity(data: unknown): OrderingActivity | null
 }
 
 /**
+ * Valida una actividad de opción múltiple basada en escenarios.
+ */
+export function validateMultipleChoiceActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): MultipleChoiceActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+
+  if (obj.type !== 'multiple_choice' && obj.type !== 'MULTIPLE_CHOICE') return null
+  if (typeof obj.title === 'string' && !obj.title.trim()) return null
+
+  const rawScenario =
+    typeof obj.scenario === 'string' && obj.scenario.trim() ? obj.scenario.trim() : ''
+  const rawQuestion =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : typeof obj.prompt === 'string' && obj.prompt.trim()
+        ? obj.prompt.trim()
+        : typeof obj.question === 'string' && obj.question.trim()
+          ? obj.question.trim()
+          : ''
+
+  const instructions =
+    rawScenario && rawQuestion && !rawQuestion.includes(rawScenario)
+      ? `${rawScenario}\n\n${rawQuestion}`
+      : rawQuestion || rawScenario
+
+  if (!instructions) return null
+
+  if (!Array.isArray(obj.options) || obj.options.length < 2) return null
+
+  const validOptions: ChoiceOption[] = []
+  for (let i = 0; i < obj.options.length; i++) {
+    const opt = obj.options[i]
+    if (!opt || typeof opt !== 'object') return null
+    const o = opt as Record<string, unknown>
+    const text =
+      typeof o.text === 'string' && o.text.trim()
+        ? o.text.trim()
+        : typeof o.label === 'string' && o.label.trim()
+          ? o.label.trim()
+          : ''
+    if (!text) return null
+
+    const id = typeof o.id === 'string' && o.id.trim() ? o.id.trim() : `opt-${i + 1}`
+    const isCorrect =
+      typeof o.isCorrect === 'boolean'
+        ? o.isCorrect
+        : typeof obj.correctOptionId === 'string'
+          ? id === obj.correctOptionId.trim()
+          : false
+
+    validOptions.push({
+      id,
+      text,
+      isCorrect,
+      feedback:
+        typeof o.feedback === 'string' && o.feedback.trim()
+          ? o.feedback.trim()
+          : typeof o.explanation === 'string' && o.explanation.trim()
+            ? o.explanation.trim()
+            : undefined,
+    })
+  }
+
+  if (validOptions.filter((o) => o.isCorrect).length !== 1) return null
+
+  const defaultTitle =
+    context?.phase === 'guidedPractice'
+      ? 'Práctica Guiada: Selección Conceptual'
+      : 'Desafío Aplicado: Resolución de Escenario'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-mc-${context.sessionId}-${context.phase}`
+          : `act-mc-${Date.now()}`,
+    type: 'multiple_choice',
+    title: typeof obj.title === 'string' && obj.title.trim() ? obj.title.trim() : defaultTitle,
+    instructions,
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context?.learningObjective
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    conceptId: typeof obj.conceptId === 'string' ? obj.conceptId.trim() : undefined,
+    conceptName: typeof obj.conceptName === 'string' ? obj.conceptName.trim() : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation:
+      typeof obj.explanation === 'string' && obj.explanation.trim()
+        ? obj.explanation.trim()
+        : 'Analiza cómo los principios de la sesión permiten resolver el escenario planteado.',
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 30,
+    options: validOptions,
+  }
+}
+
+/**
  * Validates any JSON activity structure.
  */
 export function validateActivity(data: unknown): LearningActivity | null {
@@ -151,6 +255,9 @@ export function validateActivity(data: unknown): LearningActivity | null {
   }
   if (obj.type === 'ordering') {
     return validateOrderingActivity(data)
+  }
+  if (obj.type === 'multiple_choice' || obj.type === 'MULTIPLE_CHOICE') {
+    return validateMultipleChoiceActivity(data)
   }
   return null
 }
@@ -286,6 +393,8 @@ export function buildOrderingActivityFromContent(
   }
 }
 
+export type ActivityStage = 'practice' | 'challenge'
+
 /**
  * Parses raw text from session.guidedPractice or session.challenge.
  * If JSON activity is embedded, validates and returns it.
@@ -296,6 +405,7 @@ export function parseOrBuildActivity(
   rawText: string | undefined | null,
   concepts: SessionConcept[],
   context: ActivityBuildContext,
+  stage: ActivityStage = context.phase === 'challenge' ? 'challenge' : 'practice',
 ): LearningActivity {
   const trimmed = rawText?.trim() || ''
 
@@ -307,6 +417,18 @@ export function parseOrBuildActivity(
   if (jsonContent.startsWith('{') && jsonContent.endsWith('}')) {
     try {
       const parsed = JSON.parse(jsonContent)
+      // Rama para actividades de opción múltiple basadas en escenarios
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        ((parsed as Record<string, unknown>).type === 'multiple_choice' ||
+          (parsed as Record<string, unknown>).type === 'MULTIPLE_CHOICE')
+      ) {
+        const mcActivity = validateMultipleChoiceActivity(parsed, context)
+        if (mcActivity) {
+          return mcActivity
+        }
+      }
       const validated = validateActivity(parsed)
       if (validated) {
         return validated
@@ -322,9 +444,15 @@ export function parseOrBuildActivity(
     return buildOrderingActivityFromContent(extractedSteps, context, trimmed)
   }
 
-  // 3. If session has 2+ real concepts, build a rich course-specific Matching activity
+  // 3. Si la sesión tiene 2+ conceptos, rotar o invertir el subconjunto en el desafío para evitar repetir el tablero del paso 3
   if (concepts.length >= 2) {
-    return buildMatchingActivityFromConcepts(concepts, context, trimmed)
+    const selectedConcepts =
+      stage === 'challenge'
+        ? concepts.length > 4
+          ? concepts.slice(1, 5)
+          : [...concepts].reverse()
+        : concepts.slice(0, 4)
+    return buildMatchingActivityFromConcepts(selectedConcepts, context, trimmed)
   }
 
   // 4. If session has at least 1 concept or extracted steps
