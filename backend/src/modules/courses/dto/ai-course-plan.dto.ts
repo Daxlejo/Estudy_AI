@@ -32,7 +32,10 @@ export type AiConceptsResponse = z.infer<typeof aiConceptsResponseSchema>;
 // ---------------------------------------------------------------------------
 
 // Acepta cadena JSON (o texto legado) o un objeto JSON estructurado que se serializa a texto para persistencia
-const serializedActivityJsonSchema = (requiredMsg: string, description: string) =>
+const serializedActivityJsonSchema = (
+  requiredMsg: string,
+  description: string,
+) =>
   z
     .union([
       z.string().trim().min(1, requiredMsg),
