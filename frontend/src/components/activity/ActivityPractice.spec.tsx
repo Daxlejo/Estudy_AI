@@ -26,8 +26,8 @@ function createI18nContext(lang: 'es' | 'en'): I18nContextValue {
   const dict = lang === 'en' ? en : es
   return {
     language: lang,
-    setLanguage: () => {},
-    toggleLanguage: () => {},
+    setLanguage: () => { },
+    toggleLanguage: () => { },
     t: (key: string, params?: TranslationParams) => {
       let text = dict[key] || es[key] || key
       if (params) {
@@ -164,7 +164,7 @@ test('MatchingActivityView — Visual SVG & Sequential Rendering', async (t: Tes
           pairs={{ 'p-1': 'p-1', 'p-2': 'p-3' }}
           evaluation={null}
           viewportWidth={1280}
-          onChangePairs={() => {}}
+          onChangePairs={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -189,7 +189,7 @@ test('MatchingActivityView — Visual SVG & Sequential Rendering', async (t: Tes
           evaluation={evaluation}
           showSolution={false}
           viewportWidth={1280}
-          onChangePairs={() => {}}
+          onChangePairs={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -204,7 +204,7 @@ test('MatchingActivityView — Visual SVG & Sequential Rendering', async (t: Tes
           evaluation={evaluation}
           showSolution={true}
           viewportWidth={1280}
-          onChangePairs={() => {}}
+          onChangePairs={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -220,14 +220,15 @@ test('MatchingActivityView — Visual SVG & Sequential Rendering', async (t: Tes
           pairs={{ 'p-1': 'p-1' }}
           evaluation={null}
           viewportWidth={1280}
-          onChangePairs={() => {}}
+          onChangePairs={() => { }}
         />
       </I18nContext.Provider>,
     )
 
     assert.ok(html.includes('data-matching-mode="sequential"'))
     assert.ok(html.includes('Concepto 1 de 7'))
-    assert.ok(html.includes('¡Asociación correcta!'))
+    // El feedback solo aparece después de verificar, no en el render inicial
+    assert.ok(!html.includes('¡Asociación correcta!'))
   })
 })
 
@@ -248,8 +249,8 @@ test('ActivityContainer, Hint Visibility, Objective Banner & Completion Enforcem
           stepNumber={3}
           continueButtonLabel="Continuar al Desafío aplicado"
           viewportWidth={1280}
-          onContinue={() => {}}
-          onBack={() => {}}
+          onContinue={() => { }}
+          onBack={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -300,8 +301,8 @@ test('ActivityContainer, Hint Visibility, Objective Banner & Completion Enforcem
           stepNumber={3}
           continueButtonLabel="Continue to Challenge"
           viewportWidth={1280}
-          onContinue={() => {}}
-          onBack={() => {}}
+          onContinue={() => { }}
+          onBack={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -336,8 +337,8 @@ test('ActivityContainer, Hint Visibility, Objective Banner & Completion Enforcem
           stepNumber={3}
           phaseTitle="Fase 2: Práctica Guiada"
           continueButtonLabel="Continuar al Desafío"
-          onContinue={() => {}}
-          onBack={() => {}}
+          onContinue={() => { }}
+          onBack={() => { }}
         />
       </I18nContext.Provider>,
     )
@@ -368,7 +369,7 @@ test('ActivityContainer, Hint Visibility, Objective Banner & Completion Enforcem
 
     const introHtml = renderToStaticMarkup(
       <I18nContext.Provider value={esCtx}>
-        <SessionIntroBlock session={mockSession} onContinue={() => {}} />
+        <SessionIntroBlock session={mockSession} onContinue={() => { }} />
       </I18nContext.Provider>,
     )
 
