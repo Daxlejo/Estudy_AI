@@ -92,12 +92,16 @@ export default function CourseBannerPickerModal({
   const [isSaving, setIsSaving] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
+  // Reinicia la selección al abrir el modal o cuando cambia el banner del curso
+  const syncKey = isOpen ? (course.bannerKey ?? '') : null
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey)
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey)
+    if (syncKey !== null) {
       setSelectedKey((course.bannerKey as CourseBannerKey) || COURSE_BANNERS[0].key)
       setApiError(null)
     }
-  }, [isOpen, course.bannerKey])
+  }
 
   useEffect(() => {
     if (!isOpen) return
