@@ -1,0 +1,26 @@
+{
+  "name": "desktop",
+  "productName": "EstudyAI",
+  "version": "1.0.0",
+  "description": "EstudyAI desktop shell (Electron)",
+  "author": "EstudyAI",
+  "license": "ISC",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "npm run build && electron .",
+    "stage": "node scripts/stage-backend.js",
+    "icons": "node scripts/generate-icons.js",
+    "dist": "npm run build && npm run stage && electron-builder --publish never",
+    "dist:dir": "npm run build && npm run stage && electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

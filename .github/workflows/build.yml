@@ -1,0 +1,69 @@
+name: Build EstudyAI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: EstudyAI-Setup.exe
+            glob: "desktop/dist-electron/*.exe"
+          - os: ubuntu-latest
+            artifact: EstudyAI.AppImage
+            glob: "desktop/dist-electron/*.AppImage"
+          - os: macos-latest
+            artifact: EstudyAI.dmg
+            glob: "desktop/dist-electron/*.dmg"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build --workspace=frontend
+
+      # Must run before the backend build: with workspaces the @prisma/client
+      # postinstall cannot locate backend/prisma/schema.prisma, and `nest build`
+      # needs the generated client types.
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: backend
+
+      - name: Build backend
+        run: npm run build --workspace=backend
+
+      - name: Build Electron main process
+        run: npm run build --workspace=desktop
+
+      - name: Stage backend (production deps + Prisma engines)
+        run: npm run stage --workspace=desktop
+
+      - name: Build Electron app
+        run: npx electron-builder --publish never
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS: no signing
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error

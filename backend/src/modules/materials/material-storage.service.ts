@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
+import { mkdirSync, promises as fs } from 'fs';
 import * as path from 'path';
 
 const UUID_PATTERN =
@@ -27,6 +27,11 @@ export class MaterialStorageService {
     this.rootDir = path.resolve(
       process.env.MATERIALS_STORAGE_DIR ||
         path.join(process.cwd(), 'storage', 'materials'),
+    );
+    // Ensure the storage root exists from startup (fresh installs / userData).
+    mkdirSync(this.rootDir, { recursive: true });
+    new Logger(MaterialStorageService.name).log(
+      `Materials storage root: ${this.rootDir}`,
     );
   }
 
