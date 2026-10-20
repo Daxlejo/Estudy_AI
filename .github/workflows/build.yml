@@ -53,6 +53,20 @@ jobs:
       - name: Stage backend (production deps + Prisma engines)
         run: npm run stage --workspace=desktop
 
+      - name: Install FUSE (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && (sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2)
+
+      - name: Cache winCodeSign (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z"
+          $dest = "$env:LOCALAPPDATA\electron-builder\Cache\winCodeSign"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile "$dest\winCodeSign.7z"
+          7z x -snl- -y "-o$dest\winCodeSign-2.6.0" "$dest\winCodeSign.7z"
+
       - name: Build Electron app
         run: npx electron-builder --publish never
         working-directory: desktop
