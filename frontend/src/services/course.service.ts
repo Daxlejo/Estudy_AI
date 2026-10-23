@@ -316,7 +316,6 @@ class CourseService {
 
   // Genera un nuevo intento de miniquiz preservando la identidad del curso y sesión activa.
   async retryQuiz(quizId: string, weakConceptIds?: string[]): Promise<Quiz> {
-    void weakConceptIds
     const quiz = await this.getQuiz(quizId)
     if (!quiz) {
       throw new Error(`Error al recuperar el miniquiz para reintento: ${quizId}`)
@@ -326,13 +325,33 @@ class CourseService {
     const nextAttempt = currentAttempt + 1
     localQuizAttemptStore.set(quiz.id, nextAttempt)
 
+    // Clonar preguntas y opciones
+    const clonedQuestions = quiz.questions.map((q) => ({
+      ...q,
+      options: q.options.map((o) => ({ ...o })),
+    }))
+
+    // Fisher-Yates shuffle de todas las preguntas
+    for (let i = clonedQuestions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const temp = clonedQuestions[i]
+      clonedQuestions[i] = clonedQuestions[j]
+      clonedQuestions[j] = temp
+    }
+
+    // Mover preguntas cuyos conceptos estén en weakConceptIds al frente
+    let orderedQuestions = clonedQuestions
+    if (weakConceptIds && weakConceptIds.length > 0) {
+      const weakSet = new Set(weakConceptIds)
+      const weakQuestions = clonedQuestions.filter((q) => weakSet.has(q.conceptId))
+      const otherQuestions = clonedQuestions.filter((q) => !weakSet.has(q.conceptId))
+      orderedQuestions = [...weakQuestions, ...otherQuestions]
+    }
+
     return {
       ...quiz,
       attemptNumber: nextAttempt,
-      questions: quiz.questions.map((q) => ({
-        ...q,
-        options: q.options.map((o) => ({ ...o })),
-      })),
+      questions: orderedQuestions,
     }
   }
 
