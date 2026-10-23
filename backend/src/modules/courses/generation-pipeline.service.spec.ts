@@ -1,5 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { GenerationPipelineService } from './generation-pipeline.service';
+import {
+  GenerationPipelineService,
+  splitIntoChunks,
+  CHUNK_SIZE,
+  MAX_CHUNKS,
+  OVERLAP,
+} from './generation-pipeline.service';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
@@ -566,6 +572,197 @@ describe('GenerationPipelineService', () => {
           'IMPORTANTE: Genera TODO el contenido (resúmenes, títulos, explicaciones, ejercicios, preguntas, opciones y retroalimentación) en Español.',
         );
       }
+    });
+
+    describe('Chunked Pipeline (> 20,000 chars)', () => {
+      it('splitIntoChunks respects CHUNK_SIZE, MAX_CHUNKS, and OVERLAP', () => {
+        const text = 'A'.repeat(CHUNK_SIZE * 3);
+        const chunks = splitIntoChunks(text);
+        expect(chunks.length).toBeGreaterThan(1);
+        expect(chunks[0].length).toBe(CHUNK_SIZE);
+        expect(chunks[1].length).toBe(CHUNK_SIZE);
+        // Overlap verification
+        const step = CHUNK_SIZE - OVERLAP;
+        expect(chunks[1]).toBe(text.slice(step, step + CHUNK_SIZE));
+
+        // Limit to MAX_CHUNKS
+        const hugeText = 'X'.repeat(CHUNK_SIZE * 20);
+        const hugeChunks = splitIntoChunks(hugeText);
+        expect(hugeChunks.length).toBe(MAX_CHUNKS);
+      });
+
+      it('processes documents > 20,000 chars and extracts concepts beyond the 20k boundary', async () => {
+        // Document of 24,000 characters
+        const prefix = 'Intro material content.\n'.repeat(500); // ~12k chars
+        const middle = 'Middle material content.\n'.repeat(400); // ~9.6k chars -> total > 21.6k
+        const beyondBoundaryText =
+          '=== TOPIC_BEYOND_20K ===\nAdvanced Quantum Algorithms and Quantum Circuit Synthesis.';
+        const longDocument = `${prefix}${middle}\n${beyondBoundaryText}`;
+        expect(longDocument.length).toBeGreaterThan(20000);
+
+        materialsService.getExtractedMaterials.mockResolvedValue([
+          {
+            materialId: 'm-large',
+            name: 'LargeDocument.txt',
+            type: 'txt',
+            text: longDocument,
+          },
+        ]);
+
+        // Reset completeJson once-mocks from beforeEach
+        aiService.completeJson.mockReset();
+
+        // Handler for completeJson responding differently depending on chunk or prompt
+        aiService.completeJson.mockImplementation(
+          async (systemPrompt, userMsg) => {
+            if (
+              typeof systemPrompt === 'string' &&
+              systemPrompt.includes('key "sessions"')
+            ) {
+              return {
+                sessions: [
+                  {
+                    sequenceOrder: 1,
+                    title: 'Full Course Session',
+                    learningObjective: 'Master introductory and deep concepts',
+                    durationMinutes: 45,
+                    xpReward: 100,
+                    introTitle: 'Overview',
+                    introContent:
+                      'Comprehensive content covering all concepts.',
+                    introKeyTakeaway:
+                      'Concepts beyond 20k were successfully processed.',
+                    guidedPractice: {
+                      type: 'matching',
+                      instruction: 'Match concepts',
+                      pairs: [
+                        { left: 'Quantum', right: 'Circuit' },
+                        { left: 'Intro', right: 'Concept' },
+                        { left: 'Synthesis', right: 'Algorithms' },
+                      ],
+                    },
+                    challenge: {
+                      type: 'multiple_choice',
+                      scenario: 'Select the deep concept',
+                      instructions: 'Identify which concept was loaded.',
+                      options: [
+                        {
+                          id: '1',
+                          text: 'Quantum Circuit Synthesis',
+                          isCorrect: true,
+                          feedback: 'Correct',
+                        },
+                        {
+                          id: '2',
+                          text: 'Other',
+                          isCorrect: false,
+                          feedback: 'Incorrect',
+                        },
+                        {
+                          id: '3',
+                          text: 'Other2',
+                          isCorrect: false,
+                          feedback: 'Incorrect',
+                        },
+                        {
+                          id: '4',
+                          text: 'Other3',
+                          isCorrect: false,
+                          feedback: 'Incorrect',
+                        },
+                      ],
+                      explanation:
+                        'Deep concept was retained beyond 20k characters.',
+                    },
+                    conceptNames: [
+                      'Intro Concept',
+                      'Quantum Circuit Synthesis',
+                    ],
+                  },
+                ],
+              };
+            }
+
+            if (
+              typeof systemPrompt === 'string' &&
+              systemPrompt.includes('quiz designer')
+            ) {
+              return {
+                passingThreshold: 70,
+                questions: [
+                  {
+                    conceptName: 'Quantum Circuit Synthesis',
+                    prompt: 'What is quantum circuit synthesis?',
+                    explanation:
+                      'Quantum circuit synthesis compiles unitary gates into basic operations.',
+                    options: [
+                      { id: 'a', text: 'Correct answer', isCorrect: true },
+                      { id: 'b', text: 'Wrong', isCorrect: false },
+                    ],
+                  },
+                ],
+              };
+            }
+
+            if (
+              typeof systemPrompt === 'string' &&
+              systemPrompt.includes('final comprehensive exam')
+            ) {
+              return {
+                passingThreshold: 70,
+                questions: [
+                  {
+                    prompt: 'Final question',
+                    options: [
+                      { id: 'a', text: 'Opt A', isCorrect: true },
+                      { id: 'b', text: 'Opt B', isCorrect: false },
+                    ],
+                  },
+                ],
+              };
+            }
+
+            if (
+              typeof userMsg === 'string' &&
+              userMsg.includes('TOPIC_BEYOND_20K')
+            ) {
+              return {
+                courseSummary:
+                  'Comprehensive course covering advanced concepts.',
+                concepts: [
+                  {
+                    name: 'Quantum Circuit Synthesis',
+                    summary: 'Deep concept situated beyond the 20k boundary.',
+                    detail: 'Detailed description of quantum synthesis.',
+                  },
+                ],
+              };
+            }
+
+            // Default for chunk concept extraction
+            return {
+              courseSummary: 'Introduction course summary.',
+              concepts: [
+                {
+                  name: 'Intro Concept',
+                  summary: 'Introductory concept from start of file.',
+                  detail: 'Detailed intro content.',
+                },
+              ],
+            };
+          },
+        );
+
+        await service.run('course-1', 'job-1');
+
+        // Verify the concept beyond 20,000 chars was extracted and persisted
+        expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sessionId: 'session-1',
+            name: 'Quantum Circuit Synthesis',
+          }),
+        );
+      });
     });
   });
 });
