@@ -1,4 +1,4 @@
-import { Session, Concept } from '../models/session';
+import { Session, Concept, ActivityAttempt } from '../models/session';
 
 export interface SessionRepository {
   findById(id: string): Promise<Session | null>;
@@ -13,4 +13,9 @@ export interface SessionRepository {
   addConcept(concept: Omit<Concept, 'id' | 'createdAt'>): Promise<Concept>;
   getConceptsBySessionId(sessionId: string): Promise<Concept[]>;
   unlockNextSession(currentSessionId: string): Promise<Session | null>;
+
+  addActivityAttempt(
+    attempt: Omit<ActivityAttempt, 'id' | 'attemptedAt'>,
+  ): Promise<ActivityAttempt>;
+  getActivityAttemptsBySessionId(sessionId: string): Promise<ActivityAttempt[]>;
 }
