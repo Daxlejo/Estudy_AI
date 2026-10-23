@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma.service';
 import { PrismaCourseRepository } from './prisma-course.repository';
+import { PrismaSessionRepository } from './prisma-session.repository';
 
 describe('PrismaCourseRepository', () => {
   let repository: PrismaCourseRepository;
@@ -8,7 +9,11 @@ describe('PrismaCourseRepository', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PrismaService, PrismaCourseRepository],
+      providers: [
+        PrismaService,
+        PrismaCourseRepository,
+        PrismaSessionRepository,
+      ],
     }).compile();
 
     repository = module.get<PrismaCourseRepository>(PrismaCourseRepository);
@@ -120,5 +125,88 @@ describe('PrismaCourseRepository', () => {
     expect(latest!.status).toBe('EXTRACTING');
     expect(latest!.progress).toBe(20);
     expect(latest!.id).not.toBe(firstJob.id);
+  });
+});
+
+describe('PrismaSessionRepository - ActivityAttempt', () => {
+  let sessionRepo: PrismaSessionRepository;
+  let courseRepo: PrismaCourseRepository;
+  let prisma: PrismaService;
+  let testCourseId: string;
+  let testSessionId: string;
+
+  beforeAll(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PrismaService,
+        PrismaCourseRepository,
+        PrismaSessionRepository,
+      ],
+    }).compile();
+
+    sessionRepo = module.get<PrismaSessionRepository>(PrismaSessionRepository);
+    courseRepo = module.get<PrismaCourseRepository>(PrismaCourseRepository);
+    prisma = module.get<PrismaService>(PrismaService);
+    await prisma.$connect();
+
+    const course = await courseRepo.create({
+      name: 'Session Test Course',
+      description: 'Session desc',
+      status: 'READY',
+    });
+    testCourseId = course.id;
+
+    const session = await sessionRepo.create({
+      courseId: testCourseId,
+      sequenceOrder: 1,
+      title: 'Intro Session',
+      learningObjective: 'Objective',
+      durationMinutes: 15,
+      xpReward: 50,
+      isUnlocked: true,
+      introTitle: 'Intro',
+      introContent: 'Content',
+      introKeyTakeaway: 'Takeaway',
+      introCodeSnippet: null,
+      guidedPractice: '{}',
+      challenge: '{}',
+    });
+    testSessionId = session.id;
+  });
+
+  afterAll(async () => {
+    await prisma.activityAttempt.deleteMany({
+      where: { sessionId: testSessionId },
+    });
+    await prisma.session.deleteMany({ where: { courseId: testCourseId } });
+    await prisma.course.deleteMany({ where: { id: testCourseId } });
+    await prisma.$connect();
+  });
+
+  it('should persist and retrieve activity attempts for a session', async () => {
+    const attempt1 = await sessionRepo.addActivityAttempt({
+      sessionId: testSessionId,
+      activityId: 'act-fill-1',
+      activityType: 'fill_in_blank',
+      correct: true,
+    });
+
+    expect(attempt1.id).toBeDefined();
+    expect(attempt1.sessionId).toBe(testSessionId);
+    expect(attempt1.activityType).toBe('fill_in_blank');
+    expect(attempt1.correct).toBe(true);
+
+    const attempt2 = await sessionRepo.addActivityAttempt({
+      sessionId: testSessionId,
+      activityId: 'act-tf-1',
+      activityType: 'true_false',
+      correct: false,
+    });
+
+    const attempts =
+      await sessionRepo.getActivityAttemptsBySessionId(testSessionId);
+    expect(attempts.length).toBeGreaterThanOrEqual(2);
+    expect(attempts.some((a) => a.id === attempt1.id)).toBe(true);
+    expect(attempts.some((a) => a.id === attempt2.id)).toBe(true);
   });
 });

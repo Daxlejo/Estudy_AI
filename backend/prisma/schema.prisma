@@ -89,8 +89,22 @@ model Session {
   course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   concepts Concept[]
   quiz     Quiz?
+  activityAttempts ActivityAttempt[]
 
   @@unique([courseId, sequenceOrder])
+}
+
+model ActivityAttempt {
+  id           String   @id @default(cuid())
+  sessionId    String
+  activityId   String
+  activityType String
+  correct      Boolean
+  attemptedAt  DateTime @default(now())
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([activityId])
 }
 
 model Concept {

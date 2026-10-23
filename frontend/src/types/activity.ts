@@ -1,12 +1,22 @@
 /**
  * Gamified Learning Activity Contracts for EstudyAI
- * Defines structured interactive activities: Matching, Ordering, and Multiple Choice.
+ * Defines structured interactive activities:
+ * Matching, Ordering, Multiple Choice, Fill in the Blank, True/False, Classify, Detect Error, Predict Result.
  */
 
-export type ActivityType = 'matching' | 'ordering' | 'multiple_choice'
+export type ActivityType =
+  | 'matching'
+  | 'ordering'
+  | 'multiple_choice'
+  | 'fill_in_blank'
+  | 'true_false'
+  | 'classify'
+  | 'detect_error'
+  | 'predict_result'
 
 export interface BaseActivity {
   id: string
+  sessionId?: string
   type: ActivityType
   title: string
   instructions: string
@@ -65,7 +75,70 @@ export interface MultipleChoiceActivity extends BaseActivity {
   options: ChoiceOption[]
 }
 
-export type LearningActivity = MatchingActivity | OrderingActivity | MultipleChoiceActivity
+// 4. Fill in the Blank Activity (sentence with blanks solved via text input with Levenshtein tolerance)
+export interface FillInBlankBlank {
+  index: number
+  answer: string
+  alternatives?: string[]
+}
+
+export interface FillInBlankActivity extends BaseActivity {
+  type: 'fill_in_blank'
+  sentence: string
+  blanks: FillInBlankBlank[]
+}
+
+// 5. True/False with Justification Activity
+export interface TrueFalseActivity extends BaseActivity {
+  type: 'true_false'
+  statement: string
+  correct: boolean
+  justification: string
+}
+
+// 6. Classify Items Activity (categorize items into 2+ distinct categories)
+export interface ClassifyItem {
+  label: string
+  correctCategory: string
+}
+
+export interface ClassifyActivity extends BaseActivity {
+  type: 'classify'
+  categories: string[]
+  items: ClassifyItem[]
+}
+
+// 7. Detect an Error Activity (identify deliberate error in code or text snippet)
+export interface DetectErrorActivity extends BaseActivity {
+  type: 'detect_error'
+  codeOrText: string
+  errorType: string // "lógico" | "sintáctico" | "conceptual"
+  correctVersion: string
+}
+
+// 8. Predict a Result Activity (predict output/outcome of snippet)
+export interface PredictResultOption {
+  id: string
+  text: string
+}
+
+export interface PredictResultActivity extends BaseActivity {
+  type: 'predict_result'
+  scenario: string
+  codeOrText: string
+  options: PredictResultOption[]
+  correctOptionId: string
+}
+
+export type LearningActivity =
+  | MatchingActivity
+  | OrderingActivity
+  | MultipleChoiceActivity
+  | FillInBlankActivity
+  | TrueFalseActivity
+  | ClassifyActivity
+  | DetectErrorActivity
+  | PredictResultActivity
 
 // Evaluation & Feedback Contracts
 export interface MatchingPairResult {
@@ -106,10 +179,72 @@ export interface MultipleChoiceEvaluation {
   explanation: string
 }
 
+export interface BlankResult {
+  index: number
+  studentAnswer: string
+  expectedAnswer: string
+  isCorrect: boolean
+}
+
+export interface FillInBlankEvaluation {
+  isCorrect: boolean
+  scorePercent: number
+  blankResults: BlankResult[]
+  feedback: string
+  explanation: string
+}
+
+export interface TrueFalseEvaluation {
+  isCorrect: boolean
+  scorePercent: number
+  studentAnswer: boolean
+  justification: string
+  feedback: string
+  explanation: string
+}
+
+export interface ClassifyItemResult {
+  label: string
+  assignedCategory: string
+  correctCategory: string
+  isCorrect: boolean
+}
+
+export interface ClassifyEvaluation {
+  isCorrect: boolean
+  scorePercent: number
+  itemResults: ClassifyItemResult[]
+  feedback: string
+  explanation: string
+}
+
+export interface DetectErrorEvaluation {
+  isCorrect: boolean
+  scorePercent: number
+  studentReported: string
+  correctVersion: string
+  feedback: string
+  explanation: string
+}
+
+export interface PredictResultEvaluation {
+  isCorrect: boolean
+  scorePercent: number
+  selectedOptionId: string
+  correctOptionId: string
+  feedback: string
+  explanation: string
+}
+
 export type ActivityEvaluation =
   | MatchingEvaluation
   | OrderingEvaluation
   | MultipleChoiceEvaluation
+  | FillInBlankEvaluation
+  | TrueFalseEvaluation
+  | ClassifyEvaluation
+  | DetectErrorEvaluation
+  | PredictResultEvaluation
 
 export type MatchingInteractionMode = 'visual' | 'sequential'
 
@@ -125,4 +260,3 @@ export interface ActivityProgressState {
   firstCompletedAt?: string
   lastAttemptAt?: string
 }
-

@@ -53,8 +53,12 @@ export function ConceptDetailDialog({
   const hasSummary = Boolean(concept.summary && concept.summary.trim().length > 0)
   const hasExample = Boolean(concept.example && concept.example.trim().length > 0)
 
-  // Focus the close button on mount and lock background scrolling while modal is open
+  // Focus the close button on mount, capture trigger focus to restore on close, and lock background scrolling while modal is open
   useEffect(() => {
+    const previousActiveElement =
+      typeof document !== 'undefined'
+        ? (document.activeElement as HTMLElement | null)
+        : null
     closeButtonRef.current?.focus({ preventScroll: true })
 
     if (typeof document !== 'undefined' && document.body) {
@@ -62,9 +66,12 @@ export function ConceptDetailDialog({
       document.body.style.overflow = 'hidden'
       return () => {
         document.body.style.overflow = previousOverflow
+        previousActiveElement?.focus?.({ preventScroll: true })
       }
     }
-    return undefined
+    return () => {
+      previousActiveElement?.focus?.({ preventScroll: true })
+    }
   }, [])
 
   // Reset detail panel scroll to top when moving sequentially between concepts

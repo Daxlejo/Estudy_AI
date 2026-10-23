@@ -21,6 +21,8 @@ describe('SessionsService', () => {
       addConcept: jest.fn(),
       getConceptsBySessionId: jest.fn(),
       unlockNextSession: jest.fn(),
+      addActivityAttempt: jest.fn(),
+      getActivityAttemptsBySessionId: jest.fn(),
     } as any;
 
     courseRepository = {
@@ -292,6 +294,86 @@ describe('SessionsService', () => {
         'You do not have permission to access this resource',
       );
       expect(sessionRepository.unlockNextSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recordActivityAttempt', () => {
+    it('should record an activity attempt successfully', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 'sess-123',
+        courseId: 'course-1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'user-1',
+      } as any);
+
+      const mockAttempt = {
+        id: 'attempt-1',
+        sessionId: 'sess-123',
+        activityId: 'act-match-1',
+        activityType: 'matching',
+        correct: true,
+        attemptedAt: new Date(),
+      };
+      sessionRepository.addActivityAttempt.mockResolvedValue(
+        mockAttempt as any,
+      );
+
+      const result = await service.recordActivityAttempt(
+        'sess-123',
+        {
+          activityId: 'act-match-1',
+          activityType: 'matching',
+          correct: true,
+        },
+        'user-1',
+      );
+
+      expect(result).toEqual(mockAttempt);
+      expect(sessionRepository.addActivityAttempt).toHaveBeenCalledWith({
+        sessionId: 'sess-123',
+        activityId: 'act-match-1',
+        activityType: 'matching',
+        correct: true,
+      });
+    });
+
+    it('should throw NotFoundException if session does not exist', async () => {
+      sessionRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.recordActivityAttempt('missing-sess', {
+          activityId: 'act-1',
+          activityType: 'fill_in_blank',
+          correct: false,
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(sessionRepository.addActivityAttempt).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException if user is not course owner', async () => {
+      sessionRepository.findById.mockResolvedValue({
+        id: 'sess-1',
+        courseId: 'course-1',
+      } as any);
+      courseRepository.findById.mockResolvedValue({
+        id: 'course-1',
+        userId: 'actual-owner',
+      } as any);
+
+      await expect(
+        service.recordActivityAttempt(
+          'sess-1',
+          {
+            activityId: 'act-1',
+            activityType: 'true_false',
+            correct: true,
+          },
+          'intruder',
+        ),
+      ).rejects.toThrow('You do not have permission to access this resource');
+      expect(sessionRepository.addActivityAttempt).not.toHaveBeenCalled();
     });
   });
 });

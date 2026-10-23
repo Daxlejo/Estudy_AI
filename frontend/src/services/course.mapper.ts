@@ -176,7 +176,13 @@ export function buildCurrentSessionForCourse(
     totalSessions,
     progressPercent,
     durationMinutes: currentSession.durationMinutes || 15,
-    concepts: 3,
+    concepts: Array.isArray(currentSession.concepts)
+      ? currentSession.concepts.length
+      : typeof currentSession.concepts === 'number'
+        ? currentSession.concepts
+        : Array.isArray((currentSession as { conceptNames?: string[] }).conceptNames)
+          ? (currentSession as { conceptNames?: string[] }).conceptNames!.length
+          : 0,
     streakDays: completedSessions > 0 ? 1 : 0,
   }
 }

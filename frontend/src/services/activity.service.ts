@@ -1,3 +1,4 @@
+import { apiClient } from './api'
 import type { ActivityProgressState } from '../types/activity'
 
 const STORAGE_KEY_PREFIX = 'estudy_activity_state_'
@@ -175,6 +176,21 @@ export class ActivityService {
       } catch {
         // ignore
       }
+    }
+  }
+
+  /**
+   * Persists an activity attempt to the database via backend endpoint.
+   * Gracefully fails without throwing so local state and offline UX remain unbroken.
+   */
+  async recordAttemptApi(
+    sessionId: string,
+    payload: { activityId: string; activityType: string; correct: boolean },
+  ): Promise<void> {
+    try {
+      await apiClient.post(`/sessions/${sessionId}/activity-attempts`, payload)
+    } catch (error) {
+      console.warn('[ActivityService] Could not persist attempt to backend:', error)
     }
   }
 

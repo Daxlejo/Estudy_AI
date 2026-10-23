@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Body,
   InternalServerErrorException,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import {
   CurrentUser,
   CurrentUserPayload,
 } from '../auth/decorators/current-user.decorator';
+import { RecordActivityAttemptDto } from './dto/record-activity-attempt.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -57,6 +59,23 @@ export class SessionsController {
   ) {
     try {
       return await this.sessionsService.completeSession(id, user?.sub);
+    } catch (e) {
+      this.handleError(e);
+    }
+  }
+
+  @Post('sessions/:sessionId/activity-attempts')
+  async recordActivityAttempt(
+    @Param('sessionId') sessionId: string,
+    @Body() dto: RecordActivityAttemptDto,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
+    try {
+      return await this.sessionsService.recordActivityAttempt(
+        sessionId,
+        dto,
+        user?.sub,
+      );
     } catch (e) {
       this.handleError(e);
     }

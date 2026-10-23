@@ -8,7 +8,8 @@ import {
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
-import { Session, Concept } from '../../domain/models/session';
+import { Session, Concept, ActivityAttempt } from '../../domain/models/session';
+import { RecordActivityAttemptDto } from './dto/record-activity-attempt.dto';
 
 @Injectable()
 export class SessionsService {
@@ -89,6 +90,25 @@ export class SessionsService {
     return this.sessionRepository.create({
       ...data,
       isUnlocked,
+    });
+  }
+
+  async recordActivityAttempt(
+    sessionId: string,
+    dto: RecordActivityAttemptDto,
+    userId?: string,
+  ): Promise<ActivityAttempt> {
+    const session = await this.sessionRepository.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException(`Session with id ${sessionId} not found`);
+    }
+    await this.validateCourseOwnership(session.courseId, userId);
+
+    return this.sessionRepository.addActivityAttempt({
+      sessionId,
+      activityId: dto.activityId,
+      activityType: dto.activityType,
+      correct: dto.correct,
     });
   }
 }

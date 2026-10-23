@@ -25,3 +25,12 @@ export interface Concept {
   example: string | null;
   createdAt: Date;
 }
+
+export interface ActivityAttempt {
+  id: string;
+  sessionId: string;
+  activityId: string;
+  activityType: string;
+  correct: boolean;
+  attemptedAt: Date;
+}
