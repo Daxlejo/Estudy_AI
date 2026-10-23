@@ -762,6 +762,94 @@ describe('GenerationPipelineService', () => {
             name: 'Quantum Circuit Synthesis',
           }),
         );
+    it('splits text into overlapping chunks respecting limits', () => {
+      const text = 'A'.repeat(15000);
+      const chunks = service.splitIntoChunks(text);
+      expect(chunks.length).toBe(3);
+      expect(chunks[0].length).toBe(6000);
+      expect(chunks[1].length).toBe(6000);
+      expect(chunks[2].length).toBe(3400);
+    });
+
+    it('should process a document > 20,000 chars and extract concepts from beyond the 20,000-char boundary', async () => {
+      const padding = 'Section intro. '.repeat(1400); // ~21,000 chars
+      const textBeyondBoundary =
+        padding + '\n\nKey Topic: Advanced Quantum Teleportation Protocol';
+
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        {
+          materialId: 'mat-large',
+          name: 'large_document.txt',
+          type: 'txt',
+          text: textBeyondBoundary,
+        },
+      ]);
+
+      const chunks = service.splitIntoChunks(textBeyondBoundary);
+      expect(chunks.length).toBeGreaterThan(3);
+
+      aiService.completeJson.mockReset();
+      chunks.forEach((chunk, index) => {
+        if (chunk.includes('Advanced Quantum Teleportation Protocol')) {
+          aiService.completeJson.mockResolvedValueOnce({
+            courseSummary: 'Summary of quantum teleportation',
+            concepts: [
+              {
+                name: 'Quantum Teleportation',
+                summary: 'Protocol beyond 20k characters',
+                detail: 'Detail explaining quantum states',
+              },
+            ],
+          });
+        } else {
+          aiService.completeJson.mockResolvedValueOnce({
+            courseSummary: 'Introductory material summary',
+            concepts: [
+              {
+                name: 'Concept Chunk ' + (index + 1),
+                summary: 'Summary of chunk ' + (index + 1),
+                detail: 'Detail of chunk ' + (index + 1),
+              },
+            ],
+          });
+        }
+      });
+
+      aiService.completeJson.mockResolvedValueOnce({
+        sessions: [
+          {
+            sequenceOrder: 1,
+            title: 'Quantum Protocols',
+            learningObjective: 'Understand teleportation',
+            durationMinutes: 30,
+            xpReward: 100,
+            introTitle: 'Intro',
+            introContent: 'Content',
+            introKeyTakeaway: 'Takeaway',
+            guidedPractice: '{"type":"matching"}',
+            challenge: '{"type":"multiple_choice"}',
+            conceptNames: ['Quantum Teleportation'],
+          },
+        ],
+      });
+
+      aiService.completeJson
+        .mockResolvedValueOnce(aiQuiz)
+        .mockResolvedValueOnce(aiFinalExam);
+
+      sessionRepository.create.mockResolvedValue({ id: 's-large' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-large' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Quantum Teleportation',
+          summary: 'Protocol beyond 20k characters',
+        }),
+      );
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
       });
     });
   });

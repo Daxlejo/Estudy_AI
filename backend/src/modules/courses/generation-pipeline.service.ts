@@ -53,6 +53,10 @@ export class GenerationPipelineService {
     private readonly aiService: AiService,
   ) {}
 
+  splitIntoChunks(text: string): string[] {
+    return splitIntoChunks(text);
+  }
+
   // Entry point. Updates job status/progress at each step and persists all generated artefacts.
   // On any error the job is marked ERROR, the course status reverted to ERROR, and partially persisted entities rolled back.
   async run(
@@ -96,7 +100,7 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'EXTRACTING', 10, 0);
 
-      // Step 1: ANALYZING_CONCEPTS
+      // Step 1: ANALYZING_CONCEPTS (Map-Reduce chunked extraction)
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
       const chunks = splitIntoChunks(combinedText);
@@ -146,6 +150,56 @@ export class GenerationPipelineService {
           'AI generated invalid concepts response: concepts: At least one concept is required',
         );
       }
+      const chunks = this.splitIntoChunks(combinedText);
+      const chunkResults = await Promise.all(
+        chunks.map((chunk) =>
+          this.aiService.completeJson<unknown>(
+            this.systemPromptConcepts(resolvedLang),
+            this.userMessageConcepts(chunk),
+          ),
+        ),
+      );
+
+      const extractedChunkConcepts: AiExtractedConcept[] = [];
+      let generatedSummary: string | undefined;
+
+      for (let i = 0; i < chunkResults.length; i++) {
+        const rawConceptsData = chunkResults[i];
+        const conceptsValidation =
+          aiConceptsResponseSchema.safeParse(rawConceptsData);
+        if (!conceptsValidation.success) {
+          const issues = conceptsValidation.error.issues
+            .map(
+              (issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`,
+            )
+            .join('; ');
+          throw new Error(`AI generated invalid concepts response: ${issues}`);
+        }
+        if (!generatedSummary && conceptsValidation.data.courseSummary) {
+          generatedSummary = conceptsValidation.data.courseSummary;
+        }
+        extractedChunkConcepts.push(...conceptsValidation.data.concepts);
+      }
+
+      // Deduplicate and merge concept lists
+      const seenNames = new Set<string>();
+      const deduplicatedConcepts: AiExtractedConcept[] = [];
+      for (const concept of extractedChunkConcepts) {
+        const key = concept.name.trim().toLowerCase();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          deduplicatedConcepts.push(concept);
+        }
+      }
+
+      if (deduplicatedConcepts.length === 0) {
+        throw new Error(
+          'AI generated invalid concepts response: concepts: At least one concept is required',
+        );
+      }
+
+      // Synthesize final concept map from merged list (limit to 30)
+      const rawConcepts = deduplicatedConcepts.slice(0, 30);
 
       if (generatedSummary) {
         const currentCourse = await this.courseRepository.findById(courseId);
@@ -418,6 +472,68 @@ export class GenerationPipelineService {
       .replace(/AI_KEY=[^\s&]+/gi, 'AI_KEY=[REDACTED]');
   }
 
+  extractActivityType(raw: unknown): string | null {
+    if (!raw) return null;
+    let obj: unknown = raw;
+    if (typeof raw === 'string') {
+      try {
+        const cleaned = raw
+          .replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1')
+          .trim();
+        obj = JSON.parse(cleaned);
+      } catch {
+        return null;
+      }
+    }
+    if (obj && typeof obj === 'object' && 'type' in obj) {
+      return String((obj as { type: unknown }).type).toLowerCase();
+    }
+    return null;
+  }
+
+  validateAdaptiveActivityTypes(sessions: AiSession[]): void {
+    const activitySequence: string[] = [];
+    const typeCounts = new Map<string, number>();
+
+    for (const session of sessions) {
+      const practiceType = this.extractActivityType(session.guidedPractice);
+      if (practiceType) {
+        activitySequence.push(practiceType);
+        typeCounts.set(practiceType, (typeCounts.get(practiceType) ?? 0) + 1);
+      }
+
+      const challengeType = this.extractActivityType(session.challenge);
+      if (challengeType) {
+        activitySequence.push(challengeType);
+        typeCounts.set(challengeType, (typeCounts.get(challengeType) ?? 0) + 1);
+      }
+    }
+
+    // 1. Rejects plans with > 2 consecutive identical types
+    let consecutiveCount = 1;
+    for (let i = 1; i < activitySequence.length; i++) {
+      if (activitySequence[i] === activitySequence[i - 1]) {
+        consecutiveCount++;
+        if (consecutiveCount > 2) {
+          throw new Error(
+            `Session plan rejected: more than 2 consecutive identical activity types detected ("${activitySequence[i]}")`,
+          );
+        }
+      } else {
+        consecutiveCount = 1;
+      }
+    }
+
+    // 2. Logs a warning (not an error) if a type appears > 2 times total
+    for (const [type, count] of typeCounts.entries()) {
+      if (count > 2) {
+        this.logger.warn(
+          `Activity type "${type}" appears ${count} times in course plan (> 2 total). Consider variety.`,
+        );
+      }
+    }
+  }
+
   private validateSessions(
     sessions: AiSession[],
     concepts: AiExtractedConcept[],
@@ -435,6 +551,7 @@ export class GenerationPipelineService {
         }
       }
     }
+    this.validateAdaptiveActivityTypes(sessions);
   }
 
   // Prompt builders
@@ -480,9 +597,20 @@ Each session must have:
   sequenceOrder (integer starting at 1), title, learningObjective, durationMinutes (10-60),
   xpReward (50 or 100), introTitle, introContent (2-3 paragraphs), introKeyTakeaway (1 sentence),
   introCodeSnippet (optional markdown code block),
-  guidedPractice (${guidedPracticeDesc} Must be a valid JSON string with 3-4 pairs for "matching" or 3-5 sequential steps for "ordering"),
-  challenge (${challengeDesc} Must be a valid JSON string with type "multiple_choice", a realistic applied scenario in "instructions", 4 options where exactly one has "isCorrect": true and 3 are plausible distractors with individual "feedback", plus a diagnostic "explanation"),
+  guidedPractice (${guidedPracticeDesc}),
+  challenge (${challengeDesc}),
   conceptNames (array of concept names from the provided list).
+
+When choosing activity types for a session, follow these rules:
+- Use 'ordering' only if the content describes a sequential process with clear steps.
+- Use 'detect_error' only if the content involves code, formulas, or procedures.
+- Use 'predict_result' only if the content includes executable code or mathematical expressions.
+- Use 'classify' only if the content has at least 2 distinct categories with >= 2 items each.
+- Use 'fill_in_blank' and 'true_false' for any factual or conceptual content.
+- Never force a type if the content does not support it.
+- Aim for variety: do not repeat the same type more than twice per session.
+
+Supported activity types: "matching", "ordering", "multiple_choice", "fill_in_blank", "true_false", "classify", "detect_error", "predict_result".
 Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic, and serialized as a JSON string.`;
   }
 
@@ -494,6 +622,12 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
       .map((c) => `- ${c.name}: ${c.summary}`)
       .join('\n');
     return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${studyText}`;
+    const maxChars = CHUNK_SIZE * MAX_CHUNKS;
+    const truncated =
+      studyText.length > maxChars
+        ? studyText.slice(0, maxChars) + '\n\n[...truncated...]'
+        : studyText;
+    return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${truncated}`;
   }
 
   private systemPromptQuiz(language: CourseGenerationLanguage = 'es'): string {
@@ -537,15 +671,18 @@ Create a final exam covering all the provided concepts.
 Return ONLY a JSON object with:
   estimatedMinutes (integer, 20-60),
   passingScorePct (integer, 60-80),
-  questions (array of MULTIPLE_CHOICE question objects).
+  questions (array of question objects: MULTIPLE_CHOICE, MATCHING, or ORDERING).
 Each question must have:
   conceptName (must match one of the provided concept names),
-  type: "MULTIPLE_CHOICE",
+  type ("MULTIPLE_CHOICE" | "MATCHING" | "ORDERING"),
   prompt (the question text),
   context (optional),
-  payload: { type: "MULTIPLE_CHOICE", options: [{id, text, isCorrect}], correctOptionId: string },
+  payload:
+    - If type is "MULTIPLE_CHOICE": { type: "MULTIPLE_CHOICE", options: [{id, text, isCorrect}], correctOptionId: string }
+    - If type is "MATCHING": { type: "MATCHING", leftItems: [{id, text}], rightItems: [{id, text}], correctPairs: Record<string, string> }
+    - If type is "ORDERING": { type: "ORDERING", items: [{id, text}], correctOrder: string[] }
   explanation (why the correct answer is right).
-Create one question per concept (min 5, max 20 total).`;
+Create one question per concept (min 5, max 20 total), varying question types across MULTIPLE_CHOICE, MATCHING, and ORDERING to ensure high engagement.`;
   }
 
   private userMessageFinalExam(concepts: AiExtractedConcept[]): string {

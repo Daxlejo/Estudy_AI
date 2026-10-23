@@ -12,26 +12,54 @@ import {
   IconCheck,
   IconTarget,
   IconLock,
+  IconPencil,
+  IconCategory,
+  IconBug,
+  IconEye,
 } from '@tabler/icons-react'
 import type {
   LearningActivity,
   MatchingActivity,
   OrderingActivity,
   MultipleChoiceActivity,
+  FillInBlankActivity,
+  FillInBlankEvaluation,
+  TrueFalseActivity,
+  TrueFalseEvaluation,
+  ClassifyActivity,
+  ClassifyEvaluation,
+  DetectErrorActivity,
+  DetectErrorEvaluation,
+  PredictResultActivity,
+  PredictResultEvaluation,
   ActivityEvaluation,
   ActivityProgressState,
 } from '../../types/activity'
-import { evaluateMatching, evaluateOrdering } from '../../services/activity.parser'
+import {
+  evaluateMatching,
+  evaluateOrdering,
+  evaluateFillInBlank,
+  evaluateTrueFalse,
+  evaluateClassify,
+  evaluateDetectError,
+  evaluatePredictResult,
+} from '../../services/activity.parser'
 import { activityService } from '../../services/activity.service'
 import { useTranslation } from '../../i18n'
 import MatchingActivityView from './MatchingActivityView'
 import OrderingActivityView from './OrderingActivityView'
+import FillInBlankActivityView from './FillInBlankActivityView'
+import TrueFalseActivityView from './TrueFalseActivityView'
+import ClassifyActivityView from './ClassifyActivityView'
+import DetectErrorActivityView from './DetectErrorActivityView'
+import PredictResultActivityView from './PredictResultActivityView'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
 
 export const MAX_PRACTICE_ATTEMPTS = 2
 
 export interface ActivityContainerProps {
   activity: LearningActivity
+  sessionId?: string
   phaseTitle: string
   stepNumber: number
   continueButtonLabel: string
@@ -42,6 +70,7 @@ export interface ActivityContainerProps {
 
 export function ActivityContainer({
   activity,
+  sessionId,
   phaseTitle,
   stepNumber,
   continueButtonLabel,
@@ -57,6 +86,13 @@ export function ActivityContainer({
     activity.type === 'ordering' ? (activity as OrderingActivity).items.map((i) => i.id) : [],
   )
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null)
+  const [fibAnswers, setFibAnswers] = useState<Record<number, string>>({})
+  const [tfAnswer, setTfAnswer] = useState<boolean | null>(null)
+  const [classifyAssignments, setClassifyAssignments] = useState<Record<string, string>>({})
+  const [errorReported, setErrorReported] = useState<string>('')
+  const [hasFoundError, setHasFoundError] = useState<boolean>(false)
+  const [selfAssessedError, setSelfAssessedError] = useState<boolean | null>(null)
+  const [predictChoiceId, setPredictChoiceId] = useState<string | null>(null)
 
   const [evaluation, setEvaluation] = useState<ActivityEvaluation | null>(null)
   const [progressState, setProgressState] = useState<ActivityProgressState>(() =>
@@ -87,6 +123,13 @@ export function ActivityContainer({
     setOrderedIds(
       activity.type === 'ordering' ? (activity as OrderingActivity).items.map((i) => i.id) : [],
     )
+    setFibAnswers({})
+    setTfAnswer(null)
+    setClassifyAssignments({})
+    setErrorReported('')
+    setHasFoundError(false)
+    setSelfAssessedError(null)
+    setPredictChoiceId(null)
   }
 
   // Readiness check for "Verificar solución"
@@ -95,7 +138,19 @@ export function ActivityContainer({
       ? Object.keys(matchingPairs).length === (activity as MatchingActivity).pairs.length
       : activity.type === 'ordering'
         ? orderedIds.length === (activity as OrderingActivity).items.length
-        : selectedChoiceId !== null
+        : activity.type === 'fill_in_blank'
+          ? (activity as FillInBlankActivity).blanks.every(
+              (b) => (fibAnswers[b.index] || '').trim().length > 0,
+            )
+          : activity.type === 'true_false'
+            ? tfAnswer !== null
+            : activity.type === 'classify'
+              ? Object.keys(classifyAssignments).length === (activity as ClassifyActivity).items.length
+              : activity.type === 'detect_error'
+                ? hasFoundError && errorReported.trim().length > 0
+                : activity.type === 'predict_result'
+                  ? predictChoiceId !== null
+                  : selectedChoiceId !== null
 
   const isVerified = evaluation !== null
   const isSolvedCorrectly = Boolean(evaluation?.isCorrect)
@@ -126,6 +181,16 @@ export function ActivityContainer({
       result = evaluateMatching(activity as MatchingActivity, matchingPairs)
     } else if (activity.type === 'ordering') {
       result = evaluateOrdering(activity as OrderingActivity, orderedIds)
+    } else if (activity.type === 'fill_in_blank') {
+      result = evaluateFillInBlank(activity as FillInBlankActivity, fibAnswers)
+    } else if (activity.type === 'true_false') {
+      result = evaluateTrueFalse(activity as TrueFalseActivity, tfAnswer!)
+    } else if (activity.type === 'classify') {
+      result = evaluateClassify(activity as ClassifyActivity, classifyAssignments)
+    } else if (activity.type === 'detect_error') {
+      result = evaluateDetectError(activity as DetectErrorActivity, errorReported, selfAssessedError)
+    } else if (activity.type === 'predict_result') {
+      result = evaluatePredictResult(activity as PredictResultActivity, predictChoiceId!)
     } else {
       const mcActivity = activity as MultipleChoiceActivity
       const chosen = mcActivity.options.find((o) => o.id === selectedChoiceId)
@@ -156,11 +221,20 @@ export function ActivityContainer({
 
     setProgressState(state)
     setXpNotice({ awarded: xpAwarded, isFirst: isFirstCompletion })
+
+    // Persist attempt to backend endpoint with silent fallback
+    const effectiveSessionId = sessionId || activity.sessionId
+    if (effectiveSessionId) {
+      void activityService.recordAttemptApi(effectiveSessionId, {
+        activityId: activity.id,
+        activityType: activity.type,
+        correct: result.isCorrect,
+      })
+    }
   }
 
   const handleRetry = () => {
     if (activity.type === 'matching' && evaluation && 'pairResults' in evaluation) {
-      // Preserve already-correct pairs so the learner can focus on fixing mistakes
       const retainedPairs: Record<string, string> = {}
       for (const pairRes of evaluation.pairResults) {
         if (pairRes.isCorrect) {
@@ -170,6 +244,10 @@ export function ActivityContainer({
       setMatchingPairs(retainedPairs)
     } else if (activity.type === 'multiple_choice') {
       setSelectedChoiceId(null)
+    } else if (activity.type === 'predict_result') {
+      setPredictChoiceId(null)
+    } else if (activity.type === 'true_false') {
+      setTfAnswer(null)
     }
     setEvaluation(null)
     setXpNotice(null)
@@ -189,8 +267,20 @@ export function ActivityContainer({
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
             {activity.type === 'matching' ? (
               <IconPuzzle className="size-3.5" />
-            ) : (
+            ) : activity.type === 'ordering' ? (
               <IconListNumbers className="size-3.5" />
+            ) : activity.type === 'fill_in_blank' ? (
+              <IconPencil className="size-3.5" />
+            ) : activity.type === 'true_false' ? (
+              <IconCheck className="size-3.5" />
+            ) : activity.type === 'classify' ? (
+              <IconCategory className="size-3.5" />
+            ) : activity.type === 'detect_error' ? (
+              <IconBug className="size-3.5" />
+            ) : activity.type === 'predict_result' ? (
+              <IconEye className="size-3.5" />
+            ) : (
+              <IconTarget className="size-3.5" />
             )}
             {phaseTitle}
           </span>
@@ -307,6 +397,74 @@ export function ActivityContainer({
               disabled={isSolvedCorrectly}
               showSolution={isAttemptsExhausted}
               onChangeOrder={setOrderedIds}
+            />
+          ) : activity.type === 'fill_in_blank' ? (
+            <FillInBlankActivityView
+              activity={activity as FillInBlankActivity}
+              answers={fibAnswers}
+              evaluation={evaluation as FillInBlankEvaluation | null}
+              disabled={isSolvedCorrectly}
+              showSolution={isAttemptsExhausted}
+              onChangeAnswer={(idx, val) =>
+                setFibAnswers((prev) => ({ ...prev, [idx]: val }))
+              }
+            />
+          ) : activity.type === 'true_false' ? (
+            <TrueFalseActivityView
+              activity={activity as TrueFalseActivity}
+              selectedAnswer={tfAnswer}
+              evaluation={evaluation as TrueFalseEvaluation | null}
+              disabled={isSolvedCorrectly}
+              showSolution={isAttemptsExhausted}
+              onSelectAnswer={setTfAnswer}
+            />
+          ) : activity.type === 'classify' ? (
+            <ClassifyActivityView
+              activity={activity as ClassifyActivity}
+              itemAssignments={classifyAssignments}
+              evaluation={evaluation as ClassifyEvaluation | null}
+              disabled={isSolvedCorrectly}
+              showSolution={isAttemptsExhausted}
+              onChangeAssignments={setClassifyAssignments}
+            />
+          ) : activity.type === 'detect_error' ? (
+            <DetectErrorActivityView
+              activity={activity as DetectErrorActivity}
+              studentReported={errorReported}
+              hasFoundError={hasFoundError}
+              selfAssessedCorrect={selfAssessedError}
+              evaluation={evaluation as DetectErrorEvaluation | null}
+              disabled={isSolvedCorrectly}
+              showSolution={isAttemptsExhausted}
+              onToggleFoundError={() => setHasFoundError(true)}
+              onChangeReported={setErrorReported}
+              onSelfAssess={(val) => {
+                setSelfAssessedError(val)
+                const updated = evaluateDetectError(
+                  activity as DetectErrorActivity,
+                  errorReported,
+                  val,
+                )
+                setEvaluation(updated)
+                if (val) {
+                  activityService.recordAttempt(
+                    activity.id,
+                    true,
+                    100,
+                    activity.xpReward,
+                    showHint,
+                  )
+                }
+              }}
+            />
+          ) : activity.type === 'predict_result' ? (
+            <PredictResultActivityView
+              activity={activity as PredictResultActivity}
+              selectedOptionId={predictChoiceId}
+              evaluation={evaluation as PredictResultEvaluation | null}
+              disabled={isSolvedCorrectly}
+              showSolution={isAttemptsExhausted}
+              onSelectOption={setPredictChoiceId}
             />
           ) : (
             <div className="space-y-3" role="radiogroup" aria-label={activity.title}>

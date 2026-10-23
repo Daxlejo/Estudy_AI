@@ -1,5 +1,15 @@
 import type {
+  BlankResult,
   ChoiceOption,
+  ClassifyActivity,
+  ClassifyEvaluation,
+  ClassifyItem,
+  ClassifyItemResult,
+  DetectErrorActivity,
+  DetectErrorEvaluation,
+  FillInBlankActivity,
+  FillInBlankBlank,
+  FillInBlankEvaluation,
   LearningActivity,
   MatchingActivity,
   MatchingEvaluation,
@@ -9,6 +19,11 @@ import type {
   OrderingActivity,
   OrderingEvaluation,
   OrderingItem,
+  PredictResultActivity,
+  PredictResultEvaluation,
+  PredictResultOption,
+  TrueFalseActivity,
+  TrueFalseEvaluation,
 } from '../types/activity'
 import type { SessionConcept } from '../types/course'
 
@@ -243,10 +258,319 @@ export function validateMultipleChoiceActivity(
   }
 }
 
+
+/**
+ * Validates a Fill in the Blank activity structure.
+ */
+export function validateFillInBlankActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): FillInBlankActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'fill_in_blank') return null
+
+  if (typeof obj.sentence !== 'string' || !obj.sentence.trim()) return null
+  if (!Array.isArray(obj.blanks) || obj.blanks.length === 0) return null
+
+  const validBlanks: FillInBlankBlank[] = []
+  for (const b of obj.blanks) {
+    if (!b || typeof b !== 'object') return null
+    const bl = b as Record<string, unknown>
+    if (typeof bl.index !== 'number' || typeof bl.answer !== 'string' || !bl.answer.trim()) return null
+    validBlanks.push({
+      index: bl.index,
+      answer: bl.answer.trim(),
+      alternatives: Array.isArray(bl.alternatives)
+        ? bl.alternatives.map((a) => String(a).trim()).filter(Boolean)
+        : undefined,
+    })
+  }
+
+  const title =
+    typeof obj.title === 'string' && obj.title.trim()
+      ? obj.title.trim()
+      : 'Completar los espacios en blanco'
+  const instructions =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : 'Completa la frase escribiendo el término correcto en cada espacio.'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-fib-${context.sessionId}-${context.phase}`
+          : `act-fib-${Date.now()}`,
+    sessionId: context?.sessionId,
+    type: 'fill_in_blank',
+    title,
+    instructions,
+    sentence: obj.sentence.trim(),
+    blanks: validBlanks,
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation:
+      typeof obj.explanation === 'string' && obj.explanation.trim()
+        ? obj.explanation.trim()
+        : 'Rellenar los términos clave consolida la retención conceptual.',
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 20,
+  }
+}
+
+/**
+ * Validates a True/False activity structure.
+ */
+export function validateTrueFalseActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): TrueFalseActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'true_false') return null
+
+  if (typeof obj.statement !== 'string' || !obj.statement.trim()) return null
+  if (typeof obj.correct !== 'boolean') return null
+  if (typeof obj.justification !== 'string' || !obj.justification.trim()) return null
+
+  const title =
+    typeof obj.title === 'string' && obj.title.trim()
+      ? obj.title.trim()
+      : 'Verdadero o Falso'
+  const instructions =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : 'Determina si la siguiente afirmación es verdadera o falsa.'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-tf-${context.sessionId}-${context.phase}`
+          : `act-tf-${Date.now()}`,
+    sessionId: context?.sessionId,
+    type: 'true_false',
+    title,
+    instructions,
+    statement: obj.statement.trim(),
+    correct: obj.correct,
+    justification: obj.justification.trim(),
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation:
+      typeof obj.explanation === 'string' && obj.explanation.trim()
+        ? obj.explanation.trim()
+        : obj.justification.trim(),
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 15,
+  }
+}
+
+/**
+ * Validates a Classify activity structure.
+ */
+export function validateClassifyActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): ClassifyActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'classify') return null
+
+  if (!Array.isArray(obj.categories) || obj.categories.length < 2) return null
+  const categories = obj.categories.map((c) => String(c).trim()).filter(Boolean)
+  if (categories.length < 2) return null
+
+  if (!Array.isArray(obj.items) || obj.items.length < 2) return null
+  const validItems: ClassifyItem[] = []
+  for (const item of obj.items) {
+    if (!item || typeof item !== 'object') return null
+    const it = item as Record<string, unknown>
+    if (typeof it.label !== 'string' || !it.label.trim()) return null
+    if (typeof it.correctCategory !== 'string' || !it.correctCategory.trim()) return null
+    validItems.push({
+      label: it.label.trim(),
+      correctCategory: it.correctCategory.trim(),
+    })
+  }
+
+  const title =
+    typeof obj.title === 'string' && obj.title.trim()
+      ? obj.title.trim()
+      : 'Clasificar Elementos'
+  const instructions =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : 'Asigna cada elemento a su categoría correspondiente.'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-cls-${context.sessionId}-${context.phase}`
+          : `act-cls-${Date.now()}`,
+    sessionId: context?.sessionId,
+    type: 'classify',
+    title,
+    instructions,
+    categories,
+    items: validItems,
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation:
+      typeof obj.explanation === 'string' && obj.explanation.trim()
+        ? obj.explanation.trim()
+        : 'Clasificar conceptos permite organizar mentalmente las taxonomías clave.',
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 25,
+  }
+}
+
+/**
+ * Validates a Detect Error activity structure.
+ */
+export function validateDetectErrorActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): DetectErrorActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'detect_error') return null
+
+  if (typeof obj.codeOrText !== 'string' || !obj.codeOrText.trim()) return null
+  if (typeof obj.correctVersion !== 'string' || !obj.correctVersion.trim()) return null
+  if (typeof obj.explanation !== 'string' || !obj.explanation.trim()) return null
+
+  const errorType =
+    typeof obj.errorType === 'string' && obj.errorType.trim()
+      ? obj.errorType.trim()
+      : 'conceptual'
+
+  const title =
+    typeof obj.title === 'string' && obj.title.trim()
+      ? obj.title.trim()
+      : 'Detección de Error'
+  const instructions =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : 'Encuentra el error deliberado en el fragmento y explica cómo solucionarlo.'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-err-${context.sessionId}-${context.phase}`
+          : `act-err-${Date.now()}`,
+    sessionId: context?.sessionId,
+    type: 'detect_error',
+    title,
+    instructions,
+    codeOrText: obj.codeOrText.trim(),
+    errorType,
+    correctVersion: obj.correctVersion.trim(),
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation: obj.explanation.trim(),
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 25,
+  }
+}
+
+/**
+ * Validates a Predict Result activity structure.
+ */
+export function validatePredictResultActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): PredictResultActivity | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  if (obj.type !== 'predict_result') return null
+
+  if (typeof obj.scenario !== 'string' || !obj.scenario.trim()) return null
+  if (typeof obj.codeOrText !== 'string' || !obj.codeOrText.trim()) return null
+  if (!Array.isArray(obj.options) || obj.options.length < 2) return null
+  if (typeof obj.correctOptionId !== 'string' || !obj.correctOptionId.trim()) return null
+
+  const validOptions: PredictResultOption[] = []
+  for (const opt of obj.options) {
+    if (!opt || typeof opt !== 'object') return null
+    const o = opt as Record<string, unknown>
+    if (typeof o.id !== 'string' || !o.id.trim()) return null
+    if (typeof o.text !== 'string' || !o.text.trim()) return null
+    validOptions.push({
+      id: o.id.trim(),
+      text: o.text.trim(),
+    })
+  }
+
+  const title =
+    typeof obj.title === 'string' && obj.title.trim()
+      ? obj.title.trim()
+      : 'Predecir el Resultado'
+  const instructions =
+    typeof obj.instructions === 'string' && obj.instructions.trim()
+      ? obj.instructions.trim()
+      : 'Predice el resultado de la ejecución o comportamiento del fragmento.'
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.trim()
+        ? obj.id.trim()
+        : context
+          ? `activity-pred-${context.sessionId}-${context.phase}`
+          : `act-pred-${Date.now()}`,
+    sessionId: context?.sessionId,
+    type: 'predict_result',
+    title,
+    instructions,
+    scenario: obj.scenario.trim(),
+    codeOrText: obj.codeOrText.trim(),
+    options: validOptions,
+    correctOptionId: obj.correctOptionId.trim(),
+    context:
+      typeof obj.context === 'string' && obj.context.trim()
+        ? obj.context.trim()
+        : context
+          ? `Objetivo: ${context.learningObjective}`
+          : undefined,
+    hint: typeof obj.hint === 'string' && obj.hint.trim() ? obj.hint.trim() : undefined,
+    explanation:
+      typeof obj.explanation === 'string' && obj.explanation.trim()
+        ? obj.explanation.trim()
+        : 'La predicción de resultados valida tu modelo mental del comportamiento del código.',
+    xpReward: typeof obj.xpReward === 'number' && obj.xpReward > 0 ? obj.xpReward : 25,
+  }
+}
+
 /**
  * Validates any JSON activity structure.
  */
-export function validateActivity(data: unknown): LearningActivity | null {
+export function validateActivity(
+  data: unknown,
+  context?: ActivityBuildContext,
+): LearningActivity | null {
   if (!data || typeof data !== 'object') return null
   const obj = data as Record<string, unknown>
 
@@ -257,7 +581,22 @@ export function validateActivity(data: unknown): LearningActivity | null {
     return validateOrderingActivity(data)
   }
   if (obj.type === 'multiple_choice' || obj.type === 'MULTIPLE_CHOICE') {
-    return validateMultipleChoiceActivity(data)
+    return validateMultipleChoiceActivity(data, context)
+  }
+  if (obj.type === 'fill_in_blank') {
+    return validateFillInBlankActivity(data, context)
+  }
+  if (obj.type === 'true_false') {
+    return validateTrueFalseActivity(data, context)
+  }
+  if (obj.type === 'classify') {
+    return validateClassifyActivity(data, context)
+  }
+  if (obj.type === 'detect_error') {
+    return validateDetectErrorActivity(data, context)
+  }
+  if (obj.type === 'predict_result') {
+    return validatePredictResultActivity(data, context)
   }
   return null
 }
@@ -429,7 +768,7 @@ export function parseOrBuildActivity(
           return mcActivity
         }
       }
-      const validated = validateActivity(parsed)
+      const validated = validateActivity(parsed, context)
       if (validated) {
         return validated
       }
@@ -584,6 +923,200 @@ export function evaluateOrdering(
     correctPositionsCount,
     totalItems,
     misplacedItemIds,
+    feedback,
+    explanation: activity.explanation,
+  }
+}
+
+/**
+ * Computes Levenshtein distance between two strings with case-insensitive trim comparison.
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  const s1 = a.trim().toLowerCase()
+  const s2 = b.trim().toLowerCase()
+  if (s1 === s2) return 0
+  if (s1.length === 0) return s2.length
+  if (s2.length === 0) return s1.length
+
+  const matrix: number[][] = []
+  for (let i = 0; i <= s1.length; i++) {
+    matrix[i] = [i]
+  }
+  for (let j = 0; j <= s2.length; j++) {
+    matrix[0][j] = j
+  }
+
+  for (let i = 1; i <= s1.length; i++) {
+    for (let j = 1; j <= s2.length; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      )
+    }
+  }
+  return matrix[s1.length][s2.length]
+}
+
+/**
+ * Evaluates student blanks for a Fill in the Blank activity.
+ * Case-insensitive trim comparison accepting Levenshtein distance <= 1 for typo tolerance.
+ */
+export function evaluateFillInBlank(
+  activity: FillInBlankActivity,
+  studentAnswers: Record<number, string>,
+): FillInBlankEvaluation {
+  const blankResults: BlankResult[] = []
+  let correctCount = 0
+
+  for (const blank of activity.blanks) {
+    const studentAnswer = (studentAnswers[blank.index] || '').trim()
+    const expectedAnswer = blank.answer.trim()
+
+    const candidates = [expectedAnswer, ...(blank.alternatives || [])]
+    const isBlankCorrect = candidates.some(
+      (candidate) => levenshteinDistance(studentAnswer, candidate) <= 1,
+    )
+
+    if (isBlankCorrect) {
+      correctCount++
+    }
+
+    blankResults.push({
+      index: blank.index,
+      studentAnswer,
+      expectedAnswer,
+      isCorrect: isBlankCorrect,
+    })
+  }
+
+  const totalBlanks = activity.blanks.length
+  const isCorrect = correctCount === totalBlanks
+  const scorePercent = totalBlanks > 0 ? Math.round((correctCount / totalBlanks) * 100) : 0
+
+  const feedback = isCorrect
+    ? `¡Perfecto! Has completado todos los espacios en blanco correctamente.`
+    : `Completaste ${correctCount} de ${totalBlanks} espacios correctamente. Revisa las respuestas indicadas.`
+
+  return {
+    isCorrect,
+    scorePercent,
+    blankResults,
+    feedback,
+    explanation: activity.explanation,
+  }
+}
+
+/**
+ * Evaluates student response for a True/False activity with justification.
+ */
+export function evaluateTrueFalse(
+  activity: TrueFalseActivity,
+  studentAnswer: boolean,
+): TrueFalseEvaluation {
+  const isCorrect = studentAnswer === activity.correct
+  const scorePercent = isCorrect ? 100 : 0
+  const feedback = isCorrect
+    ? '¡Correcto! Has evaluado con precisión la afirmación.'
+    : 'Tu respuesta no es correcta. Analiza la justificación conceptual a continuación.'
+
+  return {
+    isCorrect,
+    scorePercent,
+    studentAnswer,
+    justification: activity.justification,
+    feedback,
+    explanation: activity.justification || activity.explanation,
+  }
+}
+
+/**
+ * Evaluates student categorization for a Classify activity.
+ */
+export function evaluateClassify(
+  activity: ClassifyActivity,
+  studentAssignments: Record<string, string>,
+): ClassifyEvaluation {
+  const itemResults: ClassifyItemResult[] = []
+  let correctCount = 0
+
+  for (const item of activity.items) {
+    const assignedCategory = studentAssignments[item.label] || ''
+    const isItemCorrect = assignedCategory === item.correctCategory
+    if (isItemCorrect) correctCount++
+
+    itemResults.push({
+      label: item.label,
+      assignedCategory,
+      correctCategory: item.correctCategory,
+      isCorrect: isItemCorrect,
+    })
+  }
+
+  const totalItems = activity.items.length
+  const isCorrect = correctCount === totalItems
+  const scorePercent = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0
+
+  const feedback = isCorrect
+    ? `¡Excelente! Clasificaste correctamente los ${totalItems} elementos.`
+    : `Clasificaste ${correctCount} de ${totalItems} elementos en su categoría correcta. Revisa las asignaciones.`
+
+  return {
+    isCorrect,
+    scorePercent,
+    itemResults,
+    feedback,
+    explanation: activity.explanation,
+  }
+}
+
+/**
+ * Evaluates student error identification for a Detect Error activity.
+ */
+export function evaluateDetectError(
+  activity: DetectErrorActivity,
+  studentReported: string,
+  selfAssessedCorrect?: boolean | null,
+): DetectErrorEvaluation {
+  const isCorrect =
+    selfAssessedCorrect !== null && selfAssessedCorrect !== undefined
+      ? selfAssessedCorrect
+      : Boolean(studentReported && studentReported.trim().length > 3)
+
+  const scorePercent = isCorrect ? 100 : 0
+  const feedback = isCorrect
+    ? '¡Muy bien! Has identificado el error deliberado y comprendido su corrección.'
+    : 'Revisa la versión corregida y la explicación técnica para afianzar el concepto.'
+
+  return {
+    isCorrect,
+    scorePercent,
+    studentReported,
+    correctVersion: activity.correctVersion,
+    feedback,
+    explanation: activity.explanation,
+  }
+}
+
+/**
+ * Evaluates student choice for a Predict Result activity.
+ */
+export function evaluatePredictResult(
+  activity: PredictResultActivity,
+  selectedOptionId: string,
+): PredictResultEvaluation {
+  const isCorrect = selectedOptionId === activity.correctOptionId
+  const scorePercent = isCorrect ? 100 : 0
+  const feedback = isCorrect
+    ? '¡Predicción exacta! Has anticipado correctamente el comportamiento del código o procedimiento.'
+    : 'La predicción no coincide con el resultado real. Analiza la explicación para verificar los pasos.'
+
+  return {
+    isCorrect,
+    scorePercent,
+    selectedOptionId,
+    correctOptionId: activity.correctOptionId,
     feedback,
     explanation: activity.explanation,
   }

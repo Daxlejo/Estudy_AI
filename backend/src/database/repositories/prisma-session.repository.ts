@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { SessionRepository } from '../../domain/repositories/session.repository';
-import { Session, Concept } from '../../domain/models/session';
+import { Session, Concept, ActivityAttempt } from '../../domain/models/session';
 
 @Injectable()
 export class PrismaSessionRepository implements SessionRepository {
@@ -70,6 +70,23 @@ export class PrismaSessionRepository implements SessionRepository {
     return this.prisma.session.update({
       where: { id: nextSession.id },
       data: { isUnlocked: true },
+    });
+  }
+
+  async addActivityAttempt(
+    attempt: Omit<ActivityAttempt, 'id' | 'attemptedAt'>,
+  ): Promise<ActivityAttempt> {
+    return this.prisma.activityAttempt.create({
+      data: attempt,
+    });
+  }
+
+  async getActivityAttemptsBySessionId(
+    sessionId: string,
+  ): Promise<ActivityAttempt[]> {
+    return this.prisma.activityAttempt.findMany({
+      where: { sessionId },
+      orderBy: { attemptedAt: 'desc' },
     });
   }
 }

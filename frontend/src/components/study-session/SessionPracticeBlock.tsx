@@ -18,6 +18,7 @@ import { useTranslation } from '../../i18n'
 
 export interface SessionPracticeBlockProps {
   exercise: PracticeExercise
+  sessionId?: string
   blockNumber: 3 | 4
   stepNumber: number
   phaseTitle: string
@@ -29,6 +30,7 @@ export interface SessionPracticeBlockProps {
 
 export function SessionPracticeBlock({
   exercise,
+  sessionId,
   blockNumber,
   stepNumber,
   phaseTitle,
@@ -58,6 +60,7 @@ export function SessionPracticeBlock({
       <ActivityContainer
         key={exercise.activity.id}
         activity={exercise.activity}
+        sessionId={sessionId || exercise.activity.sessionId}
         phaseTitle={phaseTitle}
         stepNumber={stepNumber}
         continueButtonLabel={continueButtonLabel}

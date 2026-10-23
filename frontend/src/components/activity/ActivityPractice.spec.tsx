@@ -227,8 +227,40 @@ test('MatchingActivityView — Visual SVG & Sequential Rendering', async (t: Tes
 
     assert.ok(html.includes('data-matching-mode="sequential"'))
     assert.ok(html.includes('Concepto 1 de 7'))
-    // El feedback solo aparece después de verificar, no en el render inicial
+    // F-04: El feedback solo aparece después de handleVerify, no en el render inicial
     assert.ok(!html.includes('¡Asociación correcta!'))
+
+    // F-04: Con evaluación suministrada tras verificación, el feedback se muestra adecuadamente
+    const verifiedHtml = renderToStaticMarkup(
+      <I18nContext.Provider value={esCtx}>
+        <MatchingActivityView
+          activity={activity7}
+          pairs={{ 'p-1': 'p-1' }}
+          evaluation={{
+            isCorrect: true,
+            scorePercent: 100,
+            matchedCount: 7,
+            totalPairs: 7,
+            pairResults: [
+              {
+                leftId: 'p-1',
+                rightId: 'p-1',
+                isCorrect: true,
+                correctRightId: 'p-1',
+                leftText: 'Concepto 1',
+                rightText: 'Definición 1',
+                correctRightText: 'Definición 1',
+              },
+            ],
+            feedback: '¡Excelente!',
+            explanation: 'Explicación',
+          }}
+          viewportWidth={1280}
+          onChangePairs={() => { }}
+        />
+      </I18nContext.Provider>,
+    )
+    assert.ok(verifiedHtml.includes('¡Asociación correcta!'))
   })
 })
 
