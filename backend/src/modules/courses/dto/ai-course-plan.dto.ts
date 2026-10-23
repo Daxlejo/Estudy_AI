@@ -28,6 +28,164 @@ export type AiExtractedConcept = z.infer<typeof aiExtractedConceptSchema>;
 export type AiConceptsResponse = z.infer<typeof aiConceptsResponseSchema>;
 
 // ---------------------------------------------------------------------------
+// Activity schemas (Practice & Challenge catalogue)
+// ---------------------------------------------------------------------------
+
+export const aiMatchingPairSchema = z.object({
+  id: z.string().trim().min(1),
+  left: z.string().trim().min(1),
+  right: z.string().trim().min(1),
+  explanation: z.string().trim().optional(),
+});
+
+export const aiMatchingActivitySchema = z.object({
+  type: z.literal('matching'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  pairs: z.array(aiMatchingPairSchema).min(2),
+  hint: z.string().trim().optional(),
+  explanation: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiOrderingItemSchema = z.object({
+  id: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+  explanation: z.string().trim().optional(),
+});
+
+export const aiOrderingActivitySchema = z.object({
+  type: z.literal('ordering'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  items: z.array(aiOrderingItemSchema).min(2),
+  correctOrder: z.array(z.string().trim().min(1)).min(2),
+  hint: z.string().trim().optional(),
+  orderingHint: z.string().trim().optional(),
+  explanation: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiMultipleChoiceOptionSchema = z.object({
+  id: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+  isCorrect: z.boolean(),
+  feedback: z.string().trim().optional(),
+});
+
+export const aiMultipleChoiceActivitySchema = z.object({
+  type: z.union([z.literal('multiple_choice'), z.literal('MULTIPLE_CHOICE')]),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  scenario: z.string().trim().optional(),
+  options: z.array(aiMultipleChoiceOptionSchema).min(2),
+  correctOptionId: z.string().trim().optional(),
+  hint: z.string().trim().optional(),
+  explanation: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiFillInBlankBlankSchema = z.object({
+  index: z.number(),
+  answer: z.string().trim().min(1),
+  alternatives: z.array(z.string().trim()).optional(),
+});
+
+export const aiFillInBlankActivitySchema = z.object({
+  type: z.literal('fill_in_blank'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  sentence: z.string().trim().min(1),
+  blanks: z.array(aiFillInBlankBlankSchema).min(1),
+  hint: z.string().trim().optional(),
+  explanation: z.string().trim().min(1),
+  xpReward: z.number().optional(),
+});
+
+export const aiTrueFalseActivitySchema = z.object({
+  type: z.literal('true_false'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  statement: z.string().trim().min(1),
+  correct: z.boolean(),
+  justification: z.string().trim().min(1),
+  hint: z.string().trim().optional(),
+  explanation: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiClassifyItemSchema = z.object({
+  label: z.string().trim().min(1),
+  correctCategory: z.string().trim().min(1),
+});
+
+export const aiClassifyActivitySchema = z.object({
+  type: z.literal('classify'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  categories: z.array(z.string().trim().min(1)).min(2),
+  items: z.array(aiClassifyItemSchema).min(2),
+  hint: z.string().trim().optional(),
+  explanation: z.string().trim().min(1),
+  xpReward: z.number().optional(),
+});
+
+export const aiDetectErrorActivitySchema = z.object({
+  type: z.literal('detect_error'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  codeOrText: z.string().trim().min(1),
+  errorType: z.string().trim().min(1),
+  correctVersion: z.string().trim().min(1),
+  explanation: z.string().trim().min(1),
+  hint: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiPredictResultOptionSchema = z.object({
+  id: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+});
+
+export const aiPredictResultActivitySchema = z.object({
+  type: z.literal('predict_result'),
+  title: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
+  scenario: z.string().trim().min(1),
+  codeOrText: z.string().trim().min(1),
+  options: z.array(aiPredictResultOptionSchema).min(2),
+  correctOptionId: z.string().trim().min(1),
+  explanation: z.string().trim().min(1),
+  hint: z.string().trim().optional(),
+  xpReward: z.number().optional(),
+});
+
+export const aiActivitySchema = z.union([
+  aiMatchingActivitySchema,
+  aiOrderingActivitySchema,
+  aiMultipleChoiceActivitySchema,
+  aiFillInBlankActivitySchema,
+  aiTrueFalseActivitySchema,
+  aiClassifyActivitySchema,
+  aiDetectErrorActivitySchema,
+  aiPredictResultActivitySchema,
+]);
+
+export type AiMatchingActivity = z.infer<typeof aiMatchingActivitySchema>;
+export type AiOrderingActivity = z.infer<typeof aiOrderingActivitySchema>;
+export type AiMultipleChoiceActivity = z.infer<
+  typeof aiMultipleChoiceActivitySchema
+>;
+export type AiFillInBlankActivity = z.infer<typeof aiFillInBlankActivitySchema>;
+export type AiTrueFalseActivity = z.infer<typeof aiTrueFalseActivitySchema>;
+export type AiClassifyActivity = z.infer<typeof aiClassifyActivitySchema>;
+export type AiDetectErrorActivity = z.infer<typeof aiDetectErrorActivitySchema>;
+export type AiPredictResultActivity = z.infer<
+  typeof aiPredictResultActivitySchema
+>;
+export type AiActivity = z.infer<typeof aiActivitySchema>;
+
+// ---------------------------------------------------------------------------
 // Step 2: Session grouping
 // ---------------------------------------------------------------------------
 
@@ -58,14 +216,11 @@ export const AiSessionPlanItemSchema = z.object({
   introCodeSnippet: z.string().trim().optional().nullable(),
   guidedPractice: serializedActivityJsonSchema(
     'Guided practice is required',
-    'Structured JSON string describing a "matching" or "ordering" activity for reinforcement and procedural scaffolding. ' +
-      'For matching: {"type":"matching","title":"...","instructions":"...","hint":"...","explanation":"...","xpReward":20,"pairs":[{"id":"p1","left":"Concept","right":"Definition or example"}]}. ' +
-      'For ordering: {"type":"ordering","title":"...","instructions":"...","hint":"...","explanation":"...","xpReward":25,"items":[{"id":"s1","text":"Step 1"},{"id":"s2","text":"Step 2"}],"correctOrder":["s1","s2"]}.',
+    'Structured JSON string describing an interactive activity (matching, ordering, fill_in_blank, true_false, classify, detect_error, or predict_result).',
   ),
   challenge: serializedActivityJsonSchema(
     'Challenge is required',
-    'Structured JSON string describing a scenario-based "multiple_choice" activity for applied problem-solving with plausible distractors and a diagnostic explanation: ' +
-      '{"type":"multiple_choice","title":"...","instructions":"Concrete problem-solving scenario and question","hint":"...","explanation":"Diagnostic explanation of why the correct option solves the scenario and why distractors fail","xpReward":30,"options":[{"id":"opt-1","text":"...","isCorrect":true,"feedback":"..."},{"id":"opt-2","text":"...","isCorrect":false,"feedback":"..."}]}.',
+    'Structured JSON string describing an applied challenge activity (multiple_choice, predict_result, detect_error, classify, ordering, matching, fill_in_blank, or true_false).',
   ),
   conceptNames: z
     .array(z.string().trim().min(1))
@@ -146,14 +301,71 @@ export const aiFinalExamMultipleChoicePayloadSchema = z
     },
   );
 
-export const aiFinalExamQuestionSchema = z.object({
-  conceptName: z.string().trim().min(1),
-  type: z.literal('MULTIPLE_CHOICE'),
-  prompt: z.string().trim().min(1),
-  context: z.string().trim().optional().nullable(),
-  payload: aiFinalExamMultipleChoicePayloadSchema,
-  explanation: z.string().trim().min(1),
+export const aiFinalExamMatchingPayloadSchema = z.object({
+  type: z.literal('MATCHING'),
+  leftItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        text: z.string().trim().min(1),
+      }),
+    )
+    .min(2, 'Matching question must have at least 2 left items'),
+  rightItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        text: z.string().trim().min(1),
+      }),
+    )
+    .min(2, 'Matching question must have at least 2 right items'),
+  correctPairs: z
+    .record(z.string().trim().min(1), z.string().trim().min(1))
+    .optional(),
 });
+
+export const aiFinalExamOrderingPayloadSchema = z.object({
+  type: z.literal('ORDERING'),
+  items: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        text: z.string().trim().min(1),
+      }),
+    )
+    .min(2, 'Ordering question must have at least 2 items'),
+  orderingHint: z.string().trim().optional(),
+  correctOrder: z
+    .array(z.string().trim().min(1))
+    .min(2, 'Ordering question must have a correctOrder array'),
+});
+
+export const aiFinalExamQuestionSchema = z.discriminatedUnion('type', [
+  z.object({
+    conceptName: z.string().trim().min(1),
+    type: z.literal('MULTIPLE_CHOICE'),
+    prompt: z.string().trim().min(1),
+    context: z.string().trim().optional().nullable(),
+    payload: aiFinalExamMultipleChoicePayloadSchema,
+    explanation: z.string().trim().min(1),
+  }),
+  z.object({
+    conceptName: z.string().trim().min(1),
+    type: z.literal('MATCHING'),
+    prompt: z.string().trim().min(1),
+    context: z.string().trim().optional().nullable(),
+    payload: aiFinalExamMatchingPayloadSchema,
+    explanation: z.string().trim().min(1),
+  }),
+  z.object({
+    conceptName: z.string().trim().min(1),
+    type: z.literal('ORDERING'),
+    prompt: z.string().trim().min(1),
+    context: z.string().trim().optional().nullable(),
+    payload: aiFinalExamOrderingPayloadSchema,
+    explanation: z.string().trim().min(1),
+  }),
+]);
 
 export const aiFinalExamResponseSchema = z.object({
   estimatedMinutes: z.number().min(1).max(300).default(30),
@@ -165,6 +377,12 @@ export const aiFinalExamResponseSchema = z.object({
 
 export type AiFinalExamMultipleChoicePayload = z.infer<
   typeof aiFinalExamMultipleChoicePayloadSchema
+>;
+export type AiFinalExamMatchingPayload = z.infer<
+  typeof aiFinalExamMatchingPayloadSchema
+>;
+export type AiFinalExamOrderingPayload = z.infer<
+  typeof aiFinalExamOrderingPayloadSchema
 >;
 export type AiFinalExamQuestion = z.infer<typeof aiFinalExamQuestionSchema>;
 export type AiFinalExamResponse = z.infer<typeof aiFinalExamResponseSchema>;
