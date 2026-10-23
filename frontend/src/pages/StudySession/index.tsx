@@ -185,6 +185,7 @@ function StudySession() {
         {currentStep === 3 && (
           <SessionPracticeBlock
             exercise={session.guidedPractice}
+            sessionId={session.id}
             blockNumber={3}
             stepNumber={3}
             phaseTitle="Fase 2: Práctica Guiada"
@@ -197,6 +198,7 @@ function StudySession() {
         {currentStep === 4 && (
           <SessionPracticeBlock
             exercise={session.challenge}
+            sessionId={session.id}
             blockNumber={4}
             stepNumber={4}
             phaseTitle="Fase 3: Desafío Conceptual"
