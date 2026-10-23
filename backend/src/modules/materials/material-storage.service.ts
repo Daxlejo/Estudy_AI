@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
+import { promises as fs, constants } from 'fs';
 import * as path from 'path';
 
 const UUID_PATTERN =
@@ -35,13 +35,13 @@ export class MaterialStorageService {
   }
 
   /**
-   * Escribe el buffer en `<courseId>/<uuid>.<extension>` y devuelve la ruta relativa.
-   * Usa la bandera 'wx' para no sobrescribir nunca un archivo existente.
+   * Escribe el buffer o copia el archivo en `<courseId>/<uuid>.<extension>` y devuelve la ruta relativa.
+   * Usa la bandera 'wx' / COPYFILE_EXCL para no sobrescribir nunca un archivo existente.
    */
   async save(
     courseId: string,
     extension: string,
-    buffer: Buffer,
+    bufferOrPath: Buffer | string,
   ): Promise<string> {
     if (!UUID_PATTERN.test(courseId)) {
       throw new MaterialStorageError('Invalid course identifier for storage');
@@ -54,7 +54,11 @@ export class MaterialStorageService {
     const absolutePath = this.resolveInsideRoot(relativePath);
 
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fs.writeFile(absolutePath, buffer, { flag: 'wx' });
+    if (typeof bufferOrPath === 'string') {
+      await fs.copyFile(bufferOrPath, absolutePath, constants.COPYFILE_EXCL);
+    } else {
+      await fs.writeFile(absolutePath, bufferOrPath, { flag: 'wx' });
+    }
     return relativePath;
   }
 
