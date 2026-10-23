@@ -1,3 +1,4 @@
+import * as path from 'path';
 import {
   BadRequestException,
   NotFoundException,
@@ -20,10 +21,12 @@ describe('MaterialsService', () => {
     updatedAt: new Date(),
   };
 
+  const fixturesDir = path.resolve(__dirname, '../../../test/fixtures');
+
   let courseRepository: jest.Mocked<
     Pick<
       CourseRepository,
-      'findById' | 'addMaterial' | 'getMaterialsByCourseId'
+      'findById' | 'addMaterial' | 'getMaterialsByCourseId' | 'countByCourseId'
     >
   >;
   let storage: jest.Mocked<
@@ -55,6 +58,7 @@ describe('MaterialsService', () => {
           Promise.resolve({ ...m, id: 'mat-1', uploadedAt: new Date() }),
         ),
       getMaterialsByCourseId: jest.fn().mockResolvedValue([]),
+      countByCourseId: jest.fn().mockResolvedValue(0),
     };
     storage = {
       save: jest.fn().mockResolvedValue(`${courseId}/stored.txt`),
@@ -105,6 +109,76 @@ describe('MaterialsService', () => {
       expect(result.type).toBe('md');
     });
 
+    it('accepts pdf files from disk path and persists metadata', async () => {
+      const pdfPath = path.join(fixturesDir, 'sample.pdf');
+      const diskFile: UploadedMaterialFile = {
+        originalname: 'sample.pdf',
+        mimetype: 'application/pdf',
+        size: 500,
+        path: pdfPath,
+      };
+
+      const result = await service.upload(courseId, diskFile);
+      expect(result.type).toBe('pdf');
+      expect(result.name).toBe('sample.pdf');
+      expect(storage.save).toHaveBeenCalledWith(courseId, 'pdf', pdfPath);
+    });
+
+    it('accepts docx files and persists metadata', async () => {
+      const docxPath = path.join(fixturesDir, 'sample.docx');
+      const diskFile: UploadedMaterialFile = {
+        originalname: 'sample.docx',
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        size: 500,
+        path: docxPath,
+      };
+
+      const result = await service.upload(courseId, diskFile);
+      expect(result.type).toBe('docx');
+      expect(result.name).toBe('sample.docx');
+      expect(storage.save).toHaveBeenCalledWith(courseId, 'docx', docxPath);
+    });
+
+    it('accepts pptx files and persists metadata', async () => {
+      const pptxPath = path.join(fixturesDir, 'sample.pptx');
+      const diskFile: UploadedMaterialFile = {
+        originalname: 'sample.pptx',
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        size: 500,
+        path: pptxPath,
+      };
+
+      const result = await service.upload(courseId, diskFile);
+      expect(result.type).toBe('pptx');
+      expect(result.name).toBe('sample.pptx');
+      expect(storage.save).toHaveBeenCalledWith(courseId, 'pptx', pptxPath);
+    });
+
+    it('throws BadRequestException when course already has 5 materials', async () => {
+      courseRepository.countByCourseId.mockResolvedValue(5);
+
+      await expect(
+        service.upload(courseId, file('extra.txt', 'Content')),
+      ).rejects.toThrow(BadRequestException);
+      expect(storage.save).not.toHaveBeenCalled();
+    });
+
+    it('enforces 50 MB default size limit and rejects files above 52_428_800 bytes', async () => {
+      const hugeFile: UploadedMaterialFile = {
+        originalname: 'huge.txt',
+        mimetype: 'text/plain',
+        size: 52_428_801,
+        buffer: Buffer.from('x'),
+      };
+
+      await expect(service.upload(courseId, hugeFile)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(storage.save).not.toHaveBeenCalled();
+    });
+
     it('strips directory components from the client-provided name', async () => {
       await service.upload(courseId, file('../../evil/notes.txt', 'content'));
       expect(courseRepository.addMaterial).toHaveBeenCalledWith(
@@ -151,7 +225,7 @@ describe('MaterialsService', () => {
 
     it('throws UnsupportedMediaTypeException for unsupported extensions', async () => {
       await expect(
-        service.upload(courseId, file('slides.pdf', '%PDF-1.4')),
+        service.upload(courseId, file('malicious.exe', 'binary content')),
       ).rejects.toThrow(UnsupportedMediaTypeException);
       expect(storage.save).not.toHaveBeenCalled();
     });
