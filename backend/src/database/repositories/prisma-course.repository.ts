@@ -122,6 +122,12 @@ export class PrismaCourseRepository implements CourseRepository {
     });
   }
 
+  async countByCourseId(courseId: string): Promise<number> {
+    return this.prisma.material.count({
+      where: { courseId },
+    });
+  }
+
   async createGenerationJob(
     job: Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<GenerationJob> {

@@ -103,6 +103,53 @@ export class GenerationPipelineService {
       // Step 1: ANALYZING_CONCEPTS (Map-Reduce chunked extraction)
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
+      const chunks = splitIntoChunks(combinedText);
+      const chunkResponses = await Promise.all(
+        chunks.map(async (chunk, index) => {
+          const userMessage =
+            chunks.length === 1
+              ? this.userMessageConcepts(chunk)
+              : `Study material (part ${index + 1} of ${chunks.length}):\n\n${chunk}`;
+          const raw = await this.aiService.completeJson<unknown>(
+            this.systemPromptConcepts(resolvedLang),
+            userMessage,
+          );
+          const validation = aiConceptsResponseSchema.safeParse(raw);
+          if (!validation.success) {
+            const issues = validation.error.issues
+              .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+              .join('; ');
+            throw new Error(
+              `AI generated invalid concepts response: ${issues}`,
+            );
+          }
+          return validation.data;
+        }),
+      );
+
+      // Deduplicate and merge concept lists
+      const seenConceptNames = new Set<string>();
+      const rawConcepts: AiExtractedConcept[] = [];
+      let generatedSummary: string | undefined;
+
+      for (const res of chunkResponses) {
+        if (!generatedSummary && res.courseSummary) {
+          generatedSummary = res.courseSummary;
+        }
+        for (const concept of res.concepts) {
+          const key = concept.name.trim().toLowerCase();
+          if (!seenConceptNames.has(key)) {
+            seenConceptNames.add(key);
+            rawConcepts.push(concept);
+          }
+        }
+      }
+
+      if (rawConcepts.length === 0) {
+        throw new Error(
+          'AI generated invalid concepts response: concepts: At least one concept is required',
+        );
+      }
       const chunks = this.splitIntoChunks(combinedText);
       const chunkResults = await Promise.all(
         chunks.map((chunk) =>
@@ -574,6 +621,7 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
     const conceptList = concepts
       .map((c) => `- ${c.name}: ${c.summary}`)
       .join('\n');
+    return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${studyText}`;
     const maxChars = CHUNK_SIZE * MAX_CHUNKS;
     const truncated =
       studyText.length > maxChars

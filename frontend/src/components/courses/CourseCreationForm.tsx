@@ -7,6 +7,8 @@ import MaterialList from './MaterialList'
 import type { SelectedFile } from './MaterialItem'
 import { useTranslation } from '../../i18n'
 
+const MAX_MATERIALS = 5
+
 export function CourseCreationForm() {
   const navigate = useNavigate()
   const { language, t } = useTranslation()
@@ -15,13 +17,26 @@ export function CourseCreationForm() {
   const [materials, setMaterials] = useState<SelectedFile[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [fileLimitError, setFileLimitError] = useState<string | null>(null)
   const [touched, setTouched] = useState({ name: false, materials: false })
 
   const isNameValid = courseName.trim().length > 0
   const hasMaterials = materials.length > 0
-  const isFormValid = isNameValid && hasMaterials
+  const isFormValid = isNameValid && hasMaterials && materials.length <= MAX_MATERIALS
 
   const handleFilesSelected = (files: File[]) => {
+    if (materials.length + files.length > MAX_MATERIALS) {
+      setFileLimitError(
+        language === 'en'
+          ? `You can upload up to 5 files per course (${materials.length} already selected, tried to add ${files.length}).`
+          : `Solo puedes subir hasta 5 archivos por curso (${materials.length} ya seleccionados, intentaste añadir ${files.length}).`,
+      )
+      setTouched((prev) => ({ ...prev, materials: true }))
+      return
+    }
+
+    setFileLimitError(null)
+
     const newItems: SelectedFile[] = files.map((file, idx) => ({
       id: `file-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
       name: file.name,
@@ -38,6 +53,7 @@ export function CourseCreationForm() {
 
   const handleRemoveMaterial = (id: string) => {
     setMaterials((prev) => prev.filter((m) => m.id !== id))
+    setFileLimitError(null)
     setSubmitError(null)
   }
 
@@ -159,15 +175,30 @@ export function CourseCreationForm() {
       {/* Campo: Materiales de aprendizaje */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-text-primary">
-            {t('createCourse.materialsLabel')} <span className="text-danger">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-semibold text-text-primary">
+              {t('createCourse.materialsLabel')} <span className="text-danger">*</span>
+            </label>
+            <span className="text-xs font-semibold text-text-secondary">
+              {materials.length}/{MAX_MATERIALS} {language === 'en' ? 'files' : 'archivos'}
+            </span>
+          </div>
           <p className="mt-1 text-xs text-text-secondary">
             {t('createCourse.materialsSubtitle')}
           </p>
         </div>
 
-        <FileUploadArea onFilesSelected={handleFilesSelected} disabled={isSubmitting} />
+        <FileUploadArea
+          onFilesSelected={handleFilesSelected}
+          disabled={isSubmitting || materials.length >= MAX_MATERIALS}
+        />
+
+        {fileLimitError && (
+          <p className="flex items-center gap-1.5 text-xs text-danger">
+            <IconAlertCircle className="size-3.5 shrink-0" />
+            {fileLimitError}
+          </p>
+        )}
 
         {touched.materials && !hasMaterials && (
           <p className="flex items-center gap-1.5 text-xs text-danger">

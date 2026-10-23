@@ -14,6 +14,7 @@ export interface CourseRepository {
 
   addMaterial(material: Omit<Material, 'id' | 'uploadedAt'>): Promise<Material>;
   getMaterialsByCourseId(courseId: string): Promise<Material[]>;
+  countByCourseId(courseId: string): Promise<number>;
 
   createGenerationJob(
     job: Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>,
