@@ -19,6 +19,20 @@ import {
 
 export type CourseGenerationLanguage = 'es' | 'en';
 
+export const CHUNK_SIZE = 6_000; // chars per chunk
+export const MAX_CHUNKS = 10; // max chunks to process (60k chars total)
+export const OVERLAP = 200; // overlap between chunks
+
+export function splitIntoChunks(text: string): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length && chunks.length < MAX_CHUNKS) {
+    chunks.push(text.slice(start, start + CHUNK_SIZE));
+    start += CHUNK_SIZE - OVERLAP;
+  }
+  return chunks;
+}
+
 // Orchestrates the full AI-driven course-generation pipeline for a given GenerationJob.
 // Pipeline steps (matching GenerationJobStatus values):
 //   PENDING -> EXTRACTING -> ANALYZING_CONCEPTS -> ANALYZING_DEPENDENCIES -> BUILDING_PATH -> COMPLETED | ERROR
@@ -85,21 +99,53 @@ export class GenerationPipelineService {
       // Step 1: ANALYZING_CONCEPTS
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
-      const rawConceptsData = await this.aiService.completeJson<unknown>(
-        this.systemPromptConcepts(resolvedLang),
-        this.userMessageConcepts(combinedText),
+      const chunks = splitIntoChunks(combinedText);
+      const chunkResponses = await Promise.all(
+        chunks.map(async (chunk, index) => {
+          const userMessage =
+            chunks.length === 1
+              ? this.userMessageConcepts(chunk)
+              : `Study material (part ${index + 1} of ${chunks.length}):\n\n${chunk}`;
+          const raw = await this.aiService.completeJson<unknown>(
+            this.systemPromptConcepts(resolvedLang),
+            userMessage,
+          );
+          const validation = aiConceptsResponseSchema.safeParse(raw);
+          if (!validation.success) {
+            const issues = validation.error.issues
+              .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+              .join('; ');
+            throw new Error(
+              `AI generated invalid concepts response: ${issues}`,
+            );
+          }
+          return validation.data;
+        }),
       );
 
-      const conceptsValidation =
-        aiConceptsResponseSchema.safeParse(rawConceptsData);
-      if (!conceptsValidation.success) {
-        const issues = conceptsValidation.error.issues
-          .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
-          .join('; ');
-        throw new Error(`AI generated invalid concepts response: ${issues}`);
+      // Deduplicate and merge concept lists
+      const seenConceptNames = new Set<string>();
+      const rawConcepts: AiExtractedConcept[] = [];
+      let generatedSummary: string | undefined;
+
+      for (const res of chunkResponses) {
+        if (!generatedSummary && res.courseSummary) {
+          generatedSummary = res.courseSummary;
+        }
+        for (const concept of res.concepts) {
+          const key = concept.name.trim().toLowerCase();
+          if (!seenConceptNames.has(key)) {
+            seenConceptNames.add(key);
+            rawConcepts.push(concept);
+          }
+        }
       }
-      const rawConcepts = conceptsValidation.data.concepts;
-      const generatedSummary = conceptsValidation.data.courseSummary;
+
+      if (rawConcepts.length === 0) {
+        throw new Error(
+          'AI generated invalid concepts response: concepts: At least one concept is required',
+        );
+      }
 
       if (generatedSummary) {
         const currentCourse = await this.courseRepository.findById(courseId);
@@ -415,12 +461,7 @@ Extract between 5 and 30 concepts. Focus on the most important ideas.`;
   }
 
   private userMessageConcepts(text: string): string {
-    const maxChars = 20000;
-    const truncated =
-      text.length > maxChars
-        ? text.slice(0, maxChars) + '\n\n[...text truncated...]'
-        : text;
-    return `Study material:\n\n${truncated}`;
+    return `Study material:\n\n${text}`;
   }
 
   private systemPromptSessions(
@@ -452,12 +493,7 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
     const conceptList = concepts
       .map((c) => `- ${c.name}: ${c.summary}`)
       .join('\n');
-    const maxChars = 8000;
-    const truncated =
-      studyText.length > maxChars
-        ? studyText.slice(0, maxChars) + '\n\n[...truncated...]'
-        : studyText;
-    return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${truncated}`;
+    return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${studyText}`;
   }
 
   private systemPromptQuiz(language: CourseGenerationLanguage = 'es'): string {
