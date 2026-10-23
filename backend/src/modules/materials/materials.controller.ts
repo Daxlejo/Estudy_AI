@@ -8,11 +8,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  MaterialsService,
-  UploadedMaterialFile,
-  getMaxMaterialBytes,
-} from './materials.service';
+import { diskStorage } from 'multer';
+import * as os from 'os';
+import * as fs from 'fs';
+import { MaterialsService, UploadedMaterialFile } from './materials.service';
 import { MaterialResponseDto } from './dto/material-response.dto';
 import { DatabaseError } from '../../database/errors/database-error';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -35,9 +34,13 @@ export class MaterialsController {
 
   @Post()
   @UseInterceptors(
-    // Sin `dest`, multer conserva el archivo en memoria (file.buffer).
     FileInterceptor('file', {
-      limits: { fileSize: getMaxMaterialBytes(), files: 1 },
+      storage: diskStorage({
+        destination: os.tmpdir(),
+        filename: (_req, file, cb) =>
+          cb(null, `${Date.now()}-${file.originalname}`),
+      }),
+      limits: { fileSize: 52_428_800, files: 1 },
     }),
   )
   async upload(
@@ -48,7 +51,11 @@ export class MaterialsController {
     try {
       return await this.materialsService.upload(courseId, file, user?.sub);
     } catch (e) {
-      this.handleError(e);
+      throw this.handleError(e);
+    } finally {
+      if (file?.path) {
+        fs.unlink(file.path, () => {}); // fire-and-forget cleanup
+      }
     }
   }
 }
