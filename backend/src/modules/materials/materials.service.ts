@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -20,15 +21,19 @@ import {
   MaterialResponseDto,
 } from './dto/material-response.dto';
 
-/** Forma minima del archivo recibido por multer (sin depender de @types/multer). */
+/** Forma minima del archivo recibido por multer (soporta MemoryStorage y DiskStorage). */
 export interface UploadedMaterialFile {
   originalname: string;
   mimetype: string;
   size: number;
-  buffer: Buffer;
+  buffer?: Buffer;
+  path?: string;
+  destination?: string;
+  filename?: string;
 }
 
-export const DEFAULT_MAX_MATERIAL_BYTES = 5 * 1024 * 1024;
+export const DEFAULT_MAX_MATERIAL_BYTES = 52_428_800; // 50 MB
+export const MAX_MATERIALS_PER_COURSE = 5;
 
 export function getMaxMaterialBytes(): number {
   const configured = Number(process.env.MATERIALS_MAX_FILE_SIZE_BYTES);
@@ -61,23 +66,41 @@ export class MaterialsService {
       );
     }
 
-    if (!file || !Buffer.isBuffer(file.buffer)) {
+    // Validacion de limite de materiales por curso (5 archivos) antes de cualquier I/O
+    const currentCount =
+      typeof (this.courseRepository as any).countByCourseId === 'function'
+        ? await (this.courseRepository as any).countByCourseId(courseId)
+        : (await this.courseRepository.getMaterialsByCourseId(courseId)).length;
+
+    if (currentCount + 1 > MAX_MATERIALS_PER_COURSE) {
+      throw new BadRequestException(
+        `A course cannot have more than ${MAX_MATERIALS_PER_COURSE} materials`,
+      );
+    }
+
+    if (!file || (!Buffer.isBuffer(file.buffer) && !file.path)) {
       throw new BadRequestException('A file must be provided in field "file"');
     }
-    if (file.size === 0 || file.buffer.length === 0) {
+
+    const fileSize =
+      typeof file.size === 'number' ? file.size : (file.buffer?.length ?? 0);
+
+    if (fileSize === 0) {
       throw new BadRequestException('Uploaded file is empty');
     }
-    if (file.buffer.length > getMaxMaterialBytes()) {
+    if (fileSize > getMaxMaterialBytes()) {
       throw new BadRequestException('Uploaded file exceeds the size limit');
     }
 
     const name = this.sanitizeDisplayName(file.originalname);
     let type: SupportedMaterialType;
     let text: string;
+    const fileSource = file.path ?? file.buffer!;
+
     try {
-      type = this.textExtractionService.resolveType(name);
+      type = this.textExtractionService.resolveType(name, file.mimetype);
       // Se extrae antes de persistir para no guardar materiales inutilizables.
-      text = this.textExtractionService.extract(file.buffer, type);
+      text = await this.textExtractionService.extract(fileSource, type);
     } catch (error) {
       throw this.toHttpError(error);
     }
@@ -85,7 +108,7 @@ export class MaterialsService {
     const storagePath = await this.materialStorageService.save(
       course.id,
       type,
-      file.buffer,
+      fileSource,
     );
 
     let material: Material;
@@ -95,7 +118,7 @@ export class MaterialsService {
         name,
         storagePath,
         type,
-        sizeBytes: file.buffer.length,
+        sizeBytes: fileSize,
       });
     } catch (error) {
       // Evita archivos huerfanos si falla la persistencia de metadatos.
@@ -151,7 +174,7 @@ export class MaterialsService {
         materialId: material.id,
         name: material.name,
         type: material.type,
-        text: this.textExtractionService.extract(buffer, type),
+        text: await this.textExtractionService.extract(buffer, type),
       });
     }
     return result;
@@ -168,6 +191,9 @@ export class MaterialsService {
   }
 
   private toHttpError(error: unknown): Error {
+    if (error instanceof HttpException) {
+      return error;
+    }
     if (error instanceof MaterialExtractionError) {
       if (error.code === 'UNSUPPORTED_TYPE') {
         return new UnsupportedMediaTypeException(error.message);
