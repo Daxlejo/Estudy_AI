@@ -206,4 +206,22 @@ test('SessionConceptsBlock — Grid, Fallbacks, Detail Modal & Sequential Browsi
     assert.ok(enHtml.includes('Back to Introduction'))
     assert.ok(enHtml.includes('Continue to Guided practice'))
   })
+
+  await t.test('renders full-viewport fixed backdrop overlay outside space-y-8 container', () => {
+    const concepts = [makeConcept(1), makeConcept(2)]
+    const html = renderToStaticMarkup(
+      <SessionConceptsBlock
+        concepts={concepts}
+        initialSelectedConceptId="concept-1"
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+
+    assert.ok(
+      html.includes('fixed inset-0 top-0 left-0 right-0 bottom-0') &&
+        html.includes('min-h-screen w-screen'),
+      'Backdrop overlay must cover 100% of the viewport with fixed full-screen classes',
+    )
+  })
 })
