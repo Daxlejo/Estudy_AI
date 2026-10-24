@@ -7,6 +7,11 @@ import { FinalExamRepository } from '../../domain/repositories/final-exam.reposi
 import { MaterialsService } from '../materials/materials.service';
 import { AiService } from '../ai/ai.service';
 import { CourseStatus } from '../../domain/models/course';
+import {
+  aiSessionPlanResponseSchema,
+  normalizeSessionPlan,
+  normalizeSessionItem,
+} from './dto/ai-course-plan.dto';
 
 describe('GenerationPipelineService', () => {
   let service: GenerationPipelineService;
@@ -168,6 +173,224 @@ describe('GenerationPipelineService', () => {
         }),
       );
       expect(sessionRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject session plan when guidedPractice and challenge payloads are identical (R5)', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        { materialId: 'm1', name: 'notes.txt', type: 'txt', text: 'Some text' },
+      ]);
+      aiService.completeJson
+        .mockResolvedValueOnce({
+          concepts: [{ name: 'C1', summary: 'Summary 1', detail: 'Detail 1' }],
+        })
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'S1',
+              learningObjective: 'Obj',
+              durationMinutes: 20,
+              xpReward: 50,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'A', right: 'B' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'A', right: 'B' }],
+              }),
+              conceptNames: ['C1'],
+            },
+          ],
+        });
+
+      await service.run('course-1', 'job-1');
+
+      expect(courseRepository.updateGenerationJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          status: 'ERROR',
+          errorMessage: expect.stringContaining(
+            'identical guidedPractice and challenge',
+          ),
+        }),
+      );
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject session plan when guidedPractice and challenge have substantively duplicate matching pairs despite different titles and IDs', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        { materialId: 'm1', name: 'notes.txt', type: 'txt', text: 'Some text' },
+      ]);
+      aiService.completeJson
+        .mockResolvedValueOnce({
+          concepts: [
+            {
+              name: 'Clase',
+              summary: 'Plantilla de objetos',
+              detail: 'Detail 1',
+            },
+            {
+              name: 'Objeto',
+              summary: 'Instancia de clase',
+              detail: 'Detail 2',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'S1',
+              learningObjective: 'Obj',
+              durationMinutes: 20,
+              xpReward: 50,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                id: 'gp-1',
+                type: 'matching',
+                title: 'Práctica: Emparejamiento',
+                pairs: [
+                  { id: '1', left: 'Clase', right: 'Plantilla de objetos' },
+                  { id: '2', left: 'Objeto', right: 'Instancia de clase' },
+                ],
+              }),
+              challenge: JSON.stringify({
+                id: 'ch-1',
+                type: 'matching',
+                title: 'Desafío: Vinculación',
+                pairs: [
+                  { id: 'a', left: 'Objeto', right: 'Instancia de clase' },
+                  { id: 'b', left: 'Clase', right: 'Plantilla de objetos' },
+                ],
+              }),
+              conceptNames: ['Clase', 'Objeto'],
+            },
+          ],
+        });
+
+      await service.run('course-1', 'job-1');
+
+      expect(courseRepository.updateGenerationJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          status: 'ERROR',
+          errorMessage: expect.stringContaining(
+            'identical guidedPractice and challenge',
+          ),
+        }),
+      );
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should accept session plan when guidedPractice and challenge use distinct activity types', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        { materialId: 'm1', name: 'notes.txt', type: 'txt', text: 'Some text' },
+      ]);
+      sessionRepository.create.mockResolvedValue({ id: 'session-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({
+        id: 'concept-1',
+      } as any);
+      quizRepository.create.mockResolvedValue({ id: 'quiz-1' } as any);
+      finalExamRepository.create.mockResolvedValue({ id: 'exam-1' } as any);
+
+      aiService.completeJson
+        .mockResolvedValueOnce({
+          concepts: [
+            {
+              name: 'Clase',
+              summary: 'Plantilla de objetos',
+              detail: 'Detail 1',
+            },
+            {
+              name: 'Objeto',
+              summary: 'Instancia de clase',
+              detail: 'Detail 2',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'S1',
+              learningObjective: 'Obj',
+              durationMinutes: 20,
+              xpReward: 50,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [
+                  { id: '1', left: 'Clase', right: 'Plantilla de objetos' },
+                  { id: '2', left: 'Objeto', right: 'Instancia de clase' },
+                ],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                question: '¿Qué componente debe instanciarse en memoria?',
+                options: [
+                  { id: 'opt-1', text: 'Objeto', isCorrect: true },
+                  { id: 'opt-2', text: 'Clase', isCorrect: false },
+                ],
+              }),
+              conceptNames: ['Clase', 'Objeto'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          // Quiz response
+          passingThreshold: 70,
+          questions: [
+            {
+              conceptName: 'Clase',
+              prompt: 'Pregunta de quiz',
+              options: [
+                { id: '1', text: 'Opción A', isCorrect: true },
+                { id: '2', text: 'Opción B', isCorrect: false },
+              ],
+              explanation: 'Explicación del quiz',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          // Final exam response
+          passingScorePct: 70,
+          estimatedMinutes: 30,
+          questions: [
+            {
+              conceptName: 'Clase',
+              type: 'MULTIPLE_CHOICE',
+              prompt: 'Pregunta de examen',
+              payload: {
+                type: 'MULTIPLE_CHOICE',
+                options: [
+                  { id: '1', text: 'Opción A', isCorrect: true },
+                  { id: '2', text: 'Opción B', isCorrect: false },
+                ],
+                correctOptionId: '1',
+              },
+              explanation: 'Explicación final',
+            },
+          ],
+        });
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'S1',
+        }),
+      );
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
+      });
     });
 
     it('should reject quiz questions lacking a correct option before persistence', async () => {
@@ -656,6 +879,560 @@ describe('GenerationPipelineService', () => {
       );
       expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
         status: 'READY',
+      });
+    });
+  });
+
+  describe('session plan normalization and conceptNames contract (hotfix regression)', () => {
+    const makeExtracted = () => [
+      {
+        materialId: 'm1',
+        name: 'poo.txt',
+        type: 'txt',
+        text: 'Clases y Objetos en POO',
+      },
+    ];
+
+    const makeExtractedConcepts = () => ({
+      concepts: [
+        {
+          name: 'Clase',
+          summary: 'Plantilla de objetos',
+          detail: 'Definicion de clase',
+        },
+        {
+          name: 'Objeto',
+          summary: 'Instancia de clase',
+          detail: 'Definicion de objeto',
+        },
+        {
+          name: 'Herencia',
+          summary: 'Jerarquia de clases',
+          detail: 'Definicion de herencia',
+        },
+      ],
+    });
+
+    const standardQuiz = {
+      passingThreshold: 75,
+      questions: [
+        {
+          conceptName: 'Clase',
+          prompt: 'Que es una clase?',
+          options: [
+            { id: '1', text: 'Una plantilla', isCorrect: true },
+            { id: '2', text: 'Una variable simple', isCorrect: false },
+          ],
+          explanation: 'Una clase es un molde o plantilla.',
+        },
+      ],
+    };
+
+    const standardExam = {
+      estimatedMinutes: 30,
+      passingScorePct: 70,
+      questions: [
+        {
+          conceptName: 'Clase',
+          type: 'MULTIPLE_CHOICE',
+          prompt: 'Concepto de clase',
+          payload: {
+            type: 'MULTIPLE_CHOICE',
+            options: [
+              { id: 'a', text: 'Molde', isCorrect: true },
+              { id: 'b', text: 'Instancia', isCorrect: false },
+            ],
+            correctOptionId: 'a',
+          },
+          explanation: 'Molde que define atributos y metodos.',
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      quizRepository.create.mockResolvedValue({ id: 'quiz-1' } as any);
+      quizRepository.addQuestion.mockResolvedValue({ id: 'qq-1' } as any);
+      finalExamRepository.create.mockResolvedValue({ id: 'exam-1' } as any);
+      finalExamRepository.addQuestion.mockResolvedValue({ id: 'fq-1' } as any);
+      sessionRepository.create.mockResolvedValue({ id: 'sess-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-1' } as any);
+      courseRepository.update.mockResolvedValue(
+        makeCourse({ status: 'READY' }),
+      );
+    });
+
+    it('should validate and persist session when AI provides standard conceptNames array', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Fundamentos de POO',
+              learningObjective: 'Dominar clases y objetos',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Introduccion a POO',
+              introContent: 'La POO organiza el software en clases y objetos.',
+              introKeyTakeaway:
+                'Las clases definen el molde y los objetos las instancias.',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'Clase', right: 'Molde' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde la pregunta',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              conceptNames: ['Clase', 'Objeto'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardExam);
+
+      sessionRepository.create.mockResolvedValue({ id: 'sess-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-1' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Fundamentos de POO',
+        }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Clase' }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Objeto' }),
+      );
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
+      });
+    });
+
+    it('should normalize and validate session when AI provides concepts string array instead of conceptNames', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Fundamentos de POO',
+              learningObjective: 'Dominar clases y objetos',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Introduccion a POO',
+              introContent: 'La POO organiza el software en clases y objetos.',
+              introKeyTakeaway: 'Las clases definen el molde.',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'Clase', right: 'Molde' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde la pregunta',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              concepts: ['Clase', 'Objeto'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardExam);
+
+      sessionRepository.create.mockResolvedValue({ id: 'sess-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-1' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalled();
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Clase' }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Objeto' }),
+      );
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
+      });
+    });
+
+    it('should normalize and validate session when AI provides concepts array of objects with name property', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Fundamentos de POO',
+              learningObjective: 'Dominar clases y objetos',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Introduccion a POO',
+              introContent: 'Contenido...',
+              introKeyTakeaway: 'Takeaway...',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'Clase', right: 'Molde' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              concepts: [{ name: 'Clase' }, { name: 'Objeto' }],
+            },
+          ],
+        })
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardExam);
+
+      sessionRepository.create.mockResolvedValue({ id: 'sess-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-1' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalled();
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Clase' }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Objeto' }),
+      );
+    });
+
+    it('should normalize and validate session when AI provides concept_names (snake_case)', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Fundamentos de POO',
+              learningObjective: 'Dominar clases y objetos',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'Clase', right: 'Molde' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              concept_names: ['Clase', 'Objeto'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardExam);
+
+      sessionRepository.create.mockResolvedValue({ id: 'sess-1' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-1' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalled();
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Clase' }),
+      );
+    });
+
+    it('should reject session plan when conceptNames and all equivalent fields are missing (reproducing original bug)', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Sesion sin conceptos',
+              learningObjective: 'Objetivo',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'A', right: 'B' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              // Missing conceptNames and concepts entirely
+            },
+          ],
+        });
+
+      await service.run('course-1', 'job-1');
+
+      expect(courseRepository.updateGenerationJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          status: 'ERROR',
+          errorMessage: expect.stringMatching(
+            /conceptNames|invalid session plan/i,
+          ),
+        }),
+      );
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject session plan when concepts array is empty', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Sesion con array vacio',
+              learningObjective: 'Objetivo',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro',
+              introContent: 'Content',
+              introKeyTakeaway: 'Takeaway',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'A', right: 'B' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              concepts: [],
+            },
+          ],
+        });
+
+      await service.run('course-1', 'job-1');
+
+      expect(courseRepository.updateGenerationJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          status: 'ERROR',
+          errorMessage: expect.stringContaining(
+            'Session must include at least one concept',
+          ),
+        }),
+      );
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('should normalize and validate all sessions in a multi-session plan with diverse naming conventions', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue(makeExtracted());
+      aiService.completeJson
+        .mockResolvedValueOnce(makeExtractedConcepts())
+        .mockResolvedValueOnce({
+          sessions: [
+            {
+              sequenceOrder: 1,
+              title: 'Sesion 1',
+              learningObjective: 'Obj 1',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro 1',
+              introContent: 'Content 1',
+              introKeyTakeaway: 'Takeaway 1',
+              guidedPractice: JSON.stringify({
+                type: 'matching',
+                pairs: [{ id: '1', left: 'Clase', right: 'Molde' }],
+              }),
+              challenge: JSON.stringify({
+                type: 'multiple_choice',
+                instructions: 'Responde',
+                options: [{ id: '1', text: 'Opt', isCorrect: true }],
+              }),
+              conceptNames: ['Clase'],
+            },
+            {
+              sequenceOrder: 2,
+              title: 'Sesion 2',
+              learningObjective: 'Obj 2',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro 2',
+              introContent: 'Content 2',
+              introKeyTakeaway: 'Takeaway 2',
+              guidedPractice: JSON.stringify({
+                type: 'true_false',
+                statement: 'Un objeto es instancia de clase',
+                correct: true,
+                justification: 'Asi es',
+              }),
+              challenge: JSON.stringify({
+                type: 'classify',
+                categories: ['Cat1', 'Cat2'],
+                items: [
+                  { label: 'Item1', correctCategory: 'Cat1' },
+                  { label: 'Item2', correctCategory: 'Cat2' },
+                ],
+                explanation: 'Explicacion',
+              }),
+              concepts: ['Objeto'],
+            },
+            {
+              sequenceOrder: 3,
+              title: 'Sesion 3',
+              learningObjective: 'Obj 3',
+              durationMinutes: 30,
+              xpReward: 100,
+              introTitle: 'Intro 3',
+              introContent: 'Content 3',
+              introKeyTakeaway: 'Takeaway 3',
+              guidedPractice: JSON.stringify({
+                type: 'fill_in_blank',
+                sentence: 'La herencia permite crear jerarquias',
+                blanks: [{ index: 0, answer: 'herencia' }],
+                explanation: 'Explicacion',
+              }),
+              challenge: JSON.stringify({
+                type: 'ordering',
+                items: [
+                  { id: '1', text: 'Base' },
+                  { id: '2', text: 'Derivada' },
+                ],
+                correctOrder: ['1', '2'],
+              }),
+              concept_names: ['Herencia'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardQuiz)
+        .mockResolvedValueOnce(standardExam);
+
+      sessionRepository.create
+        .mockResolvedValueOnce({ id: 's1' } as any)
+        .mockResolvedValueOnce({ id: 's2' } as any)
+        .mockResolvedValueOnce({ id: 's3' } as any);
+      sessionRepository.addConcept.mockResolvedValue({ id: 'c-any' } as any);
+
+      await service.run('course-1', 'job-1');
+
+      expect(sessionRepository.create).toHaveBeenCalledTimes(3);
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Clase' }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Objeto' }),
+      );
+      expect(sessionRepository.addConcept).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Herencia' }),
+      );
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
+      });
+    });
+
+    describe('DTO unit parsing and normalization', () => {
+      const baseSession = {
+        sequenceOrder: 1,
+        title: 'Session Test',
+        learningObjective: 'Learning Obj',
+        durationMinutes: 30,
+        xpReward: 100,
+        introTitle: 'Intro',
+        introContent: 'Content',
+        introKeyTakeaway: 'Takeaway',
+        guidedPractice: 'Practice text',
+        challenge: 'Challenge text',
+      };
+
+      it('should parse directly with conceptNames array', () => {
+        const payload = {
+          sessions: [{ ...baseSession, conceptNames: ['Alpha', 'Beta'] }],
+        };
+        const result = aiSessionPlanResponseSchema.safeParse(payload);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.sessions[0].conceptNames).toEqual([
+            'Alpha',
+            'Beta',
+          ]);
+        }
+      });
+
+      it('should normalize and parse with concepts string array', () => {
+        const payload = {
+          sessions: [{ ...baseSession, concepts: ['Alpha', 'Beta'] }],
+        };
+        const result = aiSessionPlanResponseSchema.safeParse(payload);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.sessions[0].conceptNames).toEqual([
+            'Alpha',
+            'Beta',
+          ]);
+        }
+      });
+
+      it('should normalize and parse with concepts object array', () => {
+        const payload = {
+          sessions: [
+            { ...baseSession, concepts: [{ name: 'Alpha' }, { name: 'Beta' }] },
+          ],
+        };
+        const result = aiSessionPlanResponseSchema.safeParse(payload);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.sessions[0].conceptNames).toEqual([
+            'Alpha',
+            'Beta',
+          ]);
+        }
+      });
+
+      it('should normalize top-level array directly passed to normalizeSessionPlan', () => {
+        const rawArray = [{ ...baseSession, concepts: ['Alpha'] }];
+        const normalized = normalizeSessionPlan(rawArray) as {
+          sessions: Array<{ conceptNames: string[] }>;
+        };
+        expect(Array.isArray(normalized.sessions)).toBe(true);
+        expect(normalized.sessions[0].conceptNames).toEqual(['Alpha']);
+      });
+
+      it('should normalize individual session item using normalizeSessionItem', () => {
+        const item = { ...baseSession, concepts: ['Alpha'] };
+        const normalized = normalizeSessionItem(item) as {
+          conceptNames: string[];
+        };
+        expect(normalized.conceptNames).toEqual(['Alpha']);
+      });
+
+      it('should fail validation when conceptNames is completely absent and no alternatives exist', () => {
+        const payload = {
+          sessions: [{ ...baseSession }],
+        };
+        const result = aiSessionPlanResponseSchema.safeParse(payload);
+        expect(result.success).toBe(false);
+      });
+
+      it('should include explicit rule in systemPromptSessions forbidding compound numbered multiple_choice and requiring classify', () => {
+        const prompt = (
+          service as unknown as {
+            systemPromptSessions: (lang: string) => string;
+          }
+        ).systemPromptSessions('es');
+        expect(prompt).toContain('1. ... 2. ... 3. ...');
+        expect(prompt).toContain("use 'classify'");
       });
     });
   });
