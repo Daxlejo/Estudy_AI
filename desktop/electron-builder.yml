@@ -1,0 +1,53 @@
+appId: com.estudyai.desktop
+productName: EstudyAI
+electronVersion: 33.4.11
+publish: null
+copyright: Copyright © 2026 EstudyAI
+
+directories:
+  buildResources: assets
+  output: dist-electron
+
+# Electron main/preload (compiled by tsc). The shell has no runtime deps.
+files:
+  - dist/**/*
+  - package.json
+
+# Backend + frontend live OUTSIDE the asar archive (process.resourcesPath),
+# so Prisma engines and the Prisma CLI are directly executable/loadable.
+# The backend is staged by `scripts/stage-backend.js` (production-only deps).
+extraResources:
+  - from: build/backend
+    to: backend
+    filter:
+      - "**/*"
+  - from: ../frontend/dist
+    to: frontend/dist
+    filter:
+      - "**/*"
+
+npmRebuild: false
+
+win:
+  target: nsis
+  icon: assets/icon.ico
+  artifactName: EstudyAI-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: EstudyAI
+
+linux:
+  target: AppImage
+  icon: assets/icon.png
+  category: Education
+  artifactName: EstudyAI-${version}-${arch}.${ext}
+
+mac:
+  target: dmg
+  icon: assets/icon.icns
+  category: public.app-category.education
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  artifactName: EstudyAI-${version}-${arch}.${ext}

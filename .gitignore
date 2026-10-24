@@ -42,3 +42,6 @@ backend/storage/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+# Electron desktop build output
+desktop/build/
+desktop/dist-electron/

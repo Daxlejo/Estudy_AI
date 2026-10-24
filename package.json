@@ -1,13 +1,25 @@
 {
   "name": "estudy-ai",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "EstudyAI - AI-assisted study app (frontend + backend + desktop shell)",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "desktop"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run dev --workspace=frontend\" \"npm run start:dev --workspace=backend\"",
+    "prisma:generate": "npm exec --workspace=backend -- prisma generate",
+    "build": "npm run build --workspace=frontend && npm run prisma:generate && npm run build --workspace=backend && npm run build --workspace=desktop",
+    "dist": "npm run build && npm run dist --workspace=desktop",
+    "dist:dir": "npm run build && npm run dist:dir --workspace=desktop"
   },
   "keywords": [],
-  "author": "",
+  "author": "EstudyAI",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
