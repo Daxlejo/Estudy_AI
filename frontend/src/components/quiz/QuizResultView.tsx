@@ -18,12 +18,14 @@ import MarkdownRenderer from '../ui/MarkdownRenderer'
 interface QuizResultViewProps {
   result: QuizResult
   quiz: Quiz
+  courseBonusXp?: number
   onReviewConcepts: () => void
 }
 
 export function QuizResultView({
   result,
   quiz,
+  courseBonusXp = 0,
   onReviewConcepts,
 }: QuizResultViewProps) {
   const [showAllQuestions, setShowAllQuestions] = useState(false)
@@ -112,9 +114,18 @@ export function QuizResultView({
                 <span className="text-xs font-medium text-text-secondary">Recompensa</span>
                 <span className="mt-0.5 inline-flex items-center gap-1 font-heading text-xl font-bold text-primary md:text-2xl">
                   <IconSparkles className="size-4.5" />
-                  +{quiz.xpReward}
+                  +{quiz.xpReward + courseBonusXp}
                 </span>
-                <span className="text-[11px] text-text-secondary">Puntos XP</span>
+                <span className="text-[11px] text-text-secondary">
+                  {courseBonusXp > 0
+                    ? `${quiz.xpReward} XP + ${courseBonusXp} XP Bonus`
+                    : 'Puntos XP'}
+                </span>
+                {courseBonusXp > 0 && (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                    +{courseBonusXp} XP Curso
+                  </span>
+                )}
               </div>
             </div>
 

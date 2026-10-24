@@ -11,6 +11,9 @@ import {
 } from './matchingActivityUtils'
 import { MatchingActivityView } from './MatchingActivityView'
 import { ActivityContainer } from './ActivityContainer'
+import { ClassifyActivityView } from './ClassifyActivityView'
+import { evaluateClassify } from '../../services/activity.parser'
+import type { ClassifyActivity } from '../../types/activity'
 import { SessionPracticeBlock } from '../study-session/SessionPracticeBlock'
 import { SessionIntroBlock } from '../study-session/SessionIntroBlock'
 import { activityService } from '../../services/activity.service'
@@ -407,5 +410,123 @@ test('ActivityContainer, Hint Visibility, Objective Banner & Completion Enforcem
 
     assert.ok(introHtml.includes('Objetivo de la sesión'))
     assert.ok(introHtml.includes('Diseñar componentes desacoplados y mantenibles.'))
+  })
+})
+
+test('R2 & R3 Regressions — Guided Practice vs Applied Challenge Component Behavior', async (t: TestContext) => {
+  const esCtx = createI18nContext('es')
+
+  const sampleClassify: ClassifyActivity = {
+    id: 'act-classify-test',
+    type: 'classify' as const,
+    title: 'Clasificación de Arquitecturas',
+    instructions: 'Asigna cada patrón a su categoría arquitectónica',
+    categories: ['Monolítico', 'Distribuido'],
+    items: [
+      { label: 'Event-Driven', correctCategory: 'Distribuido' },
+      { label: 'MVC clásico', correctCategory: 'Monolítico' },
+    ],
+    hint: 'Piensa en si hay múltiples procesos independientes o uno solo.',
+    explanation: 'Event-driven distribuye la carga a través de un bus de eventos.',
+    xpReward: 25,
+  }
+
+  await t.test('Guided Practice renders hint toggle button and pedagogical hint', () => {
+    activityService.resetActivity('act-classify-test')
+    const htmlGP = renderToStaticMarkup(
+      <I18nContext.Provider value={esCtx}>
+        <ActivityContainer
+          activity={{ ...sampleClassify, phase: 'guidedPractice' }}
+          phaseTitle="Fase 2: Práctica Guiada"
+          stepNumber={3}
+          continueButtonLabel="Continuar al Desafío"
+          viewportWidth={1280}
+          onContinue={() => {}}
+          onBack={() => {}}
+        />
+      </I18nContext.Provider>
+    )
+
+    // Guided Practice has the amber hint button
+    assert.ok(htmlGP.includes('Ver pista'), 'Guided Practice must offer hint button')
+    assert.ok(htmlGP.includes('bg-[#FACC15]'), 'Hint button must have amber style')
+    // Must NOT contain raw JSON syntax
+    assert.ok(!htmlGP.includes('{"type":"classify"'), 'Must not render raw serialized JSON')
+    assert.ok(htmlGP.includes('Event-Driven'), 'Must render interactive item')
+    assert.ok(htmlGP.includes('MVC clásico'), 'Must render interactive item')
+  })
+
+  await t.test('Applied Challenge withholds hint button during attempt and reveals feedback after verification', () => {
+    const challengeActId = 'act-challenge-test-1'
+    activityService.resetActivity(challengeActId)
+
+    // In Challenge (stepNumber = 4 or phase = 'challenge'), hint button is withheld during attempt
+    const htmlCH = renderToStaticMarkup(
+      <I18nContext.Provider value={esCtx}>
+        <ActivityContainer
+          activity={{ ...sampleClassify, id: challengeActId, phase: 'challenge' }}
+          phaseTitle="Fase 3: Desafío Aplicado"
+          stepNumber={4}
+          continueButtonLabel="Continuar al Mini-Quiz"
+          viewportWidth={1280}
+          onContinue={() => {}}
+          onBack={() => {}}
+        />
+      </I18nContext.Provider>
+    )
+
+    // Challenge must NOT offer hint button during attempt
+    assert.ok(!htmlCH.includes('Ver pista'), 'Challenge must withhold hint button during attempt')
+    assert.ok(!htmlCH.includes('bg-[#FACC15]'), 'No amber hint button in challenge')
+    // Must NOT contain raw JSON syntax
+    assert.ok(!htmlCH.includes('{"type":"classify"'), 'Must not render raw JSON')
+    // Must render prominent challenge submit button and gated continue
+    assert.ok(htmlCH.includes('Enviar y calificar desafío'), 'Must render challenge submit button')
+    assert.ok(htmlCH.includes('Completa el ejercicio para continuar'), 'Must gate continue button')
+
+    // Simulate completion in activity service
+    activityService.recordAttempt(challengeActId, true, 100, 25, false)
+    const htmlCompleted = renderToStaticMarkup(
+      <I18nContext.Provider value={esCtx}>
+        <ActivityContainer
+          activity={{ ...sampleClassify, id: challengeActId, phase: 'challenge' }}
+          phaseTitle="Fase 3: Desafío Aplicado"
+          stepNumber={4}
+          continueButtonLabel="Continuar al Mini-Quiz"
+          viewportWidth={1280}
+          onContinue={() => {}}
+          onBack={() => {}}
+        />
+      </I18nContext.Provider>
+    )
+
+    // Completed challenge displays success badge and unlocks progression
+    assert.ok(htmlCompleted.includes('Actividad completada con éxito'), 'Completed challenge shows success')
+    assert.ok(!htmlCompleted.includes('Completa el ejercicio para continuar'), 'Unlocked continue button')
+
+    // Test ClassifyActivityView post-submission feedback directly (incorrect response, expected answer, explanation)
+    const evaluated = evaluateClassify(sampleClassify, {
+      'Event-Driven': 'Monolítico', // incorrect
+      'MVC clásico': 'Monolítico', // correct
+    })
+    assert.strictEqual(evaluated.isCorrect, false)
+    assert.strictEqual(evaluated.scorePercent, 50)
+    assert.strictEqual(evaluated.itemResults[0].isCorrect, false)
+    assert.strictEqual(evaluated.itemResults[0].correctCategory, 'Distribuido')
+
+    const htmlEvaluated = renderToStaticMarkup(
+      <I18nContext.Provider value={esCtx}>
+        <ClassifyActivityView
+          activity={sampleClassify}
+          itemAssignments={{ 'Event-Driven': 'Monolítico', 'MVC clásico': 'Monolítico' }}
+          evaluation={evaluated}
+          showSolution={true}
+          onChangeAssignments={() => {}}
+        />
+      </I18nContext.Provider>
+    )
+
+    assert.ok(htmlEvaluated.includes('Distribuido'), 'Reveals expected category for incorrect item')
+    assert.strictEqual(evaluated.explanation, sampleClassify.explanation, 'Evaluation preserves technical explanation')
   })
 })

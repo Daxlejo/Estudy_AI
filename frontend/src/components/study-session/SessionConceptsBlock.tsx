@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -125,7 +126,7 @@ export function ConceptDetailDialog({
     }
   }
 
-  return (
+  const dialogContent = (
     <div
       role="presentation"
       onClick={(e) => {
@@ -133,7 +134,7 @@ export function ConceptDetailDialog({
           onClose()
         }
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-150 md:p-6"
+      className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex min-h-screen w-screen items-center justify-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-150 md:p-6"
     >
       <div
         ref={dialogRef}
@@ -285,6 +286,12 @@ export function ConceptDetailDialog({
       </div>
     </div>
   )
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(dialogContent, document.body)
+  }
+
+  return dialogContent
 }
 
 export function SessionConceptsBlock({
@@ -329,8 +336,9 @@ export function SessionConceptsBlock({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Indicador de etapa */}
+    <>
+      <div className="space-y-8 animate-in fade-in duration-200">
+        {/* Indicador de etapa */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -440,17 +448,6 @@ export function SessionConceptsBlock({
         })}
       </div>
 
-      {/* Panel / diálogo dedicado de detalle del concepto */}
-      {activeConcept && selectedIndex >= 0 && (
-        <ConceptDetailDialog
-          concept={activeConcept}
-          conceptIndex={selectedIndex}
-          totalConcepts={concepts.length}
-          onClose={handleCloseDetail}
-          onSelectConceptByIndex={handleSelectConceptByIndex}
-        />
-      )}
-
       {/* Botones de navegación del flujo */}
       <div className="flex flex-col-reverse items-center justify-between gap-3 pt-4 sm:flex-row">
         <button
@@ -471,7 +468,19 @@ export function SessionConceptsBlock({
           <IconArrowRight className="size-4" />
         </button>
       </div>
-    </div>
+      </div>
+
+      {/* Panel / diálogo dedicado de detalle del concepto */}
+      {activeConcept && selectedIndex >= 0 && (
+        <ConceptDetailDialog
+          concept={activeConcept}
+          conceptIndex={selectedIndex}
+          totalConcepts={concepts.length}
+          onClose={handleCloseDetail}
+          onSelectConceptByIndex={handleSelectConceptByIndex}
+        />
+      )}
+    </>
   )
 }
 

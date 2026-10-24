@@ -21,6 +21,7 @@ export interface BaseActivity {
   title: string
   instructions: string
   context?: string
+  phase?: 'guidedPractice' | 'challenge'
   conceptId?: string
   conceptName?: string
   hint?: string

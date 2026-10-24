@@ -10,6 +10,12 @@ import {
 } from './course.mapper.ts'
 import { courseService } from './course.service.ts'
 import { apiClient, ApiError } from './api.ts'
+import {
+  COURSE_COMPLETION_BONUS_XP,
+  getUserSettings,
+  initializeNewUserSettings,
+  recordSessionCompletion,
+} from '../settings/userSettings.ts'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -423,6 +429,100 @@ export async function runCourseMapperAndProgressionTests(): Promise<void> {
 
 test('Course Mapper and Progression Regression Tests', async () => {
   await runCourseMapperAndProgressionTests()
+
+  // Prompt 2: mapBackendLearningPath excludes FINAL_EXAM from totalCount and completedCount
+  const baseCourse: BackendCourse = {
+    id: 'course-p2',
+    name: 'POO',
+    description: 'Curso',
+    bannerKey: 'ocean-focus',
+    status: 'READY',
+    createdAt: '2026-10-15T00:00:00.000Z',
+    updatedAt: '2026-10-15T00:00:00.000Z',
+  }
+  const threeSessions: BackendSession[] = [1, 2, 3].map((num) => ({
+    id: `s-${num}`,
+    courseId: 'course-p2',
+    sequenceOrder: num,
+    title: `Sesión ${num}`,
+    learningObjective: 'Objetivo',
+    durationMinutes: 15,
+    xpReward: 100,
+    isUnlocked: num <= 2,
+    introTitle: 'Intro',
+    introContent: 'Contenido',
+    introKeyTakeaway: 'Clave',
+    introCodeSnippet: null,
+    guidedPractice: 'Práctica',
+    challenge: 'Reto',
+    createdAt: '2026-10-15T00:00:00.000Z',
+  }))
+  const progressWithExam: CourseProgressResult = {
+    totalSessions: 3,
+    completedSessions: 2,
+    sessions: [
+      { id: 's-1', sequenceOrder: 1, title: 'Sesión 1', isUnlocked: true, isCompleted: true, bestScorePercent: 100, attemptsCount: 1 },
+      { id: 's-2', sequenceOrder: 2, title: 'Sesión 2', isUnlocked: true, isCompleted: true, bestScorePercent: 90, attemptsCount: 1 },
+      { id: 's-3', sequenceOrder: 3, title: 'Sesión 3', isUnlocked: true, isCompleted: false, bestScorePercent: null, attemptsCount: 0 },
+    ],
+    finalExam: {
+      status: 'LOCKED',
+      bestScorePercent: null,
+      attemptsCount: 0,
+      cooldownUntil: null,
+    },
+  }
+
+  const lp = mapBackendLearningPath(baseCourse, threeSessions, progressWithExam, new Map())
+  assertEqual(lp.nodes.length, 4, 'LearningPath nodes include 3 sessions + 1 final exam node')
+  assertEqual(lp.totalCount, 3, 'totalCount must count only study sessions (3), excluding FINAL_EXAM')
+  assertEqual(lp.completedCount, 2, 'completedCount must count only completed study sessions (2)')
+  assertEqual(lp.progressPercent, 67, 'progressPercent is calculated over study sessions (2/3 = 67%)')
+
+  // Prompt 3 & 4: Banner mapping and GENERATING -> PROCESSING status
+  const generatingCourse = mapBackendCourseToFrontend({
+    ...baseCourse,
+    status: 'GENERATING',
+    bannerKey: 'sunset-study',
+  })
+  assertEqual(generatingCourse.bannerKey, 'sunset-study', 'Maps bannerKey onto frontend Course')
+  assertEqual(generatingCourse.status, 'PROCESSING', 'Maps GENERATING status to PROCESSING')
+
+  // Prompt 1: Streak increments per completed session, resets if > 1 day passes, and awards session + course bonus XP
+  const testUserId = 'user-streak-xp-test'
+  initializeNewUserSettings(testUserId)
+
+  const r1 = recordSessionCompletion(
+    { sessionId: 's-1', xpReward: 100, courseId: 'course-p2', isLastSessionOfCourse: false },
+    testUserId,
+    '2026-10-20',
+  )
+  assertEqual(r1.xp, 100, 'First session awards 100 XP')
+  assertEqual(r1.streakDays, 1, 'First session increments streak to 1')
+  assertEqual(r1.lastSessionCompletedDate, '2026-10-20', 'Stores lastSessionCompletedDate')
+
+  const r2 = recordSessionCompletion(
+    { sessionId: 's-2', xpReward: 150, courseId: 'course-p2', isLastSessionOfCourse: false },
+    testUserId,
+    '2026-10-20',
+  )
+  assertEqual(r2.xp, 250, 'Second session adds 150 XP (total 250 XP)')
+  assertEqual(r2.streakDays, 2, 'Completing another session increments streak to 2')
+
+  // Simulate skipping a full day (2026-10-21 skipped, checking on 2026-10-22)
+  const expiredSettings = getUserSettings(testUserId, '2026-10-22')
+  assertEqual(expiredSettings.streakDays, 0, 'Streak resets to 0 when a full day passes without completing a session')
+  assertEqual(expiredSettings.xp, 250, 'XP is preserved when streak resets')
+
+  // Completing the last session of the course awards session XP + 200 XP course bonus and increments streak from 0 to 1
+  const r3 = recordSessionCompletion(
+    { sessionId: 's-3', xpReward: 100, courseId: 'course-p2', isLastSessionOfCourse: true },
+    testUserId,
+    '2026-10-22',
+  )
+  assertEqual(r3.courseBonusXpEarned, COURSE_COMPLETION_BONUS_XP, 'Last session of course awards 200 XP bonus')
+  assertEqual(r3.xp, 250 + 100 + 200, 'Total XP includes session XP + 200 XP course bonus')
+  assertEqual(r3.streakDays, 1, 'Streak increments to 1 on completing session after reset')
 })
 
 

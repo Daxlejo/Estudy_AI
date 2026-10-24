@@ -9,7 +9,6 @@ import { MaterialsService } from '../materials/materials.service';
 import { AiService } from '../ai/ai.service';
 import {
   aiConceptsResponseSchema,
-  AiSessionPlanItemSchema,
   aiSessionPlanResponseSchema,
   aiSessionQuizResponseSchema,
   aiFinalExamResponseSchema,
@@ -103,53 +102,6 @@ export class GenerationPipelineService {
       // Step 1: ANALYZING_CONCEPTS (Map-Reduce chunked extraction)
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
-      const chunks = splitIntoChunks(combinedText);
-      const chunkResponses = await Promise.all(
-        chunks.map(async (chunk, index) => {
-          const userMessage =
-            chunks.length === 1
-              ? this.userMessageConcepts(chunk)
-              : `Study material (part ${index + 1} of ${chunks.length}):\n\n${chunk}`;
-          const raw = await this.aiService.completeJson<unknown>(
-            this.systemPromptConcepts(resolvedLang),
-            userMessage,
-          );
-          const validation = aiConceptsResponseSchema.safeParse(raw);
-          if (!validation.success) {
-            const issues = validation.error.issues
-              .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
-              .join('; ');
-            throw new Error(
-              `AI generated invalid concepts response: ${issues}`,
-            );
-          }
-          return validation.data;
-        }),
-      );
-
-      // Deduplicate and merge concept lists
-      const seenConceptNames = new Set<string>();
-      const rawConcepts: AiExtractedConcept[] = [];
-      let generatedSummary: string | undefined;
-
-      for (const res of chunkResponses) {
-        if (!generatedSummary && res.courseSummary) {
-          generatedSummary = res.courseSummary;
-        }
-        for (const concept of res.concepts) {
-          const key = concept.name.trim().toLowerCase();
-          if (!seenConceptNames.has(key)) {
-            seenConceptNames.add(key);
-            rawConcepts.push(concept);
-          }
-        }
-      }
-
-      if (rawConcepts.length === 0) {
-        throw new Error(
-          'AI generated invalid concepts response: concepts: At least one concept is required',
-        );
-      }
       const chunks = this.splitIntoChunks(combinedText);
       const chunkResults = await Promise.all(
         chunks.map((chunk) =>
@@ -274,7 +226,13 @@ export class GenerationPipelineService {
         const sessionConcepts: AiExtractedConcept[] = (
           rawSession.conceptNames ?? []
         )
-          .map((name) => rawConcepts.find((c) => c.name === name))
+          .map((name) =>
+            rawConcepts.find(
+              (c) =>
+                c.name === name ||
+                c.name.trim().toLowerCase() === name.trim().toLowerCase(),
+            ),
+          )
           .filter((c): c is AiExtractedConcept => c !== undefined);
 
         for (const rawConcept of sessionConcepts) {
@@ -310,7 +268,7 @@ export class GenerationPipelineService {
           const quiz = await this.quizRepository.create({
             sessionId: session.id,
             passingThreshold: rawQuiz.passingThreshold ?? 70,
-            xpReward: 100,
+            xpReward: session.xpReward ?? 100,
           });
 
           for (const rawQ of rawQuiz.questions ?? []) {
@@ -534,6 +492,118 @@ export class GenerationPipelineService {
     }
   }
 
+  checkSubstantiveDuplication(
+    practiceRaw: unknown,
+    challengeRaw: unknown,
+  ): boolean {
+    const practiceStr =
+      typeof practiceRaw === 'string'
+        ? practiceRaw.trim()
+        : JSON.stringify(practiceRaw ?? '');
+    const challengeStr =
+      typeof challengeRaw === 'string'
+        ? challengeRaw.trim()
+        : JSON.stringify(challengeRaw ?? '');
+
+    if (!practiceStr || !challengeStr) return false;
+    if (practiceStr === challengeStr) return true;
+
+    // Parse JSON if possible to inspect internal structures
+    let pObj: Record<string, unknown> | null = null;
+    let cObj: Record<string, unknown> | null = null;
+    try {
+      pObj = JSON.parse(
+        practiceStr.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim(),
+      );
+    } catch {
+      pObj = null;
+    }
+    try {
+      cObj = JSON.parse(
+        challengeStr.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1').trim(),
+      );
+    } catch {
+      cObj = null;
+    }
+
+    if (pObj && cObj) {
+      const pType = String(pObj.type || '').toLowerCase();
+      const cType = String(cObj.type || '').toLowerCase();
+
+      // If both are matching, check if pairs overlap >= 50%
+      if (pType === 'matching' && cType === 'matching') {
+        const pPairs = Array.isArray(pObj.pairs)
+          ? (pObj.pairs as Array<{
+              left?: string;
+              right?: string;
+              item?: string;
+              match?: string;
+            }>)
+          : Array.isArray(pObj.items)
+            ? (pObj.items as Array<{
+                left?: string;
+                right?: string;
+                item?: string;
+                match?: string;
+              }>)
+            : [];
+        const cPairs = Array.isArray(cObj.pairs)
+          ? (cObj.pairs as Array<{
+              left?: string;
+              right?: string;
+              item?: string;
+              match?: string;
+            }>)
+          : Array.isArray(cObj.items)
+            ? (cObj.items as Array<{
+                left?: string;
+                right?: string;
+                item?: string;
+                match?: string;
+              }>)
+            : [];
+
+        if (pPairs.length > 0 && cPairs.length > 0) {
+          const pSet = new Set(
+            pPairs.map(
+              (p) =>
+                `${String(p.left || p.item || '')
+                  .trim()
+                  .toLowerCase()}:::${String(p.right || p.match || '')
+                  .trim()
+                  .toLowerCase()}`,
+            ),
+          );
+          let matchCount = 0;
+          for (const cp of cPairs) {
+            const key = `${String(cp.left || cp.item || '')
+              .trim()
+              .toLowerCase()}:::${String(cp.right || cp.match || '')
+              .trim()
+              .toLowerCase()}`;
+            if (pSet.has(key)) matchCount++;
+          }
+          if (matchCount / Math.max(pPairs.length, cPairs.length) >= 0.5) {
+            return true;
+          }
+        }
+      }
+
+      // Check stripped equality (ignoring id, title, and formatting)
+      const pCopy = { ...pObj };
+      const cCopy = { ...cObj };
+      delete pCopy.id;
+      delete pCopy.title;
+      delete cCopy.id;
+      delete cCopy.title;
+      if (JSON.stringify(pCopy) === JSON.stringify(cCopy)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private validateSessions(
     sessions: AiSession[],
     concepts: AiExtractedConcept[],
@@ -541,14 +611,32 @@ export class GenerationPipelineService {
     if (sessions.length === 0) {
       throw new Error('AI returned no sessions from the session plan.');
     }
-    const conceptNames = new Set(concepts.map((c) => c.name));
+    const conceptNameMap = new Map<string, string>();
+    for (const c of concepts) {
+      conceptNameMap.set(c.name.trim().toLowerCase(), c.name);
+    }
+
     for (const s of sessions) {
+      if (Array.isArray(s.conceptNames)) {
+        s.conceptNames = s.conceptNames.map((name) => {
+          const canonical = conceptNameMap.get(name.trim().toLowerCase());
+          return canonical ?? name;
+        });
+      }
+
       for (const name of s.conceptNames ?? []) {
-        if (!conceptNames.has(name)) {
+        if (!conceptNameMap.has(name.trim().toLowerCase())) {
           this.logger.warn(
             `Session "${s.title}" references unknown concept "${name}" — skipped`,
           );
         }
+      }
+
+      // Validate that guidedPractice and challenge are not substantively duplicated exercises
+      if (this.checkSubstantiveDuplication(s.guidedPractice, s.challenge)) {
+        throw new Error(
+          `Session plan rejected: session "${s.title}" has identical guidedPractice and challenge payloads. Guided practice and applied challenge must be distinct exercises.`,
+        );
       }
     }
     this.validateAdaptiveActivityTypes(sessions);
@@ -584,33 +672,59 @@ Extract between 5 and 30 concepts. Focus on the most important ideas.`;
   private systemPromptSessions(
     language: CourseGenerationLanguage = 'es',
   ): string {
-    const guidedPracticeDesc =
-      AiSessionPlanItemSchema.shape.guidedPractice.description ?? '';
-    const challengeDesc =
-      AiSessionPlanItemSchema.shape.challenge.description ?? '';
-
     return `You are an expert academic curriculum designer.
 ${this.languageInstruction(language)}
 Given a list of concepts extracted from study material, organize them into logical learning sessions.
-Return ONLY a JSON object with key "sessions" containing an array of session objects.
-Each session must have:
-  sequenceOrder (integer starting at 1), title, learningObjective, durationMinutes (10-60),
-  xpReward (50 or 100), introTitle, introContent (2-3 paragraphs), introKeyTakeaway (1 sentence),
-  introCodeSnippet (optional markdown code block),
-  guidedPractice (${guidedPracticeDesc}),
-  challenge (${challengeDesc}),
-  conceptNames (array of concept names from the provided list).
+Return ONLY a JSON object with this exact top-level structure:
+{
+  "sessions": [
+    {
+      "sequenceOrder": 1,
+      "title": "Title of session",
+      "learningObjective": "Clear learning objective",
+      "durationMinutes": 30,
+      "xpReward": 100,
+      "introTitle": "Introduction title",
+      "introContent": "2-3 paragraphs introducing the topic",
+      "introKeyTakeaway": "1 sentence key takeaway",
+      "introCodeSnippet": null,
+      "guidedPractice": "{\"type\": \"matching\", ...}",
+      "challenge": "{\"type\": \"multiple_choice\", ...}",
+      "conceptNames": ["Exact Concept Name 1", "Exact Concept Name 2"]
+    }
+  ]
+}
+
+CRITICAL RULES FOR "conceptNames":
+- Every session MUST include "conceptNames" as an array of strings.
+- Each string in "conceptNames" MUST match the exact name of a concept from the provided list.
+- Do NOT omit "conceptNames". Do NOT rename this field to "concepts", "concept_names", or anything else.
+- Every concept from the provided list must appear in exactly one session's "conceptNames" array.
+- Sessions MUST have at least one concept in "conceptNames".
+
+Supported activity types and their required JSON schemas (serialize as JSON string in guidedPractice and challenge):
+- "matching": {"type": "matching", "title": string, "instructions": string, "pairs": [{"id": string, "left": string, "right": string, "explanation": string}], "hint": string}
+- "ordering": {"type": "ordering", "title": string, "instructions": string, "items": [{"id": string, "text": string}], "correctOrder": string[], "hint": string}
+- "multiple_choice": {"type": "multiple_choice", "title": string, "instructions": string, "scenario": string, "options": [{"id": string, "text": string, "isCorrect": boolean, "feedback": string}], "hint": string, "explanation": string}
+- "fill_in_blank": {"type": "fill_in_blank", "title": string, "instructions": string, "sentence": string, "blanks": [{"index": number, "answer": string}], "hint": string, "explanation": string}
+- "true_false": {"type": "true_false", "title": string, "instructions": string, "statement": string, "correct": boolean, "justification": string}
+- "classify": {"type": "classify", "title": string, "instructions": string, "categories": string[], "items": [{"label": string, "correctCategory": string}], "hint": string}
+- "detect_error": {"type": "detect_error", "title": string, "instructions": string, "codeOrText": string, "errorType": string, "correctVersion": string, "hint": string, "explanation": string}
+- "predict_result": {"type": "predict_result", "title": string, "instructions": string, "codeOrText": string, "options": [{"id": string, "text": string}], "correctOptionId": string, "hint": string, "explanation": string}
 
 When choosing activity types for a session, follow these rules:
+- 'guidedPractice' and 'challenge' MUST be two completely distinct learning tasks within each session. They must NEVER repeat or duplicate the same exercise, task, question, or problem.
+- 'guidedPractice' is an interactive learning activity for foundational concepts, providing pedagogical hints and guided feedback (e.g. matching, ordering, fill_in_blank, classify).
+- 'challenge' is an independent, autonomous applied challenge testing the learner's ability to apply concepts to a different problem, scenario, code snippet, or diagnostic task without revealing hints during the attempt (e.g. multiple_choice, predict_result, detect_error, true_false).
+- 'guidedPractice' and 'challenge' within the same session MUST use different activity types.
+- Maintain variety across the entire course: distribute activity types across the available catalogue instead of repeatedly falling back to matching.
 - Use 'ordering' only if the content describes a sequential process with clear steps.
 - Use 'detect_error' only if the content involves code, formulas, or procedures.
 - Use 'predict_result' only if the content includes executable code or mathematical expressions.
 - Use 'classify' only if the content has at least 2 distinct categories with >= 2 items each.
+- NEVER generate a 'multiple_choice' activity with compound numbered scenarios or questions (e.g., "1. ... 2. ... 3. ...") that combine multiple cases into a single prompt while only allowing a single option selection. 'multiple_choice' MUST evaluate a single concrete scenario or question with exactly one correct answer. When there are multiple scenarios or cases to map to concepts/architectures, use 'classify' (or 'matching') instead.
 - Use 'fill_in_blank' and 'true_false' for any factual or conceptual content.
 - Never force a type if the content does not support it.
-- Aim for variety: do not repeat the same type more than twice per session.
-
-Supported activity types: "matching", "ordering", "multiple_choice", "fill_in_blank", "true_false", "classify", "detect_error", "predict_result".
 Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic, and serialized as a JSON string.`;
   }
 
@@ -621,7 +735,6 @@ Create between 3 and 8 sessions. Every concept must appear in exactly one sessio
     const conceptList = concepts
       .map((c) => `- ${c.name}: ${c.summary}`)
       .join('\n');
-    return `Concepts to organize:\n${conceptList}\n\nOriginal material context:\n${studyText}`;
     const maxChars = CHUNK_SIZE * MAX_CHUNKS;
     const truncated =
       studyText.length > maxChars

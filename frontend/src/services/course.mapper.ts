@@ -11,13 +11,19 @@ import type {
   SessionConcept,
   LearningActivity,
 } from '../types/course'
-import { parseOrBuildActivity, validateActivity } from './activity.parser.ts'
+import {
+  parseOrBuildActivity,
+  validateActivity,
+  areActivitiesSubstantivelyDuplicate,
+  buildChallengeFallbackFromConcepts,
+} from './activity.parser.ts'
 
 export interface BackendCourse {
   id: string
   name: string
   description: string | null
   bannerKey?: string | null
+  bannerUrl?: string | null
   status: string
   createdAt: string
   updatedAt: string
@@ -176,10 +182,10 @@ export function buildCurrentSessionForCourse(
     totalSessions,
     progressPercent,
     durationMinutes: currentSession.durationMinutes || 15,
-    concepts: Array.isArray(currentSession.concepts)
-      ? currentSession.concepts.length
-      : typeof currentSession.concepts === 'number'
-        ? currentSession.concepts
+    concepts: Array.isArray((currentSession as unknown as { concepts?: unknown[] }).concepts)
+      ? (currentSession as unknown as { concepts?: unknown[] }).concepts!.length
+      : typeof (currentSession as unknown as { concepts?: number }).concepts === 'number'
+        ? (currentSession as unknown as { concepts?: number }).concepts!
         : Array.isArray((currentSession as { conceptNames?: string[] }).conceptNames)
           ? (currentSession as { conceptNames?: string[] }).conceptNames!.length
           : 0,
@@ -192,6 +198,7 @@ export interface GenerationStatusResponse {
   courseId: string
   courseName: string
   bannerKey?: string | null
+  bannerUrl?: string | null
   status: string
   progressPercent: number
   currentStepIndex: number
@@ -245,6 +252,20 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/**
+ * Extrae un prompt legible desde una actividad embebida.
+ * Evita que el JSON crudo sea usado como texto visible en la UI (R1).
+ */
+function resolveActivityPrompt(act: LearningActivity): string {
+  if (act.instructions && act.instructions.trim().length > 0) {
+    return act.instructions.trim()
+  }
+  if (act.title && act.title.trim().length > 0) {
+    return act.title.trim()
+  }
+  return ''
+}
+
 export function parsePracticeExercise(
   raw: string,
   fallbackPrompt: string,
@@ -266,10 +287,37 @@ export function parsePracticeExercise(
     }
   }
 
+  // R1 fix: cuando hay una actividad interactiva embebida, derivar un prompt legible
+  // de su título/instrucciones en lugar de exponer el JSON crudo como texto visible.
+  // SessionPracticeBlock comprueba exercise.activity y delega a ActivityContainer.
+  if (embeddedActivity) {
+    const activityPrompt = resolveActivityPrompt(embeddedActivity)
+    return {
+      id: embeddedActivity.id || `practice-${Date.now()}`,
+      prompt: activityPrompt || fallbackPrompt,
+      context: embeddedActivity.context,
+      options: [
+        {
+          id: 'opt-1',
+          text: 'He comprendido la explicación y completado el ejercicio reflexivo.',
+          isCorrect: true,
+          feedback: '¡Excelente! Continuemos al siguiente paso para consolidar el aprendizaje.',
+        },
+        {
+          id: 'opt-2',
+          text: 'Requiero repasar los conceptos clave antes de continuar.',
+          isCorrect: false,
+          feedback: 'Recuerda revisar los conceptos clave de la sesión antes de avanzar.',
+        },
+      ],
+      activity: embeddedActivity,
+    }
+  }
+
   try {
     const parsed = JSON.parse(jsonContent)
     if (parsed && typeof parsed === 'object') {
-      const prompt =
+      const candidate =
         parsed.prompt ||
         parsed.instruction ||
         parsed.instructions ||
@@ -277,8 +325,14 @@ export function parsePracticeExercise(
         parsed.description ||
         parsed.task ||
         parsed.text ||
-        trimmed ||
-        fallbackPrompt
+        parsed.question
+      const prompt =
+        typeof candidate === 'string' &&
+        candidate.trim().length > 0 &&
+        !candidate.trim().startsWith('{')
+          ? candidate.trim()
+          : fallbackPrompt
+
       if (Array.isArray(parsed.options) && parsed.options.length > 0) {
         return {
           id: parsed.id || `practice-${Date.now()}`,
@@ -312,9 +366,14 @@ export function parsePracticeExercise(
   } catch {
     // not JSON, fallback to interactive reflection
   }
+  const safePrompt =
+    trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('```')
+      ? trimmed
+      : fallbackPrompt
+
   return {
     id: `practice-${Date.now()}`,
-    prompt: trimmed || fallbackPrompt,
+    prompt: safePrompt,
     options: [
       {
         id: 'opt-1',
@@ -339,11 +398,12 @@ export function mapBackendCourseToFrontend(
 ): Course {
   const completedSessions = prog?.completedSessions ?? 0
   const totalSessions = prog?.totalSessions ?? 0
+  const resolvedBannerKey = course.bannerKey || course.bannerUrl || undefined
   return {
     id: course.id,
     name: course.name,
     description: course.description || undefined,
-    ...(course.bannerKey ? { bannerKey: course.bannerKey } : {}),
+    ...(resolvedBannerKey ? { bannerKey: resolvedBannerKey } : {}),
     status: (course.status === 'GENERATING' ? 'PROCESSING' : course.status) as Course['status'],
     progress: {
       completedSessions,
@@ -430,9 +490,10 @@ export function mapBackendLearningPath(
     })
   }
 
-  const completedCount = nodes.filter((n) => n.status === 'COMPLETED').length
-  const totalCount = nodes.length
-  const currentSession = nodes.find((n) => n.status === 'CURRENT' && n.type === 'SESSION')
+  const sessionNodes = nodes.filter((n) => n.type === 'SESSION')
+  const completedCount = sessionNodes.filter((n) => n.status === 'COMPLETED').length
+  const totalCount = sessionNodes.length
+  const currentSession = sessionNodes.find((n) => n.status === 'CURRENT')
 
   return {
     courseId: course.id,
@@ -472,7 +533,7 @@ export function mapBackendStudySession(
     'practice',
   )
 
-  const challengeActivity = parseOrBuildActivity(
+  let challengeActivity = parseOrBuildActivity(
     session.challenge,
     sessionConcepts,
     {
@@ -483,6 +544,20 @@ export function mapBackendStudySession(
     },
     'challenge',
   )
+
+  // Ensure substantive distinctness between guided practice and applied challenge
+  if (areActivitiesSubstantivelyDuplicate(guidedPracticeActivity, challengeActivity)) {
+    challengeActivity = buildChallengeFallbackFromConcepts(
+      sessionConcepts,
+      {
+        sessionId: session.id,
+        sessionTitle: session.title,
+        learningObjective: session.learningObjective,
+        phase: 'challenge',
+      },
+      session.challenge,
+    )
+  }
 
   const guidedPractice = parsePracticeExercise(
     session.guidedPractice,
@@ -548,7 +623,7 @@ export function mapBackendQuiz(
       explanation: '',
     })),
     passingThreshold: data.passingThreshold,
-    xpReward: data.xpReward,
+    xpReward: session?.xpReward || data.xpReward,
   }
 }
 

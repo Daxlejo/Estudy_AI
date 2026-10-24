@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   IconArrowRight,
@@ -10,26 +11,73 @@ import type { CurrentSession } from '../../types/course'
 import ProgressBar from '../ui/ProgressBar'
 import ProgressPath, { type PathNode } from './ProgressPath'
 import { useTranslation } from '../../i18n'
+import { useAuth } from '../../context/AuthContext'
+import { getUserSettings, USER_SETTINGS_UPDATED_EVENT } from '../../settings/userSettings'
 
 interface CurrentSessionCardProps {
   session: CurrentSession
 }
 
-/** Ventana de la ruta alrededor de la sesión actual: 4 completadas, la actual y 2 bloqueadas. */
-function buildPreviewNodes(sessionNumber: number): PathNode[] {
-  const first = Math.max(1, sessionNumber - 4)
-  const last = sessionNumber + 2
+/**
+ * Construye los nodos del stepper solo para las sesiones reales de estudio (1..totalSessions)
+ * y añade un último nodo de copa (trofeo) que representa el Examen Final sin sumarlo al conteo X/Y.
+ */
+function buildPreviewNodes(session: CurrentSession, finalExamLabel: string): PathNode[] {
+  const totalSessions = Math.max(1, session.totalSessions)
+  const currentNum = Math.min(Math.max(1, session.sessionNumber), totalSessions)
+  const completedCount = Math.min(Math.max(0, session.completedSessions), totalSessions)
 
-  return Array.from({ length: last - first + 1 }, (_, i) => {
+  let first = 1
+  let last = totalSessions
+
+  if (totalSessions > 7) {
+    first = Math.max(1, Math.min(currentNum - 3, totalSessions - 6))
+    last = Math.min(totalSessions, first + 6)
+  }
+
+  const sessionNodes: PathNode[] = Array.from({ length: last - first + 1 }, (_, i) => {
     const number = first + i
-    const status = number < sessionNumber ? 'completed' : number === sessionNumber ? 'current' : 'locked'
+    const status =
+      number <= completedCount || number < currentNum
+        ? 'completed'
+        : number === currentNum
+          ? 'current'
+          : 'locked'
     return { label: `${number}`, status }
   })
+
+  sessionNodes.push({
+    label: finalExamLabel,
+    status: completedCount >= totalSessions ? 'current' : 'locked',
+    isFinalExam: true,
+  })
+
+  return sessionNodes
 }
 
 function CurrentSessionCard({ session }: CurrentSessionCardProps) {
   const { t, formatNumber } = useTranslation()
-  const nodes = buildPreviewNodes(session.sessionNumber)
+  const { user } = useAuth()
+  const [liveStreakDays, setLiveStreakDays] = useState<number>(() => {
+    const settings = getUserSettings(user?.id)
+    return settings.streakDays > 0 ? settings.streakDays : session.streakDays
+  })
+
+  useEffect(() => {
+    const syncStreak = () => {
+      const settings = getUserSettings(user?.id)
+      setLiveStreakDays(settings.streakDays)
+    }
+    syncStreak()
+    window.addEventListener(USER_SETTINGS_UPDATED_EVENT, syncStreak)
+    window.addEventListener('storage', syncStreak)
+    return () => {
+      window.removeEventListener(USER_SETTINGS_UPDATED_EVENT, syncStreak)
+      window.removeEventListener('storage', syncStreak)
+    }
+  }, [user?.id, session.streakDays])
+
+  const nodes = buildPreviewNodes(session, t('finalExam.badge'))
 
   return (
     <section
@@ -79,7 +127,7 @@ function CurrentSessionCard({ session }: CurrentSessionCardProps) {
           </li>
           <li className="flex items-center gap-1.5">
             <IconFlame className="size-4 text-tertiary" />
-            {t('common.days', { count: formatNumber(session.streakDays) })}
+            {t('common.days', { count: formatNumber(liveStreakDays) })}
           </li>
         </ul>
 

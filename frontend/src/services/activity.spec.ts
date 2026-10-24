@@ -352,12 +352,14 @@ test('Session Mapper - Activity Integration', async (t: TestContext) => {
     assert.strictEqual(studySession.challengeActivity?.type, 'matching')
   })
 
-  await t.test('parsePracticeExercise attaches provided activity and preserves prompt', () => {
+  // R1 regression: cuando se provee una actividad, el prompt debe derivarse de sus
+  // instrucciones/título, nunca del JSON crudo almacenado en guidedPractice/challenge.
+  await t.test('parsePracticeExercise derives prompt from activity instructions, not raw JSON', () => {
     const sampleActivity: MatchingActivity = {
       id: 'sample-act',
       type: 'matching',
-      title: 'Prueba',
-      instructions: 'Instrucciones',
+      title: 'Prueba de Emparejamiento',
+      instructions: 'Relaciona cada concepto con su definición.',
       explanation: 'Explicación del ejercicio',
       xpReward: 10,
       pairs: [
@@ -374,9 +376,102 @@ test('Session Mapper - Activity Integration', async (t: TestContext) => {
       ],
     }
 
-    const exercise = parsePracticeExercise('Instrucción reflexiva', 'Fallback', sampleActivity)
-    assert.strictEqual(exercise.prompt, 'Instrucción reflexiva')
+    // R1: cuando se pasa actividad, el prompt viene de activity.instructions (no del raw)
+    const exercise = parsePracticeExercise('{"type":"matching","pairs":[]}', 'Fallback', sampleActivity)
+    assert.strictEqual(exercise.prompt, 'Relaciona cada concepto con su definición.',
+      'R1: prompt must be activity.instructions, not raw JSON string')
     assert.strictEqual(exercise.activity, sampleActivity)
+    // El JSON crudo NO debe aparecer en el prompt
+    assert.ok(!exercise.prompt.startsWith('{'), 'R1: prompt must NOT start with { (raw JSON)')
+  })
+
+  // R1 regression: cuando guidedPractice/challenge contiene JSON de actividad sin campo
+  // prompt, parsePracticeExercise no debe usar el JSON crudo como texto visible.
+  await t.test('parsePracticeExercise does not expose raw JSON as prompt for embedded activity types', () => {
+    const classifyJson = JSON.stringify({
+      type: 'classify',
+      title: 'Clasificar Paradigmas',
+      instructions: 'Asigna cada concepto a su paradigma de programación.',
+      categories: ['POO', 'Funcional'],
+      items: [
+        { label: 'Herencia', correctCategory: 'POO' },
+        { label: 'Inmutabilidad', correctCategory: 'Funcional' },
+      ],
+      explanation: 'Los paradigmas agrupan estilos de programación.',
+      xpReward: 20,
+    })
+
+    // Sin actividad previa: debe parsear el JSON y usar instrucciones como prompt
+    const exercise = parsePracticeExercise(classifyJson, 'Fallback classify')
+    assert.ok(exercise.activity, 'R1: classify JSON should produce an embedded activity')
+    assert.strictEqual(exercise.activity!.type, 'classify')
+    // El prompt NO debe ser el JSON crudo
+    assert.ok(!exercise.prompt.startsWith('{'), 'R1: prompt must NOT be raw JSON string')
+    assert.ok(exercise.prompt.length > 0, 'R1: prompt must be non-empty')
+    assert.strictEqual(exercise.prompt, 'Asigna cada concepto a su paradigma de programación.',
+      'R1: prompt should match the activity instructions')
+  })
+
+  // R2/R3 regression: guided practice y applied challenge deben tener IDs y tipos distintos
+  await t.test('mapBackendStudySession produces distinct activities for guidedPractice and challenge', () => {
+    const sessionWithJsonActivities: BackendSession = {
+      ...backendSession,
+      guidedPractice: JSON.stringify({
+        type: 'classify',
+        title: 'Práctica Guiada: Clasificar Conceptos',
+        instructions: 'Clasifica cada elemento en su categoría correcta.',
+        categories: ['A', 'B'],
+        items: [
+          { label: 'Item 1', correctCategory: 'A' },
+          { label: 'Item 2', correctCategory: 'B' },
+        ],
+        explanation: 'La clasificación refuerza la comprensión categorial.',
+        xpReward: 20,
+      }),
+      challenge: JSON.stringify({
+        type: 'true_false',
+        title: 'Desafío Aplicado: Verdadero o Falso',
+        instructions: 'Evalúa si la afirmación es verdadera o falsa.',
+        statement: 'Un grafo dirigido acíclico puede contener ciclos.',
+        correct: false,
+        justification: 'Los DAGs son por definición grafos sin ciclos.',
+        explanation: 'Un DAG nunca contiene ciclos, de ahí su nombre.',
+        xpReward: 25,
+      }),
+    }
+
+    const studySession = mapBackendStudySession(
+      sessionWithJsonActivities,
+      backendConcepts,
+      {
+        id: 'c-alg',
+        name: 'Algoritmos y Estructuras de Datos',
+        description: 'Curso avanzado',
+        status: 'READY',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      5,
+      'q-alg-1',
+    )
+
+    // R2/R3: las dos actividades deben ser distintas (IDs y tipos diferentes)
+    const gpActivity = studySession.guidedPractice.activity
+    const chActivity = studySession.challenge.activity
+    assert.ok(gpActivity, 'R2/R3: guidedPractice must have activity')
+    assert.ok(chActivity, 'R2/R3: challenge must have activity')
+    assert.notStrictEqual(gpActivity?.id, chActivity?.id,
+      'R2/R3: guidedPractice and challenge must have distinct activity IDs')
+    assert.strictEqual(gpActivity?.type, 'classify',
+      'R2/R3: guidedPractice should use the classify activity from JSON')
+    assert.strictEqual(chActivity?.type, 'true_false',
+      'R2/R3: challenge should use the true_false activity from JSON')
+
+    // R1: los prompts no deben ser JSON crudo
+    assert.ok(!studySession.guidedPractice.prompt.startsWith('{'),
+      'R1: guidedPractice.prompt must not be raw JSON')
+    assert.ok(!studySession.challenge.prompt.startsWith('{'),
+      'R1: challenge.prompt must not be raw JSON')
   })
 })
 
@@ -577,3 +672,377 @@ test('Activity Internationalization - Key Parity & Content', async (t: TestConte
   })
 })
 
+test('R1 & R5 Regressions — Robust JSON Parsing and Distinct Guided/Challenge Fallbacks', async (t: TestContext) => {
+  const dummyConcepts: SessionConcept[] = [
+    { id: 'c1', name: 'Concepto 1', summary: 'Resumen 1', detail: 'Detalle 1' },
+    { id: 'c2', name: 'Concepto 2', summary: 'Resumen 2', detail: 'Detalle 2' },
+    { id: 'c3', name: 'Concepto 3', summary: 'Resumen 3', detail: 'Detalle 3' },
+    { id: 'c4', name: 'Concepto 4', summary: 'Resumen 4', detail: 'Detalle 4' },
+  ]
+
+  const contextGP = {
+    sessionId: 'sess-1',
+    sessionTitle: 'Sesión de Arquitectura',
+    learningObjective: 'Comprender principios de diseño',
+    phase: 'guidedPractice' as const,
+  }
+
+  const contextCH = {
+    ...contextGP,
+    phase: 'challenge' as const,
+  }
+
+  await t.test('parses classify JSON without top-level categories array without falling back to matching', () => {
+    const rawClassifyJson = JSON.stringify({
+      type: 'classify',
+      instructions: 'Clasifica según el paradigma',
+      items: [
+        { label: 'Map / Filter', correctCategory: 'Funcional' },
+        { label: 'Clases / Métodos', correctCategory: 'POO' },
+      ],
+    })
+
+    const parsed = parseOrBuildActivity(rawClassifyJson, dummyConcepts, contextGP)
+    assert.strictEqual(parsed.type, 'classify')
+    assert.ok(!parsed.instructions.includes('{'), 'Instructions must not contain raw JSON')
+    assert.ok(!parsed.title.includes('{'), 'Title must not contain raw JSON')
+  })
+
+  await t.test('parses multiple_choice JSON with question and string options correctly', () => {
+    const rawMcJson = JSON.stringify({
+      type: 'multiple_choice',
+      question: '¿Qué principio promueve la segregación de interfaces?',
+      options: ['ISP', 'OCP', 'LSP', 'SRP'],
+      correctOptionIndex: 0,
+      explanation: 'ISP es Interface Segregation Principle',
+    })
+
+    const parsed = parseOrBuildActivity(rawMcJson, dummyConcepts, contextGP)
+    assert.strictEqual(parsed.type, 'multiple_choice')
+    assert.ok(!parsed.instructions.includes('{'), 'Instructions must not contain raw JSON')
+    assert.strictEqual(parsed.instructions, '¿Qué principio promueve la segregación de interfaces?')
+  })
+
+  await t.test('parses matching JSON without explicit title or instructions cleanly without raw JSON text', () => {
+    const rawMatchingJson = JSON.stringify({
+      type: 'matching',
+      pairs: [
+        { id: '1', left: 'REST', right: 'Stateless HTTP' },
+        { id: '2', left: 'GraphQL', right: 'Single endpoint query' },
+      ],
+    })
+
+    const parsed = parseOrBuildActivity(rawMatchingJson, dummyConcepts, contextGP)
+    assert.strictEqual(parsed.type, 'matching')
+    assert.ok(!parsed.instructions.includes('{'), 'Instructions must not contain raw JSON')
+    assert.ok(!parsed.title.includes('{'), 'Title must not contain raw JSON')
+    assert.ok(parsed.instructions.length > 0)
+  })
+
+  await t.test('gracefully handles malformed JSON without leaking raw string into prompt or instructions', () => {
+    const malformed = '{"type": "broken_unclosed_json: [1, 2, 3'
+    const parsed = parseOrBuildActivity(malformed, dummyConcepts, contextGP)
+    assert.strictEqual(parsed.type, 'matching')
+    assert.ok(!parsed.instructions.includes('{'), 'Fallback instructions must not contain raw input')
+    assert.ok(!parsed.instructions.includes('broken'), 'Fallback instructions must not contain error tokens')
+  })
+
+  await t.test('generates distinct fallback activities for guidedPractice vs challenge', () => {
+    const gpFallback = parseOrBuildActivity('', dummyConcepts, contextGP)
+    const chFallback = parseOrBuildActivity('', dummyConcepts, contextCH)
+
+    assert.notStrictEqual(gpFallback.id, chFallback.id, 'IDs must be distinct')
+    assert.notStrictEqual(gpFallback.title, chFallback.title, 'Titles must be distinct')
+    assert.notStrictEqual(gpFallback.instructions, chFallback.instructions, 'Instructions must be distinct')
+    assert.notStrictEqual(gpFallback.type, chFallback.type, 'Activity types must be distinct between GP and CH fallback')
+  })
+
+  await t.test('eliminates repeated matching exercises in 2-concept session (Clase & Objeto)', () => {
+    const twoConcepts: BackendConcept[] = [
+      {
+        id: 'c-clase',
+        sessionId: 's-poo-1',
+        name: 'Clase',
+        summary: 'Una clase es una plantilla que define atributos y métodos.',
+        detail: 'Define la estructura base para los objetos.',
+        example: "Por ejemplo, una clase 'Coche' puede tener atributos como 'color' y 'marca'.",
+      },
+      {
+        id: 'c-objeto',
+        sessionId: 's-poo-1',
+        name: 'Objeto',
+        summary: 'Un objeto es una instancia concreta de una clase.',
+        detail: 'Representa una entidad con estado y comportamiento concretos.',
+        example: "Por ejemplo, un objeto de la clase 'Coche' podría ser un coche específico rojo Toyota.",
+      },
+    ]
+
+    const legacySession: BackendSession = {
+      id: 's-poo-1',
+      courseId: 'c-poo',
+      sequenceOrder: 1,
+      title: 'Introducción a Clases y Objetos',
+      learningObjective: 'Comprender la diferencia entre clase y objeto en POO',
+      durationMinutes: 20,
+      xpReward: 50,
+      isUnlocked: true,
+      introTitle: 'Clases y Objetos',
+      introContent: 'Conceptos fundamentales de POO.',
+      introKeyTakeaway: 'Una clase es el plano; un objeto es la casa construida.',
+      introCodeSnippet: null,
+      guidedPractice: "Para practicar, crearemos una clase simple llamada 'Coche' que tendrá atributos...",
+      challenge: "Como desafío, intenta extender la clase 'Coche' para incluir un método que calcule la edad...",
+      createdAt: new Date().toISOString(),
+    }
+
+    const mapped = mapBackendStudySession(
+      legacySession,
+      twoConcepts,
+      {
+        id: 'c-poo',
+        name: 'Programación Orientada a Objetos',
+        description: 'Curso de POO',
+        status: 'READY',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      3,
+      'q-1',
+    )
+
+    assert.ok(mapped.guidedPracticeActivity, 'GP activity must exist')
+    assert.ok(mapped.challengeActivity, 'CH activity must exist')
+    // Guided practice is interactive matching with hints
+    assert.strictEqual(mapped.guidedPracticeActivity!.type, 'matching')
+    // Applied challenge MUST NOT be matching! It must be an applied scenario
+    assert.notStrictEqual(
+      mapped.challengeActivity!.type,
+      'matching',
+      'Applied challenge must not repeat matching exercise',
+    )
+    assert.strictEqual(mapped.challengeActivity!.type, 'multiple_choice')
+    assert.ok(
+      !mapped.challenge.prompt.startsWith('{'),
+      'Raw JSON must never leak into challenge prompt',
+    )
+    assert.ok(
+      !mapped.guidedPractice.prompt.startsWith('{'),
+      'Raw JSON must never leak into GP prompt',
+    )
+  })
+
+  await t.test('detects and eliminates duplicate matching exercises even when payloads were generated as matching', () => {
+    const twoConcepts: BackendConcept[] = [
+      {
+        id: 'c1',
+        sessionId: 's-1',
+        name: 'Cliente',
+        summary: 'Solicita recursos al servidor',
+        detail: 'Interfaz del usuario',
+        example: null,
+      },
+      {
+        id: 'c2',
+        sessionId: 's-1',
+        name: 'Servidor',
+        summary: 'Procesa solicitudes y almacena datos',
+        detail: 'Lógica de negocio y persistencia',
+        example: null,
+      },
+    ]
+
+    const duplicateMatchingSession: BackendSession = {
+      id: 's-dup-1',
+      courseId: 'c-net',
+      sequenceOrder: 1,
+      title: 'Cliente-Servidor',
+      learningObjective: 'Diferenciar cliente y servidor',
+      durationMinutes: 15,
+      xpReward: 50,
+      isUnlocked: true,
+      introTitle: 'Intro',
+      introContent: 'Contenido',
+      introKeyTakeaway: 'Key takeaway',
+      introCodeSnippet: null,
+      guidedPractice: JSON.stringify({
+        type: 'matching',
+        pairs: [
+          { id: 'p1', left: 'Cliente', right: 'Solicita recursos' },
+          { id: 'p2', left: 'Servidor', right: 'Procesa solicitudes' },
+        ],
+      }),
+      // Challenge that merely duplicates the exact same matching exercise
+      challenge: JSON.stringify({
+        type: 'matching',
+        pairs: [
+          { id: 'p2', left: 'Servidor', right: 'Procesa solicitudes' },
+          { id: 'p1', left: 'Cliente', right: 'Solicita recursos' },
+        ],
+      }),
+      createdAt: new Date().toISOString(),
+    }
+
+    const mapped = mapBackendStudySession(
+      duplicateMatchingSession,
+      twoConcepts,
+      null,
+      1,
+      'q-1',
+    )
+
+    assert.strictEqual(mapped.guidedPracticeActivity!.type, 'matching')
+    // Substantive duplication was detected and challenge was replaced with a distinct applied challenge!
+    assert.strictEqual(mapped.challengeActivity!.type, 'multiple_choice')
+  })
+
+  await t.test('survives varied LLM payload structures for all 8 activity types without matching fallback', () => {
+    const dummyC: SessionConcept[] = [
+      { id: 'c1', name: 'Microservicios', summary: 'Servicios desacoplados e independientes', detail: 'Despliegue independiente' },
+      { id: 'c2', name: 'Monolito', summary: 'Aplicación unificada en un solo despliegue', detail: 'Simplicidad inicial' },
+    ]
+    const ctx = {
+      sessionId: 'sess-types',
+      sessionTitle: 'Arquitecturas',
+      learningObjective: 'Dominar patrones arquitectónicos',
+      phase: 'guidedPractice' as const,
+    }
+
+    // 1. matching with items/item/match
+    const matchItems = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'matching',
+        items: [
+          { item: 'Monolito', match: 'Todo en un solo despliegue' },
+          { item: 'Microservicios', match: 'Servicios desacoplados' },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(matchItems.type, 'matching')
+
+    // 2. multiple_choice with questions array
+    const mcQuestions = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'multiple_choice',
+        questions: [
+          {
+            question: '¿Qué arquitectura favorece el escalado independiente?',
+            options: ['Monolito', 'Microservicios'],
+            correctAnswer: 'Microservicios',
+          },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(mcQuestions.type, 'multiple_choice')
+
+    // 3. fill_in_blank with prompts array
+    const fibPrompts = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'fill_in_blank',
+        prompts: [
+          {
+            prompt: 'En la arquitectura de ___, cada servicio es independiente.',
+            answer: 'microservicios',
+          },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(fibPrompts.type, 'fill_in_blank')
+
+    // 4. true_false with statements array
+    const tfStatements = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'true_false',
+        statements: [
+          {
+            statement: 'Los microservicios siempre son más sencillos de desplegar que un monolito.',
+            isTrue: false,
+            justification: 'Requieren orquestación y mayor complejidad operativa.',
+          },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(tfStatements.type, 'true_false')
+
+    // 5. detect_error with codeSnippet and error
+    const errSnippet = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'detect_error',
+        codeSnippet: 'const x: number = "string";',
+        error: 'Asignación de string a variable de tipo number',
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(errSnippet.type, 'detect_error')
+
+    // 6. predict_result with question and expectedResult
+    const predResult = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'predict_result',
+        question: '¿Qué ocurre al ejecutar console.log(typeof NaN)?',
+        expectedResult: 'Imprime "number" en consola.',
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(predResult.type, 'predict_result')
+
+    // 7. classify with items
+    const classifyItems = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'classify',
+        items: [
+          { item: 'Django', category: 'Backend' },
+          { item: 'React', category: 'Frontend' },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(classifyItems.type, 'classify')
+
+    // 8. ordering with steps
+    const orderingSteps = parseOrBuildActivity(
+      JSON.stringify({
+        type: 'ordering',
+        steps: [
+          { step: 'Escribir código' },
+          { step: 'Ejecutar pruebas' },
+          { step: 'Desplegar a producción' },
+        ],
+      }),
+      dummyC,
+      ctx,
+    )
+    assert.strictEqual(orderingSteps.type, 'ordering')
+  })
+
+  await t.test('rejects multiple_choice with compound numbered scenarios (1. ... 2. ... 3. ...)', () => {
+    const compoundMcPayload = {
+      type: 'multiple_choice',
+      title: 'Identificando la arquitectura adecuada',
+      instructions: 'Selecciona la arquitectura de software más adecuada para cada caso de uso descrito.',
+      scenario:
+        '1. Un sistema de correo electrónico que necesita manejar múltiples usuarios de forma segura. 2. Una aplicación de gestión de tareas que se espera que crezca rápidamente. 3. Un sistema de domótica que responde a eventos en tiempo real.',
+      options: [
+        { id: '1', text: 'Arquitectura Cliente-Servidor', isCorrect: true },
+        { id: '2', text: 'Microservicios', isCorrect: true },
+        { id: '3', text: 'Arquitectura Orientada a Eventos', isCorrect: true },
+      ],
+    }
+
+    assert.strictEqual(
+      validateActivity(compoundMcPayload),
+      null,
+      'Compound numbered multiple_choice must be rejected by validateActivity',
+    )
+  })
+})

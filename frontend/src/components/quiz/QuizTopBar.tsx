@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconArrowLeft, IconSparkles } from '@tabler/icons-react'
+import { IconArrowLeft, IconFlame, IconSparkles } from '@tabler/icons-react'
 import type { Quiz } from '../../types/course'
 import { useTranslation } from '../../i18n'
+import { useAuth } from '../../context/AuthContext'
+import { getUserSettings, USER_SETTINGS_UPDATED_EVENT } from '../../settings/userSettings'
 
 interface QuizTopBarProps {
   quiz: Quiz
@@ -18,7 +21,27 @@ export function QuizTopBar({
   answeredCount,
   viewMode = 'answering',
 }: QuizTopBarProps) {
-  const { t } = useTranslation()
+  const { t, formatNumber } = useTranslation()
+  const { user } = useAuth()
+  const [{ xp, streakDays }, setStats] = useState(() => {
+    const s = getUserSettings(user?.id)
+    return { xp: s.xp, streakDays: s.streakDays }
+  })
+
+  useEffect(() => {
+    const syncStats = () => {
+      const s = getUserSettings(user?.id)
+      setStats({ xp: s.xp, streakDays: s.streakDays })
+    }
+    syncStats()
+    window.addEventListener(USER_SETTINGS_UPDATED_EVENT, syncStats)
+    window.addEventListener('storage', syncStats)
+    return () => {
+      window.removeEventListener(USER_SETTINGS_UPDATED_EVENT, syncStats)
+      window.removeEventListener('storage', syncStats)
+    }
+  }, [user?.id])
+
   const isEvaluatingOrReview = viewMode !== 'answering'
   const progressPercent = isEvaluatingOrReview
     ? 100
@@ -60,9 +83,9 @@ export function QuizTopBar({
           </div>
         </div>
 
-        {/* Lado derecho: Contador de preguntas y barra de avance */}
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="flex flex-col items-end gap-1">
+        {/* Lado derecho: Contador de preguntas, barra de avance y XP/Racha en vivo */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="hidden flex-col items-end gap-1 md:flex">
             <div className="flex items-center gap-2 text-xs">
               <span className="font-semibold text-text-primary">
                 {viewMode === 'result'
@@ -94,19 +117,30 @@ export function QuizTopBar({
             </div>
           </div>
 
-          {/* Recompensa XP sutil */}
-          <div
-            className="hidden items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold text-primary sm:inline-flex"
-            title={t('quiz.xpTooltip')}
-          >
-            <IconSparkles className="size-3.5 text-primary" />
-            <span>+{quiz.xpReward} XP</span>
+          {/* Contador total de XP y Racha en tiempo real */}
+          <div className="flex items-center gap-2">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold text-text-primary shadow-2xs"
+              title={`${t('nav.xp')}: ${formatNumber(xp)} XP (+${quiz.xpReward} XP)`}
+            >
+              <IconSparkles className="size-3.5 text-primary" />
+              <span>{formatNumber(xp)}</span>
+              <span className="text-[10px] font-medium text-text-secondary">XP</span>
+            </div>
+
+            <div
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold text-text-primary shadow-2xs"
+              title={`${t('nav.streak')}: ${formatNumber(streakDays)}`}
+            >
+              <IconFlame className="size-3.5 text-tertiary" />
+              <span>{formatNumber(streakDays)}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Barra de progreso inferior en dispositivos móviles */}
-      <div className="h-1 w-full bg-surface-high sm:hidden">
+      <div className="h-1 w-full bg-surface-high md:hidden">
         <div
           className="h-full bg-[linear-gradient(90deg,var(--primary),var(--secondary))] transition-all duration-300 ease-out"
           style={{ width: `${progressPercent}%` }}

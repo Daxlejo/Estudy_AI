@@ -449,6 +449,11 @@ test('retryQuiz with weakConceptIds', async (t: TestContext) => {
   const mockQuiz: Quiz = {
     id: 'quiz-1',
     sessionId: 'sess-1',
+    courseId: 'course-1',
+    courseTitle: 'Curso de Prueba',
+    sessionTitle: 'Sesión 1',
+    sessionNumber: 1,
+    totalSessions: 1,
     passingThreshold: 70,
     xpReward: 100,
     attemptNumber: 1,
@@ -532,7 +537,9 @@ test('course.mapper.ts — Dynamic Session Concept Count', async (t: TestContext
       id: 'course-1',
       name: 'Test Course',
       status: 'READY' as const,
-      progress: { completedSessions: 0, totalSessions: 1, sessions: [] },
+      materials: [],
+      createdAt: new Date().toISOString(),
+      progress: { completedSessions: 0, totalSessions: 1, progressPercent: 0, sessions: [] },
     }
     const mockSessions = [
       {

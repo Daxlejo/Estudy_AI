@@ -1,16 +1,59 @@
 import { Link } from 'react-router-dom'
 import { IconArrowLeft, IconSparkles, IconLayersLinked, IconCheck, IconTarget } from '@tabler/icons-react'
 import type { LearningPath } from '../../types/course'
+import ProgressPath, { type PathNode } from '../courses/ProgressPath'
 import { useTranslation } from '../../i18n'
 
 interface LearningPathHeaderProps {
   learningPath: LearningPath
 }
 
+function buildRouteStepperNodes(learningPath: LearningPath, finalExamLabel: string): PathNode[] {
+  const sessionNodes = learningPath.nodes.filter((n) => n.type === 'SESSION')
+  const examNode = learningPath.nodes.find((n) => n.type === 'FINAL_EXAM')
+
+  const mappedSessions: PathNode[] = sessionNodes.map((n) => ({
+    label: `${n.number}`,
+    status:
+      n.status === 'COMPLETED'
+        ? 'completed'
+        : n.status === 'CURRENT'
+          ? 'current'
+          : 'locked',
+  }))
+
+  const examStatus = examNode
+    ? examNode.status === 'COMPLETED'
+      ? 'completed'
+      : examNode.status === 'CURRENT'
+        ? 'current'
+        : 'locked'
+    : learningPath.completedCount >= learningPath.totalCount && learningPath.totalCount > 0
+      ? 'current'
+      : 'locked'
+
+  mappedSessions.push({
+    label: finalExamLabel,
+    status: examStatus,
+    isFinalExam: true,
+  })
+
+  return mappedSessions
+}
+
 export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
   const { t, formatNumber } = useTranslation()
-  const { courseId, courseName, completedCount, totalCount, progressPercent, nodes } = learningPath
+  const { courseId, courseName, nodes } = learningPath
+  const sessionNodes = nodes.filter((n) => n.type === 'SESSION')
+  const completedSessionsCount = sessionNodes.filter((n) => n.status === 'COMPLETED').length
+  const totalSessionsCount = sessionNodes.length > 0 ? sessionNodes.length : learningPath.totalCount
+  const sessionsProgressPercent =
+    totalSessionsCount > 0
+      ? Math.round((completedSessionsCount / totalSessionsCount) * 100)
+      : learningPath.progressPercent
+
   const currentNode = nodes.find((n) => n.status === 'CURRENT')
+  const stepperNodes = buildRouteStepperNodes(learningPath, t('finalExam.badge'))
 
   return (
     <div className="space-y-6">
@@ -58,12 +101,12 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
             </span>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-heading text-3xl font-extrabold text-primary">
-                {t('common.percent', { percent: formatNumber(progressPercent) })}
+                {t('common.percent', { percent: formatNumber(sessionsProgressPercent) })}
               </span>
               <span className="text-sm font-medium text-text-secondary">
                 ({t('common.sessionsCompleted', {
-                  completed: formatNumber(completedCount),
-                  total: formatNumber(totalCount),
+                  completed: formatNumber(completedSessionsCount),
+                  total: formatNumber(totalSessionsCount),
                 })})
               </span>
             </div>
@@ -72,13 +115,13 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-high px-3 py-1.5 text-xs font-semibold text-text-secondary">
               <IconCheck className="size-3.5 text-secondary" />
-              <span>{t('learningPath.passedCount', { count: formatNumber(completedCount) })}</span>
+              <span>{t('learningPath.passedCount', { count: formatNumber(completedSessionsCount) })}</span>
             </div>
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-high px-3 py-1.5 text-xs font-semibold text-text-secondary">
               <IconSparkles className="size-3.5 text-primary" />
               <span>
                 {t('learningPath.remainingCount', {
-                  count: formatNumber(totalCount - completedCount),
+                  count: formatNumber(Math.max(0, totalSessionsCount - completedSessionsCount)),
                 })}
               </span>
             </div>
@@ -92,15 +135,20 @@ export function LearningPathHeader({ learningPath }: LearningPathHeaderProps) {
             aria-label={`${t('learningPath.pathProgress')}: ${courseName}`}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={progressPercent}
+            aria-valuenow={sessionsProgressPercent}
             className="h-3 w-full overflow-hidden rounded-full bg-surface-high"
           >
             <div
               className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--secondary))] transition-all duration-500 ease-out"
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: `${sessionsProgressPercent}%` }}
             />
           </div>
         </div>
+
+        {/* Stepper visual de sesiones + copa del Examen Final */}
+        {stepperNodes.length > 0 && (
+          <ProgressPath nodes={stepperNodes} showLabels className="mt-6" />
+        )}
       </div>
     </div>
   )

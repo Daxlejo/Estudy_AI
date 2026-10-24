@@ -10,7 +10,6 @@ import {
   IconPencil,
   IconCircleCheckFilled,
   IconAlertCircleFilled,
-  IconBulb,
 } from '@tabler/icons-react'
 import type {
   FillInBlankActivity,
@@ -39,19 +38,12 @@ export function FillInBlankActivityView({
   const parts = activity.sentence.split(tokenRegex)
 
   const evalMap = React.useMemo(() => {
-    if (!evaluation) return new Map<number, (typeof evaluation.blankResults)[0]>()
+    if (!evaluation) return new Map<number, NonNullable<typeof evaluation>['blankResults'][number]>()
     return new Map(evaluation.blankResults.map((r) => [r.index, r]))
   }, [evaluation])
 
   return (
     <div className="space-y-6" role="region" aria-label="Actividad de rellenar espacios en blanco">
-      {activity.hint && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-text-secondary">
-          <IconBulb className="size-4 shrink-0 text-primary" />
-          <span className="leading-relaxed">{activity.hint}</span>
-        </div>
-      )}
-
       <div className="rounded-2xl border border-border/80 bg-surface p-6 shadow-sm md:p-8">
         <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-text-secondary">
           <IconPencil className="size-4 text-primary" />
