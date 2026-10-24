@@ -1,6 +1,5 @@
 import {
   IconBug,
-  IconBulb,
   IconCheck,
   IconX,
   IconSearch,
@@ -47,13 +46,6 @@ export function DetectErrorActivityView({
 
   return (
     <div className="space-y-6" role="region" aria-label="Actividad de detección de errores">
-      {activity.hint && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-text-secondary">
-          <IconBulb className="size-4 shrink-0 text-primary" />
-          <span className="leading-relaxed">{activity.hint}</span>
-        </div>
-      )}
-
       {/* Tipo de error a buscar */}
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-text-primary">

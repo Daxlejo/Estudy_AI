@@ -122,6 +122,73 @@ describe('Adaptive Activity Selection & Final Exam Types', () => {
     });
   });
 
+  describe('checkSubstantiveDuplication', () => {
+    it('detects identical raw strings', () => {
+      const str =
+        '{"type":"matching","pairs":[{"id":"1","left":"A","right":"B"}]}';
+      expect(service.checkSubstantiveDuplication(str, str)).toBe(true);
+    });
+
+    it('detects identical pairs even with reversed order and different IDs and titles', () => {
+      const gp = JSON.stringify({
+        id: 'act-1',
+        type: 'matching',
+        title: 'Práctica',
+        pairs: [
+          { id: '1', left: 'Clase', right: 'Molde' },
+          { id: '2', left: 'Objeto', right: 'Instancia' },
+        ],
+      });
+      const ch = JSON.stringify({
+        id: 'act-2',
+        type: 'matching',
+        title: 'Desafío',
+        pairs: [
+          { id: 'a', left: 'Objeto', right: 'Instancia' },
+          { id: 'b', left: 'Clase', right: 'Molde' },
+        ],
+      });
+      expect(service.checkSubstantiveDuplication(gp, ch)).toBe(true);
+    });
+
+    it('allows distinct exercises on the same concepts (different activity types)', () => {
+      const gp = JSON.stringify({
+        type: 'matching',
+        pairs: [
+          { id: '1', left: 'Clase', right: 'Molde' },
+          { id: '2', left: 'Objeto', right: 'Instancia' },
+        ],
+      });
+      const ch = JSON.stringify({
+        type: 'multiple_choice',
+        question: '¿Qué es una clase?',
+        options: [
+          { id: 'opt-1', text: 'Un molde para crear objetos', isCorrect: true },
+          { id: 'opt-2', text: 'Una variable global', isCorrect: false },
+        ],
+      });
+      expect(service.checkSubstantiveDuplication(gp, ch)).toBe(false);
+    });
+
+    it('allows distinct matching exercises with different pairs', () => {
+      const gp = JSON.stringify({
+        type: 'matching',
+        pairs: [
+          { id: '1', left: 'Clase', right: 'Molde' },
+          { id: '2', left: 'Objeto', right: 'Instancia' },
+        ],
+      });
+      const ch = JSON.stringify({
+        type: 'matching',
+        pairs: [
+          { id: '1', left: 'Herencia', right: 'Reutilización' },
+          { id: '2', left: 'Polimorfismo', right: 'Múltiples formas' },
+        ],
+      });
+      expect(service.checkSubstantiveDuplication(gp, ch)).toBe(false);
+    });
+  });
+
   describe('aiFinalExamQuestionSchema with MATCHING and ORDERING', () => {
     it('should validate a MULTIPLE_CHOICE exam question', () => {
       const mcQuestion = {

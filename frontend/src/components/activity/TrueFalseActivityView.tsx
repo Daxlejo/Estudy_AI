@@ -1,7 +1,6 @@
 import {
   IconCheck,
   IconX,
-  IconBulb,
   IconInfoCircle,
 } from '@tabler/icons-react'
 import type {
@@ -29,13 +28,6 @@ export function TrueFalseActivityView({
 
   return (
     <div className="space-y-6" role="region" aria-label="Actividad de Verdadero o Falso">
-      {activity.hint && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-text-secondary">
-          <IconBulb className="size-4 shrink-0 text-primary" />
-          <span className="leading-relaxed">{activity.hint}</span>
-        </div>
-      )}
-
       {/* Enunciado de la afirmación */}
       <div className="rounded-2xl border border-border/80 bg-surface p-6 shadow-sm md:p-8">
         <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-text-secondary">

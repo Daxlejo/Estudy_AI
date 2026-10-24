@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   IconCategory,
-  IconBulb,
   IconCircleCheckFilled,
   IconAlertCircleFilled,
   IconArrowRight,
@@ -33,7 +32,7 @@ export function ClassifyActivityView({
   const isEvaluated = evaluation !== null
 
   const evalMap = React.useMemo(() => {
-    if (!evaluation) return new Map<string, (typeof evaluation.itemResults)[0]>()
+    if (!evaluation) return new Map<string, NonNullable<typeof evaluation>['itemResults'][number]>()
     return new Map(evaluation.itemResults.map((r) => [r.label, r]))
   }, [evaluation])
 
@@ -91,13 +90,6 @@ export function ClassifyActivityView({
 
   return (
     <div className="space-y-6" role="region" aria-label="Actividad de Clasificación">
-      {activity.hint && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-text-secondary">
-          <IconBulb className="size-4 shrink-0 text-primary" />
-          <span className="leading-relaxed">{activity.hint}</span>
-        </div>
-      )}
-
       {/* Instrucciones de interacción (Tap o Drag) */}
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-text-primary">

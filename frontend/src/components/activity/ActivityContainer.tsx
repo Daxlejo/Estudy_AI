@@ -152,13 +152,21 @@ export function ActivityContainer({
                   ? predictChoiceId !== null
                   : selectedChoiceId !== null
 
+  const isChallenge =
+    stepNumber === 4 ||
+    (activity as { phase?: string }).phase === 'challenge' ||
+    Boolean(activity.id && activity.id.includes('challenge'))
+
   const isVerified = evaluation !== null
   const isSolvedCorrectly = Boolean(evaluation?.isCorrect)
   const isMastered = isSolvedCorrectly || (progressState.completed && !progressState.completedByReview)
   const isAttemptsExhausted =
     isVerified && !isSolvedCorrectly && sessionAttempts >= MAX_PRACTICE_ATTEMPTS
   const canAdvance = Boolean(
-    isSolvedCorrectly || progressState.completed || solutionAcknowledged,
+    isSolvedCorrectly ||
+      progressState.completed ||
+      solutionAcknowledged ||
+      (isChallenge && isVerified),
   )
 
   const continueRequirementId = `continue-req-${activity.id}`
@@ -337,8 +345,8 @@ export function ActivityContainer({
             </div>
           </div>
 
-          {/* Botón de Pista visible en ámbar/amarillo accesible (#FACC15) con texto oscuro legible */}
-          {activity.hint && (
+          {/* Botón de Pista visible en ámbar/amarillo accesible (#FACC15) con texto oscuro legible (solo en Práctica Guiada) */}
+          {!isChallenge && activity.hint && (
             <button
               type="button"
               onClick={handleToggleHint}
@@ -356,8 +364,8 @@ export function ActivityContainer({
           )}
         </div>
 
-        {/* Callout de Pista revelada con transición suave */}
-        {showHint && activity.hint && (
+        {/* Callout de Pista revelada con transición suave (solo en Práctica Guiada) */}
+        {!isChallenge && showHint && activity.hint && (
           <div
             id={hintPanelId}
             role="note"
@@ -385,7 +393,7 @@ export function ActivityContainer({
               pairs={matchingPairs}
               evaluation={evaluation as import('../../types/activity').MatchingEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               viewportWidth={viewportWidth}
               onChangePairs={setMatchingPairs}
             />
@@ -395,7 +403,7 @@ export function ActivityContainer({
               orderedIds={orderedIds}
               evaluation={evaluation as import('../../types/activity').OrderingEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onChangeOrder={setOrderedIds}
             />
           ) : activity.type === 'fill_in_blank' ? (
@@ -404,7 +412,7 @@ export function ActivityContainer({
               answers={fibAnswers}
               evaluation={evaluation as FillInBlankEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onChangeAnswer={(idx, val) =>
                 setFibAnswers((prev) => ({ ...prev, [idx]: val }))
               }
@@ -415,7 +423,7 @@ export function ActivityContainer({
               selectedAnswer={tfAnswer}
               evaluation={evaluation as TrueFalseEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onSelectAnswer={setTfAnswer}
             />
           ) : activity.type === 'classify' ? (
@@ -424,7 +432,7 @@ export function ActivityContainer({
               itemAssignments={classifyAssignments}
               evaluation={evaluation as ClassifyEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onChangeAssignments={setClassifyAssignments}
             />
           ) : activity.type === 'detect_error' ? (
@@ -435,7 +443,7 @@ export function ActivityContainer({
               selfAssessedCorrect={selfAssessedError}
               evaluation={evaluation as DetectErrorEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onToggleFoundError={() => setHasFoundError(true)}
               onChangeReported={setErrorReported}
               onSelfAssess={(val) => {
@@ -463,14 +471,39 @@ export function ActivityContainer({
               selectedOptionId={predictChoiceId}
               evaluation={evaluation as PredictResultEvaluation | null}
               disabled={isSolvedCorrectly}
-              showSolution={isAttemptsExhausted}
+              showSolution={isChallenge ? isVerified : isAttemptsExhausted}
               onSelectOption={setPredictChoiceId}
             />
           ) : (
             <div className="space-y-3" role="radiogroup" aria-label={activity.title}>
               {(activity as MultipleChoiceActivity).options.map((option, idx) => {
                 const isSelected = selectedChoiceId === option.id
+                const isOptionCorrect = Boolean(option.isCorrect)
                 const optionLetter = String.fromCharCode(65 + idx)
+
+                let cardStyles =
+                  'border-border bg-surface hover:border-primary/50 hover:bg-surface-high/30'
+                let badgeStyles = 'border-border bg-surface-high text-text-secondary'
+
+                if (isVerified) {
+                  if (isSelected && isOptionCorrect) {
+                    cardStyles =
+                      'border-secondary/80 bg-secondary/10 shadow-[0_0_20px_-4px_color-mix(in_srgb,var(--secondary)_25%,transparent)] ring-2 ring-secondary/30'
+                    badgeStyles = 'bg-secondary text-white'
+                  } else if (isSelected && !isOptionCorrect) {
+                    cardStyles =
+                      'border-danger/80 bg-danger/10 shadow-[0_0_20px_-4px_color-mix(in_srgb,var(--danger)_20%,transparent)] ring-2 ring-danger/30'
+                    badgeStyles = 'bg-danger text-white'
+                  } else if (!isSelected && isOptionCorrect) {
+                    cardStyles =
+                      'border-secondary/60 bg-secondary/5 ring-1 ring-secondary/20'
+                    badgeStyles = 'bg-secondary/20 text-secondary border-secondary/40'
+                  }
+                } else if (isSelected) {
+                  cardStyles = 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                  badgeStyles = 'bg-primary text-white'
+                }
+
                 return (
                   <button
                     key={option.id}
@@ -479,16 +512,37 @@ export function ActivityContainer({
                     aria-checked={isSelected}
                     disabled={isVerified}
                     onClick={() => setSelectedChoiceId(option.id)}
-                    className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 ring-2 ring-primary/25'
-                        : 'border-border bg-surface hover:border-primary/40'
-                    }`}
+                    className={`flex w-full items-start justify-between gap-3 rounded-xl border p-4 text-left transition-all ${cardStyles}`}
                   >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-high font-heading text-xs font-bold text-text-secondary">
-                      {optionLetter}
-                    </span>
-                    <span className="text-sm text-text-primary">{option.text}</span>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-md border font-heading text-xs font-bold ${badgeStyles}`}
+                      >
+                        {optionLetter}
+                      </span>
+                      <span className="text-sm text-text-primary">{option.text}</span>
+                    </div>
+                    {isVerified && (
+                      <div className="shrink-0 text-xs font-semibold">
+                        {isSelected && isOptionCorrect && (
+                          <span className="inline-flex items-center gap-1 text-secondary">
+                            <IconCircleCheckFilled className="size-4" />
+                            Correcto
+                          </span>
+                        )}
+                        {isSelected && !isOptionCorrect && (
+                          <span className="inline-flex items-center gap-1 text-danger">
+                            <IconAlertCircleFilled className="size-4" />
+                            Incorrecto
+                          </span>
+                        )}
+                        {!isSelected && isOptionCorrect && (
+                          <span className="inline-flex items-center gap-1 text-secondary font-medium">
+                            Respuesta esperada
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </button>
                 )
               })}
@@ -532,7 +586,13 @@ export function ActivityContainer({
                   </h4>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {!evaluation.isCorrect && (
+                    {isChallenge && (
+                      <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-primary">
+                        Calificación: {evaluation.scorePercent}%
+                      </span>
+                    )}
+
+                    {!isChallenge && !evaluation.isCorrect && (
                       <span className="inline-flex items-center rounded-full border border-danger/30 bg-surface px-2.5 py-0.5 font-mono text-[11px] font-bold text-danger">
                         {t('activity.attemptStatus', {
                           current: Math.min(sessionAttempts, MAX_PRACTICE_ATTEMPTS),
@@ -560,7 +620,7 @@ export function ActivityContainer({
                   <MarkdownRenderer content={evaluation.feedback} />
                 </div>
 
-                {!evaluation.isCorrect && !isAttemptsExhausted && (
+                {!isChallenge && !evaluation.isCorrect && !isAttemptsExhausted && (
                   <p className="text-xs font-medium text-text-secondary">
                     {t('activity.attemptsRemaining', {
                       remaining: Math.max(1, MAX_PRACTICE_ATTEMPTS - sessionAttempts),
@@ -574,8 +634,8 @@ export function ActivityContainer({
                   </p>
                 )}
 
-                {/* Explicación técnica de consolidación (mostrada al acertar o al agotar intentos) */}
-                {(evaluation.isCorrect || isAttemptsExhausted) && (
+                {/* Explicación técnica de consolidación (mostrada al acertar, al agotar intentos o tras verificar desafío) */}
+                {(evaluation.isCorrect || isAttemptsExhausted || isChallenge) && (
                   <div className="border-t border-border/60 pt-2 text-xs text-text-secondary">
                     <span className="font-semibold text-text-primary">
                       {t('activity.rationale')}{' '}
@@ -619,7 +679,7 @@ export function ActivityContainer({
                 }`}
               >
                 <IconCheck className="size-4" />
-                {t('activity.verifySolution')}
+                {isChallenge ? 'Enviar y calificar desafío' : t('activity.verifySolution')}
               </button>
             )}
 
