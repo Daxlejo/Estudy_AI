@@ -14,11 +14,13 @@ import Quiz from './pages/Quiz'
 import FinalExam from './pages/FinalExam'
 import OnboardingPage from './pages/Onboarding'
 import AppLayout from './components/layout/AppLayout'
+import AppNotifications from './components/ui/AppNotifications'
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AppNotifications />
         <Routes>
           {/* Rutas públicas de autenticación */}
           <Route path="/login" element={<LoginPage />} />

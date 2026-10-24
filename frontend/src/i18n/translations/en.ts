@@ -57,7 +57,14 @@ export const en: Record<string, string> = {
 
   // Course statuses
   'status.CREATED': 'Created',
-  'status.PROCESSING': 'In preparation',
+  'status.PROCESSING': 'Generating...',
+  'status.GENERATING': 'Generating...',
+  'notifications.courseReadyTitle': 'Your course is ready!',
+  'notifications.courseReadyBody': 'The course "{name}" is now ready for studying.',
+  'notifications.courseReadyAction': 'Go to course',
+  'notifications.courseCompletedTitle': 'Final session completed! +{bonus} XP Bonus',
+  'notifications.courseCompletedBody': 'You completed all sessions in the course and earned +{bonus} bonus XP.',
+  'courses.generatingHint': 'Generating sessions and activities in the background...',
   'status.READY': 'Ready to start',
   'status.IN_PROGRESS': 'In progress',
   'status.COMPLETED': 'Completed',

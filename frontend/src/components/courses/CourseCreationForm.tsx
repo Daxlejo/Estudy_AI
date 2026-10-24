@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconSparkles, IconArrowLeft, IconAlertCircle } from '@tabler/icons-react'
 import { courseService, formatFileSize } from '../../services/course.service'
+import { trackGeneratingCourse } from '../ui/AppNotifications'
 import FileUploadArea from './FileUploadArea'
 import MaterialList from './MaterialList'
 import type { SelectedFile } from './MaterialItem'
@@ -66,6 +67,7 @@ export function CourseCreationForm() {
         files: rawFiles,
       })
 
+      trackGeneratingCourse(created.id)
       navigate(`/cursos/${created.id}/procesando`)
     } catch (err) {
       setIsSubmitting(false)

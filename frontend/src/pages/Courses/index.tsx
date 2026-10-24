@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { IconPlus, IconLoader2 } from '@tabler/icons-react'
 import CourseCard from '../../components/courses/CourseCard'
+import { COURSE_READY_EVENT } from '../../components/ui/AppNotifications'
 import { courseService } from '../../services/course.service'
 import type { Course } from '../../types/course'
 import { useTranslation } from '../../i18n'
@@ -10,6 +11,15 @@ function Courses() {
   const { t } = useTranslation()
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  const refreshCourses = useCallback(async () => {
+    try {
+      const data = await courseService.getCourses()
+      setCourses(data)
+    } catch {
+      // Ignorar error transitorio
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -27,10 +37,34 @@ function Courses() {
           setIsLoading(false)
         }
       })
+
+    const handleCourseReady = () => {
+      if (isMounted) {
+        void refreshCourses()
+      }
+    }
+
+    window.addEventListener(COURSE_READY_EVENT, handleCourseReady)
+
     return () => {
       isMounted = false
+      window.removeEventListener(COURSE_READY_EVENT, handleCourseReady)
     }
-  }, [])
+  }, [refreshCourses])
+
+  const hasProcessingCourse = courses.some(
+    (c) => c.status === 'PROCESSING' || (c.status as string) === 'GENERATING',
+  )
+
+  useEffect(() => {
+    if (!hasProcessingCourse) return
+
+    const timer = setInterval(() => {
+      void refreshCourses()
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [hasProcessingCourse, refreshCourses])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8 md:py-10">

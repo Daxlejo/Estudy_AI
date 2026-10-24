@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { IconPlus } from '@tabler/icons-react'
 import CourseCard from '../../components/courses/CourseCard'
 import CurrentSessionCard from '../../components/courses/CurrentSessionCard'
+import { COURSE_READY_EVENT } from '../../components/ui/AppNotifications'
 import { courseService } from '../../services/course.service'
 import type { Course, CurrentSession } from '../../types/course'
 import { useTranslation } from '../../i18n'
@@ -11,6 +12,19 @@ function Home() {
   const { t } = useTranslation()
   const [courses, setCourses] = useState<Course[]>([])
   const [session, setSession] = useState<CurrentSession | null>(null)
+
+  const refreshHomeData = useCallback(async () => {
+    try {
+      const [coursesData, sessionData] = await Promise.all([
+        courseService.getCourses().catch(() => [] as Course[]),
+        courseService.getCurrentSession().catch(() => null),
+      ])
+      setCourses(coursesData)
+      setSession(sessionData)
+    } catch {
+      // Ignorar errores transitorios
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -33,10 +47,34 @@ function Home() {
         if (isMounted) setSession(null)
       })
 
+    const handleCourseReady = () => {
+      if (isMounted) {
+        void refreshHomeData()
+      }
+    }
+
+    window.addEventListener(COURSE_READY_EVENT, handleCourseReady)
+
     return () => {
       isMounted = false
+      window.removeEventListener(COURSE_READY_EVENT, handleCourseReady)
     }
-  }, [])
+  }, [refreshHomeData])
+
+  // Si hay algún curso en estado PROCESSING / GENERATING, hacer polling cada pocos segundos
+  const hasProcessingCourse = courses.some(
+    (c) => c.status === 'PROCESSING' || (c.status as string) === 'GENERATING',
+  )
+
+  useEffect(() => {
+    if (!hasProcessingCourse) return
+
+    const timer = setInterval(() => {
+      void refreshHomeData()
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [hasProcessingCourse, refreshHomeData])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8 md:py-10">

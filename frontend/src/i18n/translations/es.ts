@@ -57,7 +57,14 @@ export const es: Record<string, string> = {
 
   // Estados de curso
   'status.CREATED': 'Creado',
-  'status.PROCESSING': 'En preparación',
+  'status.PROCESSING': 'Generando...',
+  'status.GENERATING': 'Generando...',
+  'notifications.courseReadyTitle': '¡Tu curso está listo!',
+  'notifications.courseReadyBody': 'El curso "{name}" ya está listo para estudiar.',
+  'notifications.courseReadyAction': 'Ir al curso',
+  'notifications.courseCompletedTitle': '¡Última sesión superada! +{bonus} XP Bonus',
+  'notifications.courseCompletedBody': 'Completaste todas las sesiones del curso y ganaste +{bonus} XP adicionales.',
+  'courses.generatingHint': 'Generando sesiones y actividades en segundo plano...',
   'status.READY': 'Listo para iniciar',
   'status.IN_PROGRESS': 'En progreso',
   'status.COMPLETED': 'Completado',
