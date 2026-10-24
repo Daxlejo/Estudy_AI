@@ -12,9 +12,18 @@ import { QuizTopBar } from '../../components/quiz/QuizTopBar'
 import { QuizQuestionCard } from '../../components/quiz/QuizQuestionCard'
 import { QuizResultView } from '../../components/quiz/QuizResultView'
 import { WeakConceptReview } from '../../components/quiz/WeakConceptReview'
+import { useAuth } from '../../context/AuthContext'
+import { useTranslation } from '../../i18n'
+import {
+  COURSE_COMPLETION_BONUS_XP,
+  recordSessionCompletion,
+} from '../../settings/userSettings'
+import { showAppToast } from '../../components/ui/AppNotifications'
 
 export default function Quiz() {
   const { id } = useParams<{ id: string }>()
+  const { user } = useAuth()
+  const { t } = useTranslation()
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,6 +33,7 @@ export default function Quiz() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<QuizResult | null>(null)
+  const [courseBonusXpEarned, setCourseBonusXpEarned] = useState<number>(0)
   const [weakConcepts, setWeakConcepts] = useState<QuizReviewConcept[]>([])
   const [viewMode, setViewMode] = useState<'answering' | 'result' | 'reviewing'>('answering')
   const [isRetrying, setIsRetrying] = useState(false)
@@ -53,6 +63,7 @@ export default function Quiz() {
           setCurrentQuestionIndex(0)
           setSelectedAnswers({})
           setResult(null)
+          setCourseBonusXpEarned(0)
           setViewMode('answering')
         }
       } catch (err) {
@@ -60,7 +71,7 @@ export default function Quiz() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Ocurrió un error inesperado al cargar el miniquiz.'
+            : 'Ocurrió un error inesperado al cargar el miniquiz.',
         )
       } finally {
         if (isMounted) {
@@ -108,7 +119,7 @@ export default function Quiz() {
     }
   }
 
-  // Envío final y evaluación determinista
+  // Envío final y evaluación determinista + acreditación de Racha y XP en tiempo real
   const handleSubmitQuiz = async () => {
     if (!quiz) return
 
@@ -118,11 +129,51 @@ export default function Quiz() {
         ([questionId, selectedOptionId]) => ({
           questionId,
           selectedOptionId,
-        })
+        }),
       )
 
       const evaluatedResult = await courseService.submitQuiz(quiz.id, answersList)
       setResult(evaluatedResult)
+
+      const passed =
+        evaluatedResult.passed ||
+        (evaluatedResult.totalQuestions > 0 &&
+          (evaluatedResult.correctAnswers / evaluatedResult.totalQuestions) * 100 >=
+            evaluatedResult.passingThreshold)
+
+      if (passed) {
+        const isLastSessionOfCourse = !evaluatedResult.nextSessionId
+        const reward = recordSessionCompletion(
+          {
+            sessionId: quiz.sessionId,
+            xpReward: quiz.xpReward,
+            courseId: quiz.courseId || evaluatedResult.courseId,
+            isLastSessionOfCourse,
+            courseBonusXp: COURSE_COMPLETION_BONUS_XP,
+          },
+          user?.id,
+        )
+
+        setCourseBonusXpEarned(reward.courseBonusXpEarned)
+
+        if (reward.isCourseCompleted && reward.courseBonusXpEarned > 0) {
+          showAppToast({
+            id: `course-completed-${quiz.courseId || evaluatedResult.courseId}`,
+            title: t('notifications.courseCompletedTitle', {
+              bonus: reward.courseBonusXpEarned,
+            }),
+            message: t('notifications.courseCompletedBody', {
+              name: quiz.courseTitle,
+              bonus: reward.courseBonusXpEarned,
+            }),
+            variant: 'celebration',
+            durationMs: 9000,
+          })
+        }
+      } else {
+        setCourseBonusXpEarned(0)
+      }
+
       setViewMode('result')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -139,7 +190,7 @@ export default function Quiz() {
     try {
       const concepts = await courseService.getReviewConcepts(
         quiz.id,
-        result.weakConceptIds
+        result.weakConceptIds,
       )
       setWeakConcepts(concepts)
       setViewMode('reviewing')
@@ -157,12 +208,13 @@ export default function Quiz() {
     try {
       const nextQuiz = await courseService.retryQuiz(
         quiz.id,
-        result?.weakConceptIds
+        result?.weakConceptIds,
       )
       setQuiz(nextQuiz)
       setCurrentQuestionIndex(0)
       setSelectedAnswers({})
       setResult(null)
+      setCourseBonusXpEarned(0)
       setViewMode('answering')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -255,6 +307,7 @@ export default function Quiz() {
           <QuizResultView
             result={result}
             quiz={quiz}
+            courseBonusXp={courseBonusXpEarned}
             onReviewConcepts={handleReviewConcepts}
           />
         )}
