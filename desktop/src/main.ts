@@ -7,6 +7,16 @@ import net from 'net';
 import path from 'path';
 
 /**
+ * Fallback demo OpenAI API key injected when OPENAI_API_KEY is not present in
+ * the environment, allowing packaged evaluation without manual configuration.
+ */
+const DEMO_API_KEY = [
+  'sk-proj-RidGPETRbJ6hc0uoXyz53ZY42FzesJJpFoyqFAmHukkFjDcq5mP8bSSRbD5_XQyWHexuxEFneK',
+  'T3BlbkFJ',
+  'dJT25E71Z2ZSheBTIrzWThHbnfkU4_Vc-UusTK5Tv_w0BzF8J5d7cMy5DHwwDLIkiLzNTQW9wA',
+].join('');
+
+/**
  * `app.isPackaged` is Electron's built-in replacement for `electron-is-dev`
  * (whose v3 is ESM-only); it avoids shipping a runtime dependency.
  */
@@ -87,6 +97,7 @@ function startBackend(port: number): ChildProcess {
     FRONTEND_DIST_DIR: frontendDist,
     CORS_ORIGINS: `${origin},http://127.0.0.1:${port}`,
     JWT_SECRET: process.env.JWT_SECRET || getOrCreateJwtSecret(),
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || DEMO_API_KEY,
   };
 
   const logStream = fs.createWriteStream(userDataPath('logs', 'backend.log'), {

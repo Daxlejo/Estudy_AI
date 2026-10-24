@@ -3,6 +3,7 @@ name: Build EstudyAI
 on:
   push:
     branches: [main, "feat/**"]
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
