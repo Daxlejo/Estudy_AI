@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiService } from './ai.service';
+import { AiService, DEFAULT_AI_MODEL } from './ai.service';
 
 // Mock the entire openai module so tests don't make real HTTP calls.
 jest.mock('openai', () => {
@@ -32,6 +32,10 @@ describe('AiService', () => {
 
   afterEach(() => {
     delete process.env.OPENAI_API_KEY;
+  });
+
+  it('should have DEFAULT_AI_MODEL set to gpt-6.1-sol', () => {
+    expect(DEFAULT_AI_MODEL).toBe('gpt-6.1-sol');
   });
 
   it('should throw if OPENAI_API_KEY is not set', async () => {
@@ -72,6 +76,38 @@ describe('AiService', () => {
         ]),
       }),
     );
+  });
+
+  it('should complete plain text without JSON response format', async () => {
+    mockCreate.mockResolvedValue({
+      choices: [
+        {
+          message: { content: 'VALID_EDUCATIONAL: Good content' },
+          finish_reason: 'stop',
+        },
+      ],
+    });
+
+    const result = await service.completeText(
+      'You are a validator.',
+      'Text to validate',
+    );
+
+    expect(result).toBe('VALID_EDUCATIONAL: Good content');
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-6.1-sol',
+        max_tokens: expect.any(Number),
+        temperature: expect.any(Number),
+        messages: [
+          { role: 'system', content: 'You are a validator.' },
+          { role: 'user', content: 'Text to validate' },
+        ],
+      }),
+    );
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs.response_format).toBeUndefined();
+    expect(callArgs.temperature).toBeDefined();
   });
 
   it('should throw if the response is not valid JSON', async () => {

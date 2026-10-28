@@ -8,7 +8,7 @@ export interface AiServiceConfig {
   temperature: number;
 }
 
-export const DEFAULT_AI_MODEL = 'gpt-4o-mini';
+export const DEFAULT_AI_MODEL = 'gpt-6.1-sol';
 export const DEFAULT_MAX_TOKENS = 8192;
 export const DEFAULT_TEMPERATURE = 0.3;
 
@@ -55,6 +55,82 @@ export class AiService implements OnModuleDestroy {
     return this.client;
   }
 
+  private buildRequestParams(
+    systemPrompt: string,
+    userMessage: string,
+    jsonMode = false,
+  ): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
+    const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming =
+      {
+        model: this.config.model,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+      };
+
+    if (jsonMode) {
+      params.response_format = { type: 'json_object' };
+    }
+
+    return params;
+  }
+
+  private handleCompletionError(error: any): never {
+    if (error?.status === 429) {
+      throw new Error(
+        'AI provider rate limit reached (429). Please retry in a few moments.',
+      );
+    }
+    if (
+      error?.name === 'APIConnectionTimeoutError' ||
+      error?.code === 'ETIMEDOUT'
+    ) {
+      throw new Error(
+        'AI provider request timed out. Please retry in a few moments.',
+      );
+    }
+    if (typeof error?.status === 'number' && error.status >= 500) {
+      throw new Error(
+        `AI provider service error (${error.status}). Please retry in a few moments.`,
+      );
+    }
+    const rawMsg = error instanceof Error ? error.message : String(error);
+    const sanitized = rawMsg
+      .replace(/sk-[a-zA-Z0-9_\-]{20,}/g, '[REDACTED_KEY]')
+      .replace(/Bearer\s+[a-zA-Z0-9_\.\-]+/gi, 'Bearer [REDACTED]');
+    throw new Error(`AI completion failed: ${sanitized}`);
+  }
+
+  /**
+   * Sends a plain-text chat completion and returns the trimmed response string.
+   * Used for fast classification and content validation.
+   */
+  async completeText(
+    systemPrompt: string,
+    userMessage: string,
+  ): Promise<string> {
+    const client = this.getClient();
+
+    this.logger.debug(
+      `Sending chat completion text request (model=${this.config.model})`,
+    );
+
+    let raw: string;
+    try {
+      const response = await client.chat.completions.create(
+        this.buildRequestParams(systemPrompt, userMessage, false),
+      );
+      raw = response.choices[0]?.message?.content ?? '';
+    } catch (error: any) {
+      this.handleCompletionError(error);
+    }
+
+    return raw.trim();
+  }
+
   /**
    * Sends a JSON-mode chat completion and returns the parsed result.
    * Throws if the API key is not configured or if parsing fails.
@@ -68,42 +144,13 @@ export class AiService implements OnModuleDestroy {
 
     let raw: string;
     try {
-      const response = await client.chat.completions.create({
-        model: this.config.model,
-        max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-      });
+      const response = await client.chat.completions.create(
+        this.buildRequestParams(systemPrompt, userMessage, true),
+      );
 
       raw = response.choices[0]?.message?.content ?? '';
     } catch (error: any) {
-      if (error?.status === 429) {
-        throw new Error(
-          'AI provider rate limit reached (429). Please retry in a few moments.',
-        );
-      }
-      if (
-        error?.name === 'APIConnectionTimeoutError' ||
-        error?.code === 'ETIMEDOUT'
-      ) {
-        throw new Error(
-          'AI provider request timed out. Please retry in a few moments.',
-        );
-      }
-      if (typeof error?.status === 'number' && error.status >= 500) {
-        throw new Error(
-          `AI provider service error (${error.status}). Please retry in a few moments.`,
-        );
-      }
-      const rawMsg = error instanceof Error ? error.message : String(error);
-      const sanitized = rawMsg
-        .replace(/sk-[a-zA-Z0-9_\-]{20,}/g, '[REDACTED_KEY]')
-        .replace(/Bearer\s+[a-zA-Z0-9_\.\-]+/gi, 'Bearer [REDACTED]');
-      throw new Error(`AI completion failed: ${sanitized}`);
+      this.handleCompletionError(error);
     }
 
     this.logger.debug(`Received response (${raw.length} chars)`);
