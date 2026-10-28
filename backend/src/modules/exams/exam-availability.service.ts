@@ -41,32 +41,34 @@ export class ExamAvailabilityService {
       (a, b) => a.sequenceOrder - b.sequenceOrder,
     );
 
-    let completedSessionsCount = 0;
+    // Per-session completion checks are independent: run them concurrently
+    // (together with the exam lookup) instead of 2 sequential queries per session.
+    const [completionFlags, exam] = await Promise.all([
+      Promise.all(
+        sessions.map(async (s) => {
+          const quiz = await this.quizRepository.findBySessionId(s.id);
 
-    for (const s of sessions) {
-      const quiz = await this.quizRepository.findBySessionId(s.id);
-      let isCompleted = false;
+          if (quiz) {
+            const attempts = await this.quizRepository.getAttemptsByQuizId(
+              quiz.id,
+            );
+            return attempts.some((a) => a.isPassed);
+          }
 
-      if (quiz) {
-        const attempts = await this.quizRepository.getAttemptsByQuizId(quiz.id);
-        isCompleted = attempts.some((a) => a.isPassed);
-      } else {
-        const nextSession = sessions.find(
-          (ns) => ns.sequenceOrder === s.sequenceOrder + 1,
-        );
-        // A session without a quiz is completed only if the next session exists and is unlocked.
-        // The last session without a quiz is never marked as completed; AI generation must create a quiz for every session.
-        isCompleted = nextSession ? Boolean(nextSession.isUnlocked) : false;
-      }
-
-      if (isCompleted) {
-        completedSessionsCount++;
-      }
-    }
+          const nextSession = sessions.find(
+            (ns) => ns.sequenceOrder === s.sequenceOrder + 1,
+          );
+          // A session without a quiz is completed only if the next session exists and is unlocked.
+          // The last session without a quiz is never marked as completed; AI generation must create a quiz for every session.
+          return nextSession ? Boolean(nextSession.isUnlocked) : false;
+        }),
+      ),
+      this.finalExamRepository.findByCourseId(courseId),
+    ]);
+    const completedSessionsCount = completionFlags.filter(Boolean).length;
 
     const totalSessions = sessions.length;
     const pendingSessionsCount = totalSessions - completedSessionsCount;
-    const exam = await this.finalExamRepository.findByCourseId(courseId);
 
     const rawCooldown = exam?.cooldownUntil
       ? new Date(exam.cooldownUntil)

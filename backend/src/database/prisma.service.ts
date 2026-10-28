@@ -12,6 +12,10 @@ import * as os from 'os';
 /** Directory containing `schema.prisma` (works from both `src/` and `dist/`). */
 const PRISMA_SCHEMA_DIR = path.resolve(__dirname, '..', '..', 'prisma');
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = `file:${path.resolve(PRISMA_SCHEMA_DIR, 'dev.db')}`;
+}
+
 /**
  * Resolves the physical file of a SQLite `file:` URL the same way Prisma does
  * (relative paths are resolved against the schema directory).
@@ -51,6 +55,23 @@ export class PrismaService
       `SQLite database: ${dbPath ? maskHome(dbPath) : '(DATABASE_URL not set or not a file: URL)'}`,
     );
     await this.$connect();
+    if (dbPath) await this.enableWalMode();
+  }
+
+  /**
+   * WAL lets readers (UI polling, progress queries) proceed while the
+   * generation pipeline writes, instead of blocking on the rollback journal.
+   * The setting is persisted in the database file. Best-effort: failures are
+   * logged and ignored.
+   */
+  private async enableWalMode(): Promise<void> {
+    try {
+      await this.$queryRawUnsafe('PRAGMA journal_mode=WAL;');
+    } catch (e) {
+      this.logger.warn(
+        `Could not enable SQLite WAL mode: ${(e as Error).message}`,
+      );
+    }
   }
 
   async onModuleDestroy() {

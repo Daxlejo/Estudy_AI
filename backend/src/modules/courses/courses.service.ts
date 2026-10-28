@@ -342,13 +342,17 @@ export class CoursesService {
     );
 
     const sessions = await this.sessionRepository.findByCourseId(courseId);
-    let conceptsCount = 0;
-    for (const session of sessions) {
-      const concepts = await this.sessionRepository.getConceptsBySessionId(
-        session.id,
-      );
-      conceptsCount += concepts.length;
-    }
+    // Polled by the UI while generating: fetch per-session concepts in
+    // parallel instead of one sequential round-trip per session.
+    const conceptLists = await Promise.all(
+      sessions.map((session) =>
+        this.sessionRepository.getConceptsBySessionId(session.id),
+      ),
+    );
+    const conceptsCount = conceptLists.reduce(
+      (total, concepts) => total + concepts.length,
+      0,
+    );
 
     return {
       jobId: job.id,

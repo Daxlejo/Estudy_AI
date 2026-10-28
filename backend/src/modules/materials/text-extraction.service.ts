@@ -1,9 +1,25 @@
 import { Injectable, UnsupportedMediaTypeException } from '@nestjs/common';
 import * as fs from 'fs';
+/*
+ * Document parsers are loaded lazily on first use: they are only needed when a
+ * material is uploaded, so keeping them out of the import graph shortens the
+ * backend cold start (mammoth alone pulls in jszip, xmldom, bluebird, ...).
+ */
+type PdfParse = typeof import('pdf-parse');
+type Mammoth = typeof import('mammoth');
+type AdmZipCtor = typeof import('adm-zip');
+
+let pdfParseModule: PdfParse | undefined;
+let mammothModule: Mammoth | undefined;
+let admZipModule: AdmZipCtor | undefined;
+
 /* eslint-disable @typescript-eslint/no-require-imports */
-import pdfParse = require('pdf-parse');
-import mammoth = require('mammoth');
-import AdmZip = require('adm-zip');
+const loadPdfParse = (): PdfParse =>
+  (pdfParseModule ??= require('pdf-parse') as PdfParse);
+const loadMammoth = (): Mammoth =>
+  (mammothModule ??= require('mammoth') as Mammoth);
+const loadAdmZip = (): AdmZipCtor =>
+  (admZipModule ??= require('adm-zip') as AdmZipCtor);
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 export type SupportedMaterialType = 'txt' | 'md' | 'pdf' | 'docx' | 'pptx';
@@ -84,6 +100,7 @@ export class TextExtractionService {
           dataBuffer.byteOffset + dataBuffer.byteLength,
         ),
       );
+      const pdfParse = loadPdfParse();
       const data = await pdfParse(uint8 as unknown as Buffer);
       return data.text;
     } catch (error) {
@@ -98,6 +115,7 @@ export class TextExtractionService {
   // DOCX
   async extractDocx(filePathOrBuffer: string | Buffer): Promise<string> {
     try {
+      const mammoth = loadMammoth();
       const result =
         typeof filePathOrBuffer === 'string'
           ? await mammoth.extractRawText({ path: filePathOrBuffer })
@@ -115,6 +133,7 @@ export class TextExtractionService {
   // PPTX — extract text from slide XML nodes
   async extractPptx(filePathOrBuffer: string | Buffer): Promise<string> {
     try {
+      const AdmZip = loadAdmZip();
       const zip = new AdmZip(filePathOrBuffer);
       const slideEntries = zip
         .getEntries()
