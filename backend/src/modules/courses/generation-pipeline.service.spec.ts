@@ -1438,6 +1438,20 @@ describe('GenerationPipelineService', () => {
       });
 
       describe('Quiz Generation Quality and Option Shuffling (Prompt 2)', () => {
+        it('should instruct AI in systemPromptQuiz to avoid obvious options and represent misconceptions', () => {
+          const prompt = (
+            service as unknown as {
+              systemPromptQuiz: (lang: string) => string;
+            }
+          ).systemPromptQuiz('es');
+          expect(prompt).toContain(
+            'Make each distractor represent a genuinely different (and common) misconception',
+          );
+          expect(prompt).toContain(
+            'Avoid options that differ only in one word at the end of an otherwise identical sentence',
+          );
+          expect(prompt).toContain('Vary the length and structure of options');
+        });
 
         it('should perform Fisher-Yates shuffle on quiz options and update correctOptionIndex', () => {
           const options = [

@@ -836,6 +836,9 @@ Quality requirements for options:
   - Exactly one option must be clearly correct based on the provided material.
   - Exactly three options must be plausible but incorrect distractors related to the topic.
   - Do NOT include generic filler options, random noise, or answers unrelated to the concept being tested.
+  - Make each distractor represent a genuinely different (and common) misconception.
+  - Avoid options that differ only in one word at the end of an otherwise identical sentence.
+  - Vary the length and structure of options.
 Create 3-5 questions, one per concept if possible.`;
   }
 
