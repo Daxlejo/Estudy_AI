@@ -14,7 +14,10 @@ interface SessionIntroBlockProps {
   onContinue: () => void
 }
 
-export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProps) {
+export function SessionIntroBlock({
+  session,
+  onContinue,
+}: SessionIntroBlockProps) {
   const { t } = useTranslation()
   const { introduction, learningObjective } = session
 
@@ -104,7 +107,7 @@ export function SessionIntroBlock({ session, onContinue }: SessionIntroBlockProp
           onClick={onContinue}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_24px_color-mix(in_srgb,var(--primary)_50%,transparent)] focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.99] sm:w-auto"
         >
-          Continuar a Conceptos clave
+          {t('studySession.continueToConcepts')}
           <IconArrowRight className="size-4" />
         </button>
       </div>

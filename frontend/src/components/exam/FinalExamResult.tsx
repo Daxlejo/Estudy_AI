@@ -13,6 +13,7 @@ import {
 import type { FinalExamResult as FinalExamResultType } from '../../types/exam'
 import { FinalExamCooldown } from './FinalExamCooldown'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 
 interface FinalExamResultProps {
   result: FinalExamResultType
@@ -28,6 +29,7 @@ export function FinalExamResult({
   onRetryUnlocked,
 }: FinalExamResultProps) {
   const [filterMode, setFilterMode] = useState<FilterMode>('incorrect')
+  const { t } = useTranslation()
 
   const {
     passed,
@@ -86,38 +88,34 @@ export function FinalExamResult({
               {passed ? (
                 <>
                   <IconCertificate className="size-3.5" />
-                  Certificación Obtenida
+                  {t('finalExam.result.certified')}
                 </>
               ) : (
                 <>
                   <IconAlertCircle className="size-3.5" />
-                  Intento {attemptNumber} no aprobado
+                  {t('finalExam.result.attemptFailed', { attempt: attemptNumber })}
                 </>
               )}
             </span>
 
             <span className="rounded-full border border-border bg-surface-high px-3 py-1 text-xs font-medium text-text-secondary">
-              Umbral requerido: {passingThreshold}/{totalQuestions} correctas (&gt; 70%)
+              {t('finalExam.result.requiredThreshold', { threshold: passingThreshold, total: totalQuestions })}
             </span>
           </div>
 
           <h2 className="mt-4 font-heading text-2xl font-bold text-text-primary md:text-3xl">
-            {passed
-              ? `¡Felicitaciones! Has completado ${courseTitle}`
-              : 'El examen final no ha sido superado en este intento'}
+            {passed ? t('finalExam.result.congrats', { course: courseTitle }) : t('finalExam.result.notPassed')}
           </h2>
 
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
-            {passed
-              ? 'Has demostrado un dominio integral de los conceptos, arquitecturas y optimizaciones evaluadas a lo largo de todas las sesiones de este curso.'
-              : `Obtuviste ${correctAnswers} de ${totalQuestions} respuestas correctas (${scorePercent}%). Se requiere un mínimo de ${passingThreshold} preguntas acertadas para certificar el curso.`}
+            {passed ? t('finalExam.result.passedDesc') : t('finalExam.result.failedDesc', { correct: correctAnswers, total: totalQuestions, percent: scorePercent, threshold: passingThreshold })}
           </p>
 
           {/* Métricas clave */}
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-background/80 p-3">
               <span className="text-[11px] font-semibold uppercase text-text-secondary">
-                Puntaje
+                {t('finalExam.result.score')}
               </span>
               <p
                 className={`mt-1 font-mono text-2xl font-bold ${
@@ -130,7 +128,7 @@ export function FinalExamResult({
 
             <div className="rounded-xl border border-border bg-background/80 p-3">
               <span className="text-[11px] font-semibold uppercase text-text-secondary">
-                Aciertos
+                {t('finalExam.result.correct')}
               </span>
               <p className="mt-1 font-mono text-2xl font-bold text-secondary">
                 {correctAnswers}/{totalQuestions}
@@ -139,7 +137,7 @@ export function FinalExamResult({
 
             <div className="rounded-xl border border-border bg-background/80 p-3">
               <span className="text-[11px] font-semibold uppercase text-text-secondary">
-                Errores
+                {t('finalExam.result.incorrect')}
               </span>
               <p className="mt-1 font-mono text-2xl font-bold text-red-400">
                 {result.incorrectAnswers}
@@ -148,7 +146,7 @@ export function FinalExamResult({
 
             <div className="rounded-xl border border-border bg-background/80 p-3">
               <span className="text-[11px] font-semibold uppercase text-text-secondary">
-                Intento
+                {t('finalExam.result.attempt')}
               </span>
               <p className="mt-1 font-mono text-2xl font-bold text-text-primary">
                 #{attemptNumber}
@@ -163,7 +161,7 @@ export function FinalExamResult({
                 to={`/cursos/${courseId}/ruta`}
                 className="inline-flex items-center gap-2 rounded-xl bg-secondary px-6 py-3 font-heading text-xs font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:brightness-110"
               >
-                Volver a la ruta del curso
+                {t('finalExam.result.backToCoursePath')}
                 <IconArrowRight className="size-4" />
               </Link>
               <Link
@@ -193,11 +191,11 @@ export function FinalExamResult({
           <div className="flex items-center gap-2 pb-4">
             <IconBookmarks className="size-5 text-tertiary" />
             <h3 className="font-heading text-base font-bold text-text-primary">
-              Conceptos Clave para Reforzar
+              {t('finalExam.result.weakConceptsTitle')}
             </h3>
           </div>
           <p className="text-xs text-text-secondary">
-            Las siguientes áreas registraron respuestas incorrectas durante la evaluación:
+            {t('finalExam.result.weakConceptsDesc')}
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -222,10 +220,10 @@ export function FinalExamResult({
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
           <div>
             <h3 className="font-heading text-lg font-bold text-text-primary">
-              Revisión Detallada de Respuestas
+              {t('finalExam.result.detailedReviewTitle')}
             </h3>
             <p className="text-xs text-text-secondary">
-              Analiza la explicación y retroalimentación pedagógica para cada pregunta.
+              {t('finalExam.result.detailedReviewDesc')}
             </p>
           </div>
 
@@ -262,7 +260,7 @@ export function FinalExamResult({
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              Todas ({totalQuestions})
+              {t('finalExam.result.filterAll', { total: totalQuestions })}
             </button>
           </div>
         </div>
@@ -313,7 +311,7 @@ export function FinalExamResult({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="space-y-1">
                       <span className="font-semibold text-text-secondary">
-                        Tu respuesta:
+                        {t('finalExam.result.yourAnswer')}
                       </span>
                       <div
                         className={`font-medium ${
@@ -343,7 +341,7 @@ export function FinalExamResult({
                     </span>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <span className="text-[11px] text-text-secondary">Tu selección:</span>
+                        <span className="text-[11px] text-text-secondary">{t('finalExam.result.yourSelection')}</span>
                         <ul className="space-y-1">
                           {ev.studentPairsDisplay?.map((p, pIdx) => (
                             <li key={pIdx} className="rounded bg-surface px-2 py-1">
@@ -354,7 +352,7 @@ export function FinalExamResult({
                       </div>
                       {!ev.isCorrect && (
                         <div className="space-y-1">
-                          <span className="text-[11px] text-secondary">Solución correcta:</span>
+                          <span className="text-[11px] text-secondary">{t('finalExam.result.correctSolution')}</span>
                           <ul className="space-y-1">
                             {ev.correctPairsDisplay?.map((p, pIdx) => (
                               <li
@@ -376,7 +374,7 @@ export function FinalExamResult({
                     <span className="font-semibold text-text-secondary">Secuencia:</span>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <span className="text-[11px] text-text-secondary">Tu orden:</span>
+                        <span className="text-[11px] text-text-secondary">{t('finalExam.result.yourOrder')}</span>
                         <ol className="list-inside list-decimal space-y-1">
                           {ev.studentOrderDisplay?.map((item, oIdx) => (
                             <li key={oIdx} className="rounded bg-surface px-2 py-1">
@@ -387,7 +385,7 @@ export function FinalExamResult({
                       </div>
                       {!ev.isCorrect && (
                         <div className="space-y-1">
-                          <span className="text-[11px] text-secondary">Orden correcto:</span>
+                          <span className="text-[11px] text-secondary">{t('finalExam.result.correctOrder')}</span>
                           <ol className="list-inside list-decimal space-y-1">
                             {ev.correctOrderDisplay?.map((item, oIdx) => (
                               <li
@@ -407,7 +405,7 @@ export function FinalExamResult({
                 {/* Explicación pedagógica */}
                 <div className="border-t border-border/60 pt-3">
                   <span className="font-semibold text-text-primary block mb-1">
-                    Explicación técnica:
+                    {t('finalExam.result.technicalExplanation')}
                   </span>
                   <MarkdownRenderer content={ev.explanation} />
                 </div>

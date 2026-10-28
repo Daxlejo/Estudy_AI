@@ -44,7 +44,7 @@ export default function Quiz() {
 
     async function fetchQuiz() {
       if (!id) {
-        setError('No se especificó un identificador de miniquiz.')
+        setError(t('quiz.missingIdError'))
         setLoading(false)
         return
       }
@@ -57,7 +57,7 @@ export default function Quiz() {
         if (!isMounted) return
 
         if (!data) {
-          setError(`No se encontró el miniquiz solicitado con ID "${id}".`)
+          setError(t('quiz.notFoundIdError', { id }))
         } else {
           setQuiz(data)
           setCurrentQuestionIndex(0)
@@ -71,7 +71,7 @@ export default function Quiz() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Ocurrió un error inesperado al cargar el miniquiz.',
+            : t('quiz.unexpectedLoadError'),
         )
       } finally {
         if (isMounted) {
@@ -232,10 +232,10 @@ export default function Quiz() {
           <IconLoader2 className="size-7 animate-spin" />
         </div>
         <p className="mt-4 font-heading text-lg font-bold text-text-primary">
-          Cargando evaluación miniquiz...
+          {t('quiz.loading')}
         </p>
         <p className="mt-1 text-sm text-text-secondary">
-          Preparando preguntas y estructura pedagógica
+          {t('quiz.preparingQuestions')}
         </p>
       </div>
     )
@@ -249,10 +249,10 @@ export default function Quiz() {
           <IconAlertTriangle className="size-8" />
         </div>
         <h2 className="mt-4 font-heading text-xl font-bold text-text-primary">
-          Miniquiz no encontrado
+          {t('quiz.notFoundTitle')}
         </h2>
         <p className="mt-2 max-w-md text-sm text-text-secondary">
-          {error || 'El identificador recibido no coincide con ninguna evaluación activa.'}
+          {error || t('quiz.notFoundDesc')}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link
@@ -260,14 +260,14 @@ export default function Quiz() {
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90"
           >
             <IconBook className="size-4" />
-            Explorar Cursos
+            {t('quiz.exploreCourses')}
           </Link>
           <Link
             to="/"
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary"
           >
             <IconArrowLeft className="size-4" />
-            Ir al Inicio
+            {t('quiz.goHome')}
           </Link>
         </div>
       </div>

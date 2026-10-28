@@ -14,17 +14,19 @@ import SessionIntroBlock from '../../components/study-session/SessionIntroBlock'
 import SessionConceptsBlock from '../../components/study-session/SessionConceptsBlock'
 import SessionPracticeBlock from '../../components/study-session/SessionPracticeBlock'
 import SessionQuizTransitionBlock from '../../components/study-session/SessionQuizTransitionBlock'
+import { useTranslation } from '../../i18n'
 
-const STEPS = [
-  { id: 1, label: 'Introducción' },
-  { id: 2, label: 'Conceptos clave' },
-  { id: 3, label: 'Práctica guiada' },
-  { id: 4, label: 'Desafío aplicado' },
-  { id: 5, label: 'Consolidación' },
+const getSteps = (t: (k: string) => string) => [
+  { id: 1, label: t('studySession.stepIntro') },
+  { id: 2, label: t('studySession.stepConcepts') },
+  { id: 3, label: t('studySession.stepPractice') },
+  { id: 4, label: t('studySession.stepChallenge') },
+  { id: 5, label: t('studySession.stepConsolidation') },
 ]
 
 function StudySession() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useTranslation()
   const [session, setSession] = useState<StudySessionType | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
   const [currentStep, setCurrentStep] = useState(1)
@@ -73,10 +75,10 @@ function StudySession() {
           </div>
           <div>
             <h2 className="font-heading text-lg font-bold text-text-primary">
-              Preparando tu sesión de estudio
+              {t('studySession.loadingTitle')}
             </h2>
             <p className="mt-1.5 text-xs leading-relaxed text-text-secondary md:text-sm">
-              Cargando conceptos pedagógicos, bloques interactivos y desafíos aplicados...
+              {t('studySession.loadingDesc')}
             </p>
           </div>
         </div>
@@ -92,11 +94,10 @@ function StudySession() {
             <IconAlertCircle className="size-8" />
           </div>
           <h1 className="font-heading text-xl font-bold text-text-primary">
-            Sesión de estudio no encontrada
+            {t('studySession.notFoundTitle')}
           </h1>
           <p className="text-xs leading-relaxed text-text-secondary md:text-sm">
-            No pudimos localizar la sesión solicitada. Verifica el identificador o regresa al catálogo
-            de cursos para continuar tu ruta.
+            {t('studySession.notFoundDesc')}
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -104,7 +105,7 @@ function StudySession() {
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-heading text-sm font-bold text-on-primary shadow-sm transition-transform hover:scale-[1.02]"
             >
               <IconArrowLeft className="size-4" />
-              Volver a mis cursos
+              {t('studySession.backToCourses')}
             </Link>
           </div>
         </div>
@@ -112,6 +113,7 @@ function StudySession() {
     )
   }
 
+  const STEPS = getSteps(t)
   const progressPercent = Math.round((currentStep / STEPS.length) * 100)
 
   return (
@@ -125,7 +127,7 @@ function StudySession() {
       />
 
       {/* Navegación por pasos / breadcrumbs interactivos */}
-      <nav aria-label="Etapas de la sesión" className="border-b border-border/60 bg-surface/50">
+      <nav aria-label={t('studySession.stagesAria')} className="border-b border-border/60 bg-surface/50">
         <div className="mx-auto flex max-w-5xl items-center justify-between overflow-x-auto px-4 py-3 md:px-8">
           <div className="flex items-center gap-2 md:gap-3">
             {STEPS.map((step) => {
@@ -163,7 +165,7 @@ function StudySession() {
           </div>
 
           <span className="hidden text-xs font-medium text-text-secondary md:inline-block">
-            {progressPercent}% completado
+            {t('studySession.percentCompleted', { percent: progressPercent })}
           </span>
         </div>
       </nav>
@@ -188,8 +190,8 @@ function StudySession() {
             sessionId={session.id}
             blockNumber={3}
             stepNumber={3}
-            phaseTitle="Fase 2: Práctica Guiada"
-            continueButtonLabel="Continuar al Desafío aplicado"
+            phaseTitle={t('studySession.phase2Practice')}
+            continueButtonLabel={t('studySession.continueToChallenge')}
             onBack={() => goToStep(2)}
             onContinue={() => goToStep(4)}
           />
@@ -201,8 +203,8 @@ function StudySession() {
             sessionId={session.id}
             blockNumber={4}
             stepNumber={4}
-            phaseTitle="Fase 3: Desafío Conceptual"
-            continueButtonLabel="Continuar a la Evaluación"
+            phaseTitle={t('studySession.phase3Challenge')}
+            continueButtonLabel={t('studySession.continueToQuiz')}
             onBack={() => goToStep(3)}
             onContinue={() => goToStep(5)}
           />

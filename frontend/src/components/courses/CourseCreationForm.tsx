@@ -27,11 +27,7 @@ export function CourseCreationForm() {
 
   const handleFilesSelected = (files: File[]) => {
     if (materials.length + files.length > MAX_MATERIALS) {
-      setFileLimitError(
-        language === 'en'
-          ? `You can upload up to 5 files per course (${materials.length} already selected, tried to add ${files.length}).`
-          : `Solo puedes subir hasta 5 archivos por curso (${materials.length} ya seleccionados, intentaste añadir ${files.length}).`,
-      )
+      setFileLimitError(t('createCourse.fileLimitError', { max: MAX_MATERIALS, current: materials.length, added: files.length }))
       setTouched((prev) => ({ ...prev, materials: true }))
       return
     }
@@ -182,7 +178,7 @@ export function CourseCreationForm() {
               {t('createCourse.materialsLabel')} <span className="text-danger">*</span>
             </label>
             <span className="text-xs font-semibold text-text-secondary">
-              {materials.length}/{MAX_MATERIALS} {language === 'en' ? 'files' : 'archivos'}
+              {t('createCourse.filesCount', { current: materials.length, max: MAX_MATERIALS })}
             </span>
           </div>
           <p className="mt-1 text-xs text-text-secondary">

@@ -102,7 +102,7 @@ export function BuilderProgress({
   characterSrc,
   className = '',
 }: BuilderProgressProps) {
-  const { t, language } = useTranslation()
+  const { t } = useTranslation()
   const currentIndex = getStepIndex(currentStepId)
 
   // Cálculo dinámico de posición horizontal (0%, 33%, 66%, 100%)
@@ -114,7 +114,7 @@ export function BuilderProgress({
   }
   const translateX = stepPercentages[currentIndex] ?? `${Math.round((currentIndex / 3) * 100)}%`
   const activeStep = BUILDER_STEPS[currentIndex] ?? BUILDER_STEPS[0]
-  const phaseLabel = language === 'en' ? `Phase ${activeStep.phaseNumber}` : `Fase ${activeStep.phaseNumber}`
+  const phaseLabel = t('builder.phase', { number: activeStep.phaseNumber })
   const activeStepLabel = t(activeStep.labelKey) !== activeStep.labelKey ? t(activeStep.labelKey) : activeStep.defaultLabel
 
   return (
@@ -175,7 +175,7 @@ export function BuilderProgress({
               {/* Tag <img> con el personaje constructor / GIF */}
               <img
                 src={characterSrc || DEFAULT_BUILDER_CHARACTER_SVG}
-                alt="Constructor EstudyAI"
+                alt={t('processing.builderAlt')}
                 className="builder-character-animated size-12 object-contain drop-shadow-lg select-none"
               />
             </div>

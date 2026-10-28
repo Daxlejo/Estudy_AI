@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import {
   IconEye,
   IconCircleCheckFilled,
@@ -25,6 +26,7 @@ export function PredictResultActivityView({
   showSolution = false,
   onSelectOption,
 }: PredictResultActivityViewProps) {
+  const { t } = useTranslation()
   const isEvaluated = evaluation !== null
   const isCode =
     activity.codeOrText.includes('\n') ||
@@ -34,12 +36,12 @@ export function PredictResultActivityView({
     activity.codeOrText.includes('console.')
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de predicción de resultado">
+    <div className="space-y-6" role="region" aria-label={t('activity.predictResult.ariaLabel')}>
       {/* Cabecera del escenario */}
       <div className="rounded-2xl border border-border/80 bg-surface p-5 shadow-sm space-y-3">
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
           <IconEye className="size-4" />
-          <span>Predicción de Resultado</span>
+          <span>{t('activity.predictResult.title')}</span>
         </div>
         <p className="text-base font-semibold leading-relaxed text-text-primary">
           {activity.scenario}
@@ -59,7 +61,7 @@ export function PredictResultActivityView({
       </div>
 
       {/* Opciones de predicción */}
-      <div className="space-y-3" role="radiogroup" aria-label="Opciones de predicción">
+      <div className="space-y-3" role="radiogroup" aria-label={t('activity.predictResult.optionsAria')}>
         {activity.options.map((option, idx) => {
           const isSelected = selectedOptionId === option.id
           const optionLetter = String.fromCharCode(65 + idx)

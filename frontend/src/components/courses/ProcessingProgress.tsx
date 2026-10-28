@@ -79,7 +79,7 @@ export function ProcessingProgress({ state }: ProcessingProgressProps) {
 
         <div
           role="progressbar"
-          aria-label="Progreso de preparación del curso"
+          aria-label={t('processing.progressAria')}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={state.progressPercent}

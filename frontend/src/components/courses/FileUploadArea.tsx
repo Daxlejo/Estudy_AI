@@ -10,7 +10,7 @@ interface FileUploadAreaProps {
 const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.txt']
 
 export function FileUploadArea({ onFilesSelected, disabled = false }: FileUploadAreaProps) {
-  const { t, language } = useTranslation()
+  const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -100,11 +100,7 @@ export function FileUploadArea({ onFilesSelected, disabled = false }: FileUpload
       </div>
 
       <h3 className="font-heading text-base font-bold text-text-primary md:text-lg">
-        {isDragging
-          ? language === 'en'
-            ? 'Drop your files here'
-            : 'Suelta tus archivos aquí'
-          : t('fileUpload.dropzoneTitle')}
+        {isDragging ? t('fileUpload.dropzoneDragging') : t('fileUpload.dropzoneTitle')}
       </h3>
 
       <p className="mt-1 text-sm text-text-secondary">

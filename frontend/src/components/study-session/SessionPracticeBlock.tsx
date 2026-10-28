@@ -170,7 +170,7 @@ export function SessionPracticeBlock({
         </div>
 
         {/* Lista de opciones seleccionables */}
-        <div className="mt-6 space-y-3" role="radiogroup" aria-label="Opciones de respuesta">
+        <div className="mt-6 space-y-3" role="radiogroup" aria-label={t('activity.practice.optionsAria')}>
           {exercise.options.map((option, idx) => {
             const isSelected = selectedId === option.id
             const isVerifiedOption = verifiedId === option.id

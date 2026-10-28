@@ -15,7 +15,7 @@ interface FinalExamNodeProps {
 }
 
 export function FinalExamNode({ node }: FinalExamNodeProps) {
-  const { t, formatNumber, language } = useTranslation()
+  const { t, formatNumber } = useTranslation()
   const isCompleted = node.status === 'COMPLETED'
   const isCurrent = node.status === 'CURRENT'
   const isLocked = node.status === 'LOCKED'
@@ -112,7 +112,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
               to={`/examen/${courseId}`}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-high px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:border-secondary hover:text-secondary sm:w-auto"
             >
-              {language === 'en' ? 'View exam results' : 'Ver resultados del examen'}
+              {t('learningPath.viewExamResults')}
               <IconArrowRight className="size-3.5" />
             </Link>
           )}
@@ -120,7 +120,7 @@ export function FinalExamNode({ node }: FinalExamNodeProps) {
           {isLocked && (
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface-high/40 px-4 py-2 text-xs font-medium text-text-secondary/60">
               <IconLock className="size-3.5" />
-              {language === 'en' ? 'Locked' : 'Bloqueado'}
+              {t('learningPath.locked')}
             </span>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconCheck, IconCode, IconCopy } from '@tabler/icons-react'
 import { highlightLine } from './codeHighlight'
@@ -35,6 +36,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 type CopyState = 'idle' | 'copied' | 'error'
 
 export function CodeBlock({ code, language }: CodeBlockProps) {
+  const { t } = useTranslation()
   const lines = useMemo(() => code.split('\n'), [code])
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -55,26 +57,26 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   }, [code])
 
   const label =
-    copyState === 'copied' ? 'Copiado' : copyState === 'error' ? 'No se pudo copiar' : 'Copiar'
+    copyState === 'copied' ? t('common.copied') : copyState === 'error' ? t('common.copyFailed') : t('common.copy')
 
   return (
     <div className="my-4 w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border/80 bg-[#18181b] text-left shadow-md">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/5 px-4 py-2 font-mono text-xs text-zinc-300">
         <div className="flex items-center gap-1.5 font-semibold tracking-wider text-primary">
           <IconCode className="size-3.5 text-primary/80" />
-          <span>{language ? language.toUpperCase() : 'CÓDIGO'}</span>
+          <span>{language ? language.toUpperCase() : t('common.code')}</span>
         </div>
         <button
           type="button"
           onClick={handleCopy}
           aria-label={
             copyState === 'copied'
-              ? 'Código copiado al portapapeles'
+              ? t('common.codeCopiedAria')
               : copyState === 'error'
-                ? 'Error al copiar código'
-                : 'Copiar código'
+                ? t('common.codeCopyFailedAria')
+                : t('common.copyCodeAria')
           }
-          title={copyState === 'copied' ? 'Copiado al portapapeles' : 'Copiar código'}
+          title={copyState === 'copied' ? t('common.codeCopiedTitle') : t('common.copyCodeAria')}
           className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 transition-all duration-150 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           {copyState === 'copied' ? (

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   IconCheck,
@@ -11,9 +12,9 @@ import {
   IconChevronDown,
   IconChevronUp,
 } from '@tabler/icons-react'
-import { useState } from 'react'
 import type { Quiz, QuizResult } from '../../types/course'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 
 interface QuizResultViewProps {
   result: QuizResult
@@ -28,6 +29,7 @@ export function QuizResultView({
   courseBonusXp = 0,
   onReviewConcepts,
 }: QuizResultViewProps) {
+  const { t } = useTranslation()
   const [showAllQuestions, setShowAllQuestions] = useState(false)
   const incorrectAnswers = result.answers.filter((a) => !a.isCorrect)
 
@@ -37,18 +39,18 @@ export function QuizResultView({
       <div className="space-y-8 animate-in fade-in duration-300">
         <div className="relative overflow-hidden rounded-3xl border border-border bg-surface p-8 text-center shadow-lg md:p-10">
           <h2 className="font-heading text-xl font-bold text-text-primary md:text-2xl">
-            Resultado indeterminado
+            {t('quiz.result.indeterminateTitle')}
           </h2>
           <p className="mt-2 text-sm text-text-secondary md:text-base">
-            No se registraron preguntas en esta evaluación para calcular una calificación.
+            {t('quiz.result.indeterminateDesc')}
           </p>
           <div className="mt-6 flex items-center justify-center">
             <Link
               to={`/cursos/${result.courseId}/ruta`}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3.5 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary"
             >
               <IconBook className="size-4" />
-              Ver ruta de aprendizaje
+              {t('quiz.result.viewPath')}
             </Link>
           </div>
         </div>
@@ -79,51 +81,51 @@ export function QuizResultView({
 
             <div className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-success/40 bg-success/10 px-3.5 py-1 text-xs font-bold text-success uppercase tracking-wider">
               <IconCheck className="size-3.5" />
-              <span>Miniquiz Aprobado</span>
+              <span>{t('quiz.result.passedBadge')}</span>
             </div>
 
             <h2 className="mt-3 font-heading text-2xl font-black tracking-tight text-text-primary md:text-3xl">
-              ¡Excelente trabajo! Has superado la evaluación
+              {t('quiz.result.passedTitle')}
             </h2>
 
             <p className="mt-2 max-w-xl text-sm text-text-secondary md:text-base">
-              Demostraste comprensión sólida de los conceptos de <span className="font-semibold text-text-primary">"{quiz.sessionTitle}"</span>. Esta sesión ha sido marcada como completada en tu ruta.
+              {t('quiz.result.passedDesc', { session: quiz.sessionTitle })}
             </p>
 
             {/* Tarjeta de Métricas / Puntaje */}
             <div className="mt-8 grid w-full max-w-lg grid-cols-3 gap-3 rounded-2xl border border-border bg-surface-high/60 p-4">
               <div className="flex flex-col items-center">
-                <span className="text-xs font-medium text-text-secondary">Aciertos</span>
+                <span className="text-xs font-medium text-text-secondary">{t('quiz.result.correct')}</span>
                 <span className="mt-0.5 font-heading text-xl font-bold text-success md:text-2xl">
                   {result.correctAnswers} / {result.totalQuestions}
                 </span>
                 <span className="text-[11px] text-text-secondary">
-                  mín. {result.passingThreshold}% de aciertos
+                  {t('quiz.result.minThreshold', { threshold: result.passingThreshold })}
                 </span>
               </div>
 
               <div className="flex flex-col items-center border-x border-border">
-                <span className="text-xs font-medium text-text-secondary">Calificación</span>
+                <span className="text-xs font-medium text-text-secondary">{t('quiz.result.score')}</span>
                 <span className="mt-0.5 font-heading text-xl font-bold text-text-primary md:text-2xl">
                   {result.scorePercent}%
                 </span>
-                <span className="text-[11px] font-semibold text-success">Aprobatorio</span>
+                <span className="text-[11px] font-semibold text-success">{t('quiz.result.passingGrade')}</span>
               </div>
 
               <div className="flex flex-col items-center">
-                <span className="text-xs font-medium text-text-secondary">Recompensa</span>
+                <span className="text-xs font-medium text-text-secondary">{t('quiz.result.reward')}</span>
                 <span className="mt-0.5 inline-flex items-center gap-1 font-heading text-xl font-bold text-primary md:text-2xl">
                   <IconSparkles className="size-4.5" />
                   +{quiz.xpReward + courseBonusXp}
                 </span>
                 <span className="text-[11px] text-text-secondary">
                   {courseBonusXp > 0
-                    ? `${quiz.xpReward} XP + ${courseBonusXp} XP Bonus`
-                    : 'Puntos XP'}
+                    ? t('quiz.result.bonusXp', { quiz: quiz.xpReward, bonus: courseBonusXp })
+                    : t('quiz.result.xpPoints')}
                 </span>
                 {courseBonusXp > 0 && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400">
-                    +{courseBonusXp} XP Curso
+                    {t('quiz.result.courseBonus', { bonus: courseBonusXp })}
                   </span>
                 )}
               </div>
@@ -136,7 +138,7 @@ export function QuizResultView({
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3.5 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary sm:w-auto"
               >
                 <IconBook className="size-4" />
-                Ver ruta de aprendizaje
+                {t('quiz.result.viewPath')}
               </Link>
 
               {result.nextSessionId ? (
@@ -144,7 +146,7 @@ export function QuizResultView({
                   to={`/sesion/${result.nextSessionId}`}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_55%,transparent)] focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.99] sm:w-auto"
                 >
-                  Continuar a la siguiente sesión
+                  {t('quiz.result.continueNextSession')}
                   <IconArrowRight className="size-4" />
                 </Link>
               ) : (
@@ -152,7 +154,7 @@ export function QuizResultView({
                   to={`/cursos/${result.courseId}/ruta`}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-md transition-all hover:scale-[1.02] sm:w-auto"
                 >
-                  Ir al examen final del curso
+                  {t('quiz.result.goToFinalExam')}
                   <IconArrowRight className="size-4" />
                 </Link>
               )}
@@ -167,7 +169,7 @@ export function QuizResultView({
             onClick={() => setShowAllQuestions(!showAllQuestions)}
             className="flex w-full items-center justify-between text-left text-sm font-semibold text-text-primary"
           >
-            <span>Detalle de tus respuestas ({result.correctAnswers} correctas de {result.totalQuestions})</span>
+            <span>{t('quiz.result.answersDetail', { correct: result.correctAnswers, total: result.totalQuestions })}</span>
             {showAllQuestions ? (
               <IconChevronUp className="size-4 text-text-secondary" />
             ) : (
@@ -181,7 +183,7 @@ export function QuizResultView({
                 <div key={ans.questionId} className="pt-4 first:pt-0 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <span className="text-xs font-semibold text-text-secondary">
-                      Pregunta {idx + 1} • {ans.conceptName}
+                      {t('quiz.result.questionNum', { num: idx + 1 })} • {ans.conceptName}
                     </span>
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
@@ -191,20 +193,20 @@ export function QuizResultView({
                       }`}
                     >
                       {ans.isCorrect ? <IconCheck className="size-3" /> : <IconX className="size-3" />}
-                      {ans.isCorrect ? 'Correcta' : 'Incorrecta'}
+                      {ans.isCorrect ? t('quiz.result.correctAnswerLabel') : t('quiz.result.incorrectAnswerLabel')}
                     </span>
                   </div>
                   <div className="text-sm font-medium text-text-primary">
                     <MarkdownRenderer content={ans.prompt} />
                   </div>
                   <div className="text-xs text-text-secondary">
-                    <span className="font-semibold text-text-primary">Tu respuesta:</span>{' '}
+                    <span className="font-semibold text-text-primary">{t('quiz.result.yourAnswer')}</span>{' '}
                     <span className="text-text-primary font-medium">
                       <MarkdownRenderer content={ans.selectedOptionText} inline />
                     </span>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-surface-high/40 p-3 text-xs text-text-secondary">
-                    <span className="font-semibold text-text-primary block mb-1">Explicación:</span>
+                    <span className="font-semibold text-text-primary block mb-1">{t('quiz.result.explanation')}</span>
                     <MarkdownRenderer content={ans.explanation} />
                   </div>
                 </div>
@@ -232,34 +234,39 @@ export function QuizResultView({
 
           <div className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-error/40 bg-error/10 px-3.5 py-1 text-xs font-bold text-error uppercase tracking-wider">
             <IconX className="size-3.5" />
-            <span>Miniquiz no superado • Intento {quiz.attemptNumber}</span>
+            <span>{t('quiz.result.failedBadge', { attempt: quiz.attemptNumber })}</span>
           </div>
 
           <h2 className="mt-3 font-heading text-2xl font-black tracking-tight text-text-primary md:text-3xl">
-            Sigue esforzándote — necesitas un poco más de práctica
+            {t('quiz.result.failedTitle')}
           </h2>
 
           <p className="mt-2 max-w-xl text-sm text-text-secondary md:text-base">
-            Obtuviste <span className="font-bold text-text-primary">{result.correctAnswers} de {result.totalQuestions} aciertos</span> ({result.scorePercent}%). Para desbloquear la siguiente sesión se requiere <span className="font-semibold text-text-primary">mín. {result.passingThreshold}% de aciertos</span>.
+            {t('quiz.result.failedExplanation', {
+              correct: result.correctAnswers,
+              total: result.totalQuestions,
+              percent: result.scorePercent,
+              threshold: result.passingThreshold,
+            })}
           </p>
 
           {/* Tarjeta de Métricas */}
           <div className="mt-6 grid w-full max-w-md grid-cols-2 gap-3 rounded-2xl border border-border bg-surface-high/60 p-4">
             <div className="flex flex-col items-center">
-              <span className="text-xs font-medium text-text-secondary">Puntaje obtenido</span>
+              <span className="text-xs font-medium text-text-secondary">{t('quiz.result.obtainedScore')}</span>
               <span className="mt-0.5 font-heading text-xl font-bold text-error md:text-2xl">
                 {result.correctAnswers} / {result.totalQuestions}
               </span>
-              <span className="text-[11px] text-text-secondary">{result.scorePercent}% de acierto</span>
+              <span className="text-[11px] text-text-secondary">{result.scorePercent}{t('quiz.result.accuracyPercent')}</span>
             </div>
 
             <div className="flex flex-col items-center border-l border-border">
-              <span className="text-xs font-medium text-text-secondary">Mínimo para aprobar</span>
+              <span className="text-xs font-medium text-text-secondary">{t('quiz.result.minToPass')}</span>
               <span className="mt-0.5 font-heading text-xl font-bold text-text-primary md:text-2xl">
-                mín. {result.passingThreshold}% de aciertos
+                {t('quiz.result.minThreshold', { threshold: result.passingThreshold })}
               </span>
               <span className="text-[11px] text-text-secondary">
-                Faltaron {missingAnswers} respuesta(s)
+                {t('quiz.result.needMoreCorrect', { count: missingAnswers })}
               </span>
             </div>
           </div>
@@ -269,7 +276,7 @@ export function QuizResultView({
             <div className="mt-6 w-full max-w-lg rounded-2xl border border-tertiary/30 bg-tertiary/5 p-4 text-left">
               <div className="flex items-center gap-2 text-xs font-bold text-tertiary uppercase tracking-wider">
                 <IconBrain className="size-4" />
-                <span>Conceptos a reforzar identificados:</span>
+                <span>{t('quiz.result.weakConceptsDetected')}</span>
               </div>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {Array.from(new Set(incorrectAnswers.map((a) => a.conceptName))).map((conceptName) => (
@@ -292,7 +299,7 @@ export function QuizResultView({
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-[0_8px_24px_-8px_color-mix(in_srgb,var(--primary)_70%,transparent)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_28px_color-mix(in_srgb,var(--primary)_55%,transparent)] focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.99] sm:w-auto"
             >
               <IconBrain className="size-4.5" />
-              Repasar conceptos clave
+              {t('quiz.result.reviewWeakConcepts')}
             </button>
           </div>
         </div>
@@ -302,10 +309,10 @@ export function QuizResultView({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-heading text-lg font-bold tracking-tight text-text-primary">
-            Preguntas donde tuviste dificultades ({incorrectAnswers.length})
+            {t('quiz.result.difficultQuestions', { count: incorrectAnswers.length })}
           </h3>
           <span className="text-xs text-text-secondary">
-            Analiza el razonamiento antes de tu siguiente intento
+            {t('quiz.result.difficultQuestionsDesc')}
           </span>
         </div>
 
@@ -318,12 +325,12 @@ export function QuizResultView({
               {/* Encabezado del ítem */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
                 <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
-                  Pregunta {idx + 1}
+                  {t('quiz.result.questionNum', { num: idx + 1 })}
                 </span>
 
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-tertiary/40 bg-tertiary/10 px-2.5 py-0.5 text-xs font-semibold text-tertiary">
                   <IconBrain className="size-3.5" />
-                  <span>Concepto: {ans.conceptName}</span>
+                  <span>{t('quiz.conceptLabel', { name: ans.conceptName })}</span>
                 </div>
               </div>
 
@@ -338,7 +345,7 @@ export function QuizResultView({
                 <div className="rounded-xl border border-error/40 bg-error/5 p-3.5 text-xs md:text-sm">
                   <div className="flex items-center gap-2 font-bold text-error">
                     <IconX className="size-4 shrink-0" />
-                    <span>Tu respuesta (Incorrecta):</span>
+                    <span>{t('quiz.result.yourAnswerIncorrect')}</span>
                   </div>
                   <div className="mt-1 pl-6 text-text-primary">
                     <MarkdownRenderer content={ans.selectedOptionText} inline />
@@ -349,7 +356,7 @@ export function QuizResultView({
                 <div className="rounded-xl border border-success/40 bg-success/5 p-3.5 text-xs md:text-sm">
                   <div className="flex items-center gap-2 font-bold text-success">
                     <IconCheck className="size-4 shrink-0" />
-                    <span>Respuesta correcta:</span>
+                    <span>{t('quiz.result.correctAnswer')}</span>
                   </div>
                   <div className="mt-1 pl-6 font-medium text-text-primary">
                     <MarkdownRenderer content={ans.correctOptionText} inline />
@@ -359,7 +366,7 @@ export function QuizResultView({
 
               {/* Justificación pedagógica */}
               <div className="rounded-xl border border-border/80 bg-surface-high/50 p-4 text-xs md:text-sm text-text-secondary">
-                <span className="font-bold text-text-primary block mb-1">¿Por qué es correcta?</span>
+                <span className="font-bold text-text-primary block mb-1">{t('quiz.result.whyCorrect')}</span>
                 <MarkdownRenderer content={ans.explanation} />
               </div>
             </div>

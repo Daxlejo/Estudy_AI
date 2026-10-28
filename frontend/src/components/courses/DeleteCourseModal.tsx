@@ -59,7 +59,7 @@ export default function DeleteCourseModal({
       const msg =
         err instanceof Error
           ? err.message
-          : t('common.error') || 'Error al eliminar el curso'
+          : t('courses.deleteError')
       setApiError(msg)
     } finally {
       setIsDeleting(false)

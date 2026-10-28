@@ -329,7 +329,7 @@ export function MatchingActivityView({
   )
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de emparejamiento">
+    <div className="space-y-6" role="region" aria-label={t('activity.matching.ariaLabel')}>
       <style>{`
         @media (prefers-reduced-motion: no-preference) {
           @keyframes activity-error-shake {

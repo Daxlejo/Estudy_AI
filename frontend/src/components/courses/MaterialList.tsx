@@ -9,7 +9,7 @@ interface MaterialListProps {
 }
 
 export function MaterialList({ materials, onRemove, disabled = false }: MaterialListProps) {
-  const { t, language } = useTranslation()
+  const { t } = useTranslation()
   if (materials.length === 0) return null
 
   const totalBytes = materials.reduce((acc, curr) => acc + curr.sizeBytes, 0)
@@ -22,7 +22,7 @@ export function MaterialList({ materials, onRemove, disabled = false }: Material
           {t('fileUpload.materialsAdded', { count: materials.length })}
         </span>
         <span>
-          {language === 'en' ? `Total size: ${totalFormatted}` : `Peso total: ${totalFormatted}`}
+          {t('fileUpload.totalSize', { size: totalFormatted })}
         </span>
       </div>
 

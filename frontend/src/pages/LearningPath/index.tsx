@@ -11,17 +11,19 @@ import type { LearningPath as LearningPathType } from '../../types/course'
 import LearningPathHeader from '../../components/learning-path/LearningPathHeader'
 import LearningPathNode from '../../components/learning-path/LearningPathNode'
 import LearningPathConnector from '../../components/learning-path/LearningPathConnector'
+import { useTranslation } from '../../i18n'
 
-function getPhaseTitle(nodeNumber: number): string | undefined {
-  if (nodeNumber === 1) return 'Fase 1: Fundamentos y Conceptos Básicos'
-  if (nodeNumber === 5) return 'Fase 2: Relaciones y Aplicaciones Intermedias'
-  if (nodeNumber === 9) return 'Fase 3: Técnicas Avanzadas y Optimización'
-  if (nodeNumber === 12) return 'Fase 4: Evaluación y Certificación Final'
+function getPhaseTitle(nodeNumber: number, t: (k: string) => string): string | undefined {
+  if (nodeNumber === 1) return t('learningPath.phase1')
+  if (nodeNumber === 5) return t('learningPath.phase2')
+  if (nodeNumber === 9) return t('learningPath.phase3')
+  if (nodeNumber === 12) return t('learningPath.phase4')
   return undefined
 }
 
 function LearningPath() {
   const { id } = useParams<{ id: string }>()
+  const { t } = useTranslation()
   const [learningPath, setLearningPath] = useState<LearningPathType | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
 
@@ -55,7 +57,7 @@ function LearningPath() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
         <IconLoader2 className="size-8 animate-spin text-primary" />
         <p className="font-heading text-sm font-semibold text-text-secondary">
-          Cargando tu ruta de aprendizaje...
+          {t('learningPath.loading')}
         </p>
       </div>
     )
@@ -68,17 +70,17 @@ function LearningPath() {
           <IconAlertCircle className="size-8" />
         </div>
         <h1 className="mt-4 font-heading text-2xl font-bold text-text-primary">
-          Ruta no encontrada
+          {t('learningPath.notFoundTitle')}
         </h1>
         <p className="mt-2 text-sm text-text-secondary">
-          No pudimos localizar la ruta de aprendizaje solicitada. Verifica el identificador del curso.
+          {t('learningPath.notFoundDesc')}
         </p>
         <Link
           to="/cursos"
           className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-heading text-sm font-bold text-on-primary shadow-sm hover:scale-[1.02] transition-transform"
         >
           <IconArrowLeft className="size-4" />
-          Volver a mis cursos
+          {t('learningPath.backToCourses')}
         </Link>
       </div>
     )
@@ -90,11 +92,11 @@ function LearningPath() {
       <LearningPathHeader learningPath={learningPath} />
 
       {/* Recorrido secuencial de la ruta */}
-      <section aria-label="Ruta de sesiones de estudio" className="mt-10">
+      <section aria-label={t('learningPath.pathAria')} className="mt-10">
         <div className="space-y-0">
           {learningPath.nodes.map((node, index) => {
             const nextNode = learningPath.nodes[index + 1]
-            const phaseTitle = getPhaseTitle(node.number)
+            const phaseTitle = getPhaseTitle(node.number, t)
 
             return (
               <div key={node.id}>
@@ -116,7 +118,7 @@ function LearningPath() {
                   <LearningPathConnector
                     fromStatus={node.status}
                     toStatus={nextNode?.status}
-                    phaseTitle={nextNode ? getPhaseTitle(nextNode.number) : undefined}
+                    phaseTitle={nextNode ? getPhaseTitle(nextNode.number, t) : undefined}
                   />
                 )}
               </div>
@@ -132,12 +134,10 @@ function LearningPath() {
         </div>
         <div className="space-y-1">
           <p className="font-semibold text-text-primary">
-            Estructura del método EstudyAI
+            {t('learningPath.methodStructureTitle')}
           </p>
           <p className="text-xs md:text-sm">
-            Cada sesión incluye material guiado, ejemplos prácticos y un miniquiz al finalizar para
-            consolidar los conceptos en tu memoria de largo plazo. Al completar todas las sesiones,
-            se habilitará el Examen Final para certificar tu dominio del tema.
+            {t('learningPath.methodStructureDesc')}
           </p>
         </div>
       </div>

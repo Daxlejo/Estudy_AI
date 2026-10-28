@@ -527,18 +527,18 @@ export function ActivityContainer({
                         {isSelected && isOptionCorrect && (
                           <span className="inline-flex items-center gap-1 text-secondary">
                             <IconCircleCheckFilled className="size-4" />
-                            Correcto
+                            {t('common.correct')}
                           </span>
                         )}
                         {isSelected && !isOptionCorrect && (
                           <span className="inline-flex items-center gap-1 text-danger">
                             <IconAlertCircleFilled className="size-4" />
-                            Incorrecto
+                            {t('common.incorrect')}
                           </span>
                         )}
                         {!isSelected && isOptionCorrect && (
                           <span className="inline-flex items-center gap-1 text-secondary font-medium">
-                            Respuesta esperada
+                            {t('activity.expectedAnswer')}
                           </span>
                         )}
                       </div>
@@ -588,7 +588,7 @@ export function ActivityContainer({
                   <div className="flex flex-wrap items-center gap-2">
                     {isChallenge && (
                       <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-bold text-primary">
-                        Calificación: {evaluation.scorePercent}%
+                        {t('activity.scorePercent', { score: evaluation.scorePercent })}
                       </span>
                     )}
 
@@ -679,7 +679,7 @@ export function ActivityContainer({
                 }`}
               >
                 <IconCheck className="size-4" />
-                {isChallenge ? 'Enviar y calificar desafío' : t('activity.verifySolution')}
+                {isChallenge ? t('activity.submitAndGradeChallenge') : t('activity.verifySolution')}
               </button>
             )}
 

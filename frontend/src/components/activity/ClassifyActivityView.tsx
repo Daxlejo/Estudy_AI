@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import React, { useState } from 'react'
 import {
   IconCategory,
@@ -28,6 +29,7 @@ export function ClassifyActivityView({
   showSolution = false,
   onChangeAssignments,
 }: ClassifyActivityViewProps) {
+  const { t } = useTranslation()
   const [selectedItemLabel, setSelectedItemLabel] = useState<string | null>(null)
   const isEvaluated = evaluation !== null
 
@@ -89,25 +91,25 @@ export function ClassifyActivityView({
   }
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de Clasificación">
+    <div className="space-y-6" role="region" aria-label={t('activity.classify.ariaLabel')}>
       {/* Instrucciones de interacción (Tap o Drag) */}
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-text-primary">
           <IconCategory className="size-4 text-primary" />
-          Clasificación por Categorías
+          {t('activity.classify.title')}
         </span>
-        <span>Haz clic en un elemento y luego en su categoría, o arrástralo</span>
+        <span>{t('activity.classify.instruction')}</span>
       </div>
 
       {/* Banco de elementos pendientes de clasificar */}
       <div className="rounded-2xl border border-border/80 bg-surface p-4 shadow-sm">
         <span className="mb-2.5 block text-xs font-semibold text-text-secondary">
-          Elementos pendientes por clasificar ({unassignedItems.length}):
+          {t('activity.classify.unassignedCount', { count: unassignedItems.length })}
         </span>
 
         {unassignedItems.length === 0 ? (
           <p className="text-xs italic text-secondary">
-            ¡Todos los elementos han sido asignados a una categoría!
+            {t('activity.classify.allAssigned')}
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -169,8 +171,8 @@ export function ClassifyActivityView({
                 {assignedToThisCat.length === 0 ? (
                   <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border/80 text-center text-xs text-text-secondary">
                     {selectedItemLabel
-                      ? 'Haz clic aquí para asignar el elemento'
-                      : 'Arrastra elementos aquí'}
+                      ? t('activity.classify.clickToAssign')
+                      : t('activity.classify.dragHere')}
                   </div>
                 ) : (
                   assignedToThisCat.map((item) => {
@@ -223,7 +225,7 @@ export function ClassifyActivityView({
               {/* Si se muestra solución y hay errores */}
               {showSolution && isEvaluated && (
                 <div className="mt-3 border-t border-border/60 pt-2 text-[11px] text-text-secondary">
-                  <span className="font-semibold text-secondary">Correctos en esta categoría: </span>
+                  <span className="font-semibold text-secondary">{t('activity.classify.correctInCategory')} </span>
                   {activity.items
                     .filter((it) => it.correctCategory === category)
                     .map((it) => it.label)

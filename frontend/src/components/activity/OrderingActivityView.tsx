@@ -48,7 +48,7 @@ export function OrderingActivityView({
   }
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de ordenamiento">
+    <div className="space-y-6" role="region" aria-label={t('activity.ordering.ariaLabel')}>
       <style>{`
         @media (prefers-reduced-motion: no-preference) {
           @keyframes ordering-error-shake {
@@ -79,7 +79,7 @@ export function OrderingActivityView({
       </div>
 
       {/* Lista de pasos interactiva */}
-      <div className="space-y-3" role="list" aria-label="Lista de pasos a ordenar">
+      <div className="space-y-3" role="list" aria-label={t('activity.ordering.listAriaLabel')}>
         {currentOrderedItems.map((item, index) => {
           const isFirst = index === 0
           const isLast = index === currentOrderedItems.length - 1

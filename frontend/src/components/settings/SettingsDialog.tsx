@@ -191,9 +191,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               {t('settings.langTitle')}
             </h3>
             <p className="text-xs text-text-secondary">
-              {language === 'en'
-                ? 'Choose the display language for the application interface.'
-                : 'Elige el idioma de visualización de la interfaz de la aplicación.'}
+              {t('settings.langDescShort')}
             </p>
           </div>
 
@@ -286,9 +284,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               ⚠️
             </span>
             <p>
-              {language === 'en'
-                ? 'Courses you have already created will remain in their original language even if you change this preference. Only new courses will use the selected language.'
-                : 'Los cursos que ya creaste seguirán en su idioma original aunque cambies esta preferencia. Solo los nuevos cursos usarán el idioma seleccionado.'}
+              {t('settings.langDesc')}
             </p>
           </div>
         </div>

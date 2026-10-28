@@ -18,8 +18,10 @@ import { FinalExamTopBar } from '../../components/exam/FinalExamTopBar'
 import { FinalExamQuestionCard } from '../../components/exam/FinalExamQuestionCard'
 import { FinalExamProgress } from '../../components/exam/FinalExamProgress'
 import { FinalExamResult } from '../../components/exam/FinalExamResult'
+import { useTranslation } from '../../i18n'
 
 export default function FinalExamPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const examId = (id || '1').replace(/-exam$/, '')
 
@@ -50,7 +52,7 @@ export default function FinalExamPage() {
       setAnswersMap(new Map())
       setCurrentQuestionIndex(0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar la evaluación final.')
+      setError(err instanceof Error ? err.message : t('finalExam.loadError'))
     } finally {
       setLoading(false)
     }
@@ -95,10 +97,10 @@ export default function FinalExamPage() {
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="size-10 animate-spin rounded-full border-2 border-tertiary border-t-transparent" />
           <p className="font-heading text-sm font-semibold text-text-primary">
-            Cargando evaluación final...
+            {t('finalExam.loading')}
           </p>
           <span className="text-xs text-text-secondary">
-            Preparando preguntas integrales del curso
+            {t('finalExam.preparingQuestions')}
           </span>
         </div>
       </div>
@@ -113,10 +115,10 @@ export default function FinalExamPage() {
             <IconAlertTriangle className="size-8" />
           </div>
           <h2 className="font-heading text-xl font-bold text-text-primary">
-            No se pudo cargar la evaluación final
+            {t('finalExam.loadFailedTitle')}
           </h2>
           <p className="text-sm leading-relaxed text-text-secondary">
-            {error || 'No fue posible recuperar los datos del examen para este curso.'}
+            {error || t('finalExam.loadFailedDesc')}
           </p>
           <div className="mt-2 flex gap-3">
             <button
@@ -124,13 +126,13 @@ export default function FinalExamPage() {
               onClick={loadExamData}
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-high px-4 py-2.5 text-xs font-semibold text-text-primary transition hover:bg-surface"
             >
-              Reintentar
+              {t('common.retry')}
             </button>
             <Link
               to={`/cursos/${exam?.courseId || examId}/ruta`}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
             >
-              Volver a la Ruta
+              {t('finalExam.returnToPath')}
             </Link>
           </div>
         </div>
@@ -146,16 +148,16 @@ export default function FinalExamPage() {
             <IconLock className="size-8" />
           </div>
           <h2 className="font-heading text-xl font-bold text-text-primary">
-            Evaluación Final Bloqueada
+            {t('finalExam.lockedTitle')}
           </h2>
           <p className="text-sm leading-relaxed text-text-secondary">
-            Debes completar y aprobar todas las sesiones de estudio y sus respectivos cuestionarios antes de rendir la evaluación final de este curso.
+            {t('finalExam.lockedDesc')}
           </p>
           <Link
             to={`/cursos/${exam.courseId || examId}/ruta`}
             className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
           >
-            Volver a la Ruta de Aprendizaje
+            {t('finalExam.returnToPath')}
           </Link>
         </div>
       </div>
@@ -192,16 +194,16 @@ export default function FinalExamPage() {
             <IconLock className="size-8" />
           </div>
           <h2 className="font-heading text-xl font-bold text-text-primary">
-            Evaluación Final Bloqueada
+            {t('finalExam.lockedTitle')}
           </h2>
           <p className="text-sm leading-relaxed text-text-secondary">
-            Debes completar y aprobar todas las sesiones de estudio y sus respectivos cuestionarios antes de rendir la evaluación final de este curso.
+            {t('finalExam.lockedDesc')}
           </p>
           <Link
             to={`/cursos/${exam.courseId || examId}/ruta`}
             className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition hover:brightness-110"
           >
-            Volver a la Ruta de Aprendizaje
+            {t('finalExam.returnToPath')}
           </Link>
         </div>
       </div>
@@ -241,7 +243,7 @@ export default function FinalExamPage() {
       setSubmitError(
         err instanceof Error
           ? err.message
-          : 'No se pudo enviar la evaluación final. Inténtalo de nuevo.'
+          : t('finalExam.submitError')
       )
     } finally {
       setIsSubmitting(false)
@@ -294,7 +296,7 @@ export default function FinalExamPage() {
                 }`}
               >
                 <IconArrowLeft className="size-4" />
-                Anterior
+                {t('common.previous')}
               </button>
 
               <div className="flex items-center gap-3">
@@ -305,7 +307,7 @@ export default function FinalExamPage() {
                     className="inline-flex items-center gap-2 rounded-xl bg-tertiary px-6 py-2.5 font-heading text-xs font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:brightness-110"
                   >
                     <IconCheck className="size-4" />
-                    Finalizar y Calificar Examen
+                    {t('finalExam.finishAndGrade')}
                   </button>
                 ) : (
                   <button
@@ -317,7 +319,7 @@ export default function FinalExamPage() {
                     }
                     className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-heading text-xs font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110"
                   >
-                    Siguiente
+                    {t('common.next')}
                     <IconArrowRight className="size-4" />
                   </button>
                 )}
@@ -341,7 +343,7 @@ export default function FinalExamPage() {
                 onClick={() => setShowSubmitModal(true)}
                 className="w-full rounded-xl border border-tertiary/40 bg-tertiary/10 py-2.5 font-heading text-xs font-bold text-tertiary transition hover:bg-tertiary/20"
               >
-                Enviar Respuestas ({answeredCount}/{exam.totalQuestions})
+                {t('finalExam.submitAnswersCount', { answered: answeredCount, total: exam.totalQuestions })}
               </button>
             </div>
           </div>
@@ -367,26 +369,18 @@ export default function FinalExamPage() {
                 )}
               </div>
               <h3 className="font-heading text-lg font-bold text-text-primary">
-                {unansweredCount > 0
-                  ? '¿Enviar examen con preguntas vacías?'
-                  : '¿Listo para calificar el examen?'}
+                {unansweredCount > 0 ? t('finalExam.submitEmptyModalTitle') : t('finalExam.submitReadyModalTitle')}
               </h3>
             </div>
 
             <div className="mt-4 text-sm leading-relaxed text-text-secondary">
               {unansweredCount > 0 ? (
                 <p>
-                  Aún tienes{' '}
-                  <strong className="text-warning">{unansweredCount} preguntas</strong> sin
-                  responder. Las preguntas sin contestar se computarán como incorrectas en el
-                  puntaje final.
+                  {t('finalExam.submitEmptyModalDesc', { unanswered: unansweredCount })}
                 </p>
               ) : (
                 <p>
-                  Has respondido las{' '}
-                  <strong className="text-secondary">{exam.totalQuestions} preguntas</strong>.
-                  Tus respuestas serán evaluadas de forma determinista para comprobar si
-                  superas el 70% requerido.
+                  {t('finalExam.submitReadyModalDesc', { total: exam.totalQuestions })}
                 </p>
               )}
             </div>
@@ -408,10 +402,10 @@ export default function FinalExamPage() {
                 {isSubmitting ? (
                   <>
                     <IconRotateClockwise className="size-4 animate-spin" />
-                    Evaluando...
+                    {t('finalExam.evaluating')}
                   </>
                 ) : (
-                  'Confirmar y Enviar'
+                  t('finalExam.confirmAndSubmit')
                 )}
               </button>
             </div>

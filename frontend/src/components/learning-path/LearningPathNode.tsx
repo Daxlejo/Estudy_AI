@@ -18,7 +18,7 @@ interface LearningPathNodeProps {
 }
 
 export function LearningPathNode({ node }: LearningPathNodeProps) {
-  const { t, formatNumber, language } = useTranslation()
+  const { t, formatNumber } = useTranslation()
 
   // Si el nodo es el examen final, delegamos al componente especializado
   if (node.type === 'FINAL_EXAM') {
@@ -140,9 +140,7 @@ export function LearningPathNode({ node }: LearningPathNodeProps) {
             {isLocked && (
               <p className="flex items-center gap-1.5 pt-1 text-xs text-text-secondary/70">
                 <IconLock className="size-3.5 shrink-0" />
-                {language === 'en'
-                  ? 'Complete the previous session to unlock this content.'
-                  : 'Completa la sesión anterior para desbloquear este contenido.'}
+                {t('learningPath.lockedNotice')}
               </p>
             )}
           </div>

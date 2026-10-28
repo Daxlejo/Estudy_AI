@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import {
   IconArrowUp,
   IconArrowDown,
@@ -17,6 +18,7 @@ export function OrderingQuestion({
   orderedIds,
   onChangeOrder,
 }: OrderingQuestionProps) {
+  const { t } = useTranslation()
   // Mapeo id -> item
   const itemMap = new Map(question.items.map((i) => [i.id, i]))
 
@@ -51,13 +53,13 @@ export function OrderingQuestion({
       <div className="flex items-center justify-between pb-1 text-xs text-text-secondary">
         <span className="flex items-center gap-1.5 font-heading font-bold uppercase tracking-wider">
           <IconArrowsSort className="size-4 text-tertiary" />
-          Secuencia de Ejecución
+          {t('exam.ordering.sequenceTitle')}
         </span>
-        <span>Usa los botones ▲ y ▼ para mover cada etapa a su posición correcta</span>
+        <span>{t('exam.ordering.guide')}</span>
       </div>
 
       {/* Lista de pasos interactiva */}
-      <div className="space-y-3" role="list" aria-label="Lista de pasos a ordenar">
+      <div className="space-y-3" role="list" aria-label={t('exam.ordering.listAria')}>
         {currentOrderedItems.map((item, index) => {
           const isFirst = index === 0
           const isLast = index === currentOrderedItems.length - 1
@@ -84,8 +86,8 @@ export function OrderingQuestion({
                   type="button"
                   onClick={() => moveItem(index, 'up')}
                   disabled={isFirst}
-                  title="Subir un nivel"
-                  aria-label={`Mover "${item.text}" hacia arriba`}
+                  title={t('exam.ordering.moveUp')}
+                  aria-label={t('exam.ordering.moveItemUp', { item: item.text })}
                   className={`flex size-8 items-center justify-center rounded-lg border transition-colors ${
                     isFirst
                       ? 'border-border/40 text-text-secondary/30 cursor-not-allowed'
@@ -99,8 +101,8 @@ export function OrderingQuestion({
                   type="button"
                   onClick={() => moveItem(index, 'down')}
                   disabled={isLast}
-                  title="Bajar un nivel"
-                  aria-label={`Mover "${item.text}" hacia abajo`}
+                  title={t('exam.ordering.moveDown')}
+                  aria-label={t('exam.ordering.moveItemDown', { item: item.text })}
                   className={`flex size-8 items-center justify-center rounded-lg border transition-colors ${
                     isLast
                       ? 'border-border/40 text-text-secondary/30 cursor-not-allowed'

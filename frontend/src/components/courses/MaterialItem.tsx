@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import {
   IconFileTypePdf,
   IconFileTypeDocx,
@@ -40,6 +41,7 @@ function getFileIcon(type: string, name: string) {
 }
 
 export function MaterialItem({ item, onRemove, disabled = false }: MaterialItemProps) {
+  const { t } = useTranslation()
   return (
     <li className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-all duration-200 hover:border-primary/40 hover:bg-surface-high/30">
       <div className="flex min-w-0 items-center gap-3">
@@ -59,8 +61,8 @@ export function MaterialItem({ item, onRemove, disabled = false }: MaterialItemP
         type="button"
         onClick={() => onRemove(item.id)}
         disabled={disabled}
-        aria-label={`Eliminar ${item.name}`}
-        title="Quitar archivo"
+        aria-label={t('fileUpload.removeFileAria', { name: item.name })}
+        title={t('fileUpload.removeFile')}
         className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-danger/15 hover:text-danger focus-visible:outline-2 focus-visible:outline-danger disabled:pointer-events-none disabled:opacity-50"
       >
         <IconX className="size-4" />

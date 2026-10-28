@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import {
   IconCheck,
   IconX,
@@ -24,14 +25,15 @@ export function TrueFalseActivityView({
   disabled = false,
   onSelectAnswer,
 }: TrueFalseActivityViewProps) {
+  const { t } = useTranslation()
   const isEvaluated = evaluation !== null
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de Verdadero o Falso">
+    <div className="space-y-6" role="region" aria-label={t('activity.trueFalse.ariaLabel')}>
       {/* Enunciado de la afirmación */}
       <div className="rounded-2xl border border-border/80 bg-surface p-6 shadow-sm md:p-8">
         <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-text-secondary">
-          Afirmación
+          {t('activity.trueFalse.statementLabel')}
         </span>
         <blockquote className="text-base font-semibold leading-relaxed text-text-primary md:text-lg">
           "{activity.statement}"
@@ -39,7 +41,7 @@ export function TrueFalseActivityView({
       </div>
 
       {/* Dos botones grandes: Verdadero / Falso */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" role="radiogroup" aria-label="Opciones de respuesta">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" role="radiogroup" aria-label={t('activity.trueFalse.optionsAria')}>
         {/* Opción VERDADERO */}
         <button
           type="button"
@@ -70,7 +72,7 @@ export function TrueFalseActivityView({
           >
             <IconCheck className="size-5" strokeWidth={2.5} />
           </div>
-          <span>Verdadero</span>
+          <span>{t('common.true')}</span>
         </button>
 
         {/* Opción FALSO */}
@@ -103,7 +105,7 @@ export function TrueFalseActivityView({
           >
             <IconX className="size-5" strokeWidth={2.5} />
           </div>
-          <span>Falso</span>
+          <span>{t('common.false')}</span>
         </button>
       </div>
 
@@ -116,7 +118,7 @@ export function TrueFalseActivityView({
             </div>
             <div className="space-y-1">
               <h5 className="font-heading text-xs font-bold uppercase tracking-wider text-text-secondary">
-                Justificación Conceptual
+                {t('activity.trueFalse.justificationLabel')}
               </h5>
               <p className="text-sm leading-relaxed text-text-primary">
                 {activity.justification}

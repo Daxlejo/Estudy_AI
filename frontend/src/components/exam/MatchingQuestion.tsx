@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import { useState } from 'react'
 import {
   IconArrowsExchange,
@@ -18,6 +19,7 @@ export function MatchingQuestion({
   pairs,
   onChangePairs,
 }: MatchingQuestionProps) {
+  const { t } = useTranslation()
   // Estado para la interacción de clic dual (clic en izquierda, luego clic en derecha)
   const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null)
 
@@ -73,13 +75,12 @@ export function MatchingQuestion({
         <div className="flex items-center gap-2">
           <IconArrowsExchange className="size-4 text-tertiary" />
           <span>
-            Haz clic en un elemento de la columna izquierda y luego selecciona su
-            correspondencia en la derecha, o utiliza el selector desplegable.
+            {t('exam.matching.guide')}
           </span>
         </div>
         <div className="flex items-center gap-1.5 font-semibold text-text-primary">
           <span className={pairedCount === totalPairsCount ? 'text-secondary' : 'text-tertiary'}>
-            {pairedCount}/{totalPairsCount} emparejados
+            {t('exam.matching.pairedCount', { paired: pairedCount, total: totalPairsCount })}
           </span>
         </div>
       </div>
@@ -90,9 +91,9 @@ export function MatchingQuestion({
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-1">
             <span className="font-heading text-xs font-bold uppercase tracking-wider text-text-secondary">
-              1. Concepto / Elemento
+              {t('exam.matching.leftColTitle')}
             </span>
-            <span className="text-[11px] text-text-secondary">Selecciona para vincular</span>
+            <span className="text-[11px] text-text-secondary">{t('exam.matching.selectToLink')}</span>
           </div>
 
           <div className="space-y-3">
@@ -131,7 +132,7 @@ export function MatchingQuestion({
                     {/* Selector desplegable directo accesible */}
                     <div className="shrink-0">
                       <select
-                        aria-label={`Asociar con ${leftItem.text}`}
+                        aria-label={t('exam.matching.associateWith', { text: leftItem.text })}
                         value={matchedRightId || ''}
                         onChange={(e) => {
                           if (e.target.value) {
@@ -142,10 +143,10 @@ export function MatchingQuestion({
                         }}
                         className="rounded-lg border border-border bg-surface-high px-2 py-1 text-xs text-text-primary outline-none focus:border-tertiary focus:ring-1 focus:ring-tertiary"
                       >
-                        <option value="">-- Elegir --</option>
+                        <option value="">{t('exam.matching.choosePlaceholder')}</option>
                         {rightItems.map((r, rIdx) => (
                           <option key={r.id} value={r.id}>
-                            Opción {rIdx + 1}: {r.text.slice(0, 35)}...
+                            {t('exam.matching.optionNum', { num: rIdx + 1, text: r.text.slice(0, 35) })}
                           </option>
                         ))}
                       </select>
@@ -163,8 +164,8 @@ export function MatchingQuestion({
                         type="button"
                         onClick={() => handleUnpair(leftItem.id)}
                         className="shrink-0 rounded p-0.5 text-text-secondary hover:bg-surface hover:text-red-400"
-                        title="Desvincular relación"
-                        aria-label="Desvincular relación"
+                        title={t('exam.matching.unlink')}
+                        aria-label={t('exam.matching.unlink')}
                       >
                         <IconX className="size-3.5" />
                       </button>
@@ -180,11 +181,11 @@ export function MatchingQuestion({
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-1">
             <span className="font-heading text-xs font-bold uppercase tracking-wider text-text-secondary">
-              2. Definición / Aplicación
+              {t('exam.matching.rightColTitle')}
             </span>
             {selectedLeftId && (
               <span className="animate-pulse font-semibold text-tertiary text-[11px]">
-                ¡Haz clic para conectar!
+                {t('exam.matching.clickToConnect')}
               </span>
             )}
           </div>

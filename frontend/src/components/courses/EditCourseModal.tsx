@@ -91,7 +91,7 @@ export default function EditCourseModal({
       const msg =
         err instanceof Error
           ? err.message
-          : t('common.error') || 'Error al guardar los cambios'
+          : t('courses.saveError')
       setApiError(msg)
     } finally {
       setIsSaving(false)

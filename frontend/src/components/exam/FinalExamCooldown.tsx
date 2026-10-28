@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from '../../i18n'
 import {
   IconHourglass,
   IconClock,
@@ -22,6 +23,7 @@ export function FinalExamCooldown({
   attemptNumber,
   onRetryUnlocked,
 }: FinalExamCooldownProps) {
+  const { t } = useTranslation()
   const [remainingSeconds, setRemainingSeconds] = useState<number>(3600)
   const [isCooldownActive, setIsCooldownActive] = useState<boolean>(true)
   const [loadingRetry, setLoadingRetry] = useState(false)
@@ -83,26 +85,22 @@ export function FinalExamCooldown({
 
         <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-bold text-warning">
           <IconClock className="size-3.5" />
-          Periodo de Asimilación Pedagógica
+          {t('finalExam.cooldown.badge')}
         </span>
 
         <h3 className="mt-3 font-heading text-xl font-bold text-text-primary md:text-2xl">
-          {isCooldownActive
-            ? 'Tiempo de espera antes del nuevo intento'
-            : '¡El periodo de espera ha concluido!'}
+          {isCooldownActive ? t('finalExam.cooldown.activeTitle') : t('finalExam.cooldown.completedTitle')}
         </h3>
 
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-secondary">
-          {isCooldownActive
-            ? 'Para garantizar una comprensión genuina y evitar la memorización mecánica de respuestas, el examen final requiere un lapso de 1 hora. Utiliza este tiempo para reforzar los conceptos débiles detectados.'
-            : 'Tu mente ha tenido tiempo para consolidar las nociones clave. El siguiente intento evaluará el curso con un nuevo conjunto adaptativo de preguntas.'}
+          {isCooldownActive ? t('finalExam.cooldown.activeDesc') : t('finalExam.cooldown.completedDesc')}
         </p>
 
         {/* Cronómetro visual */}
         {isCooldownActive && (
           <div className="mt-6 flex flex-col items-center rounded-2xl border border-border/80 bg-background/80 px-8 py-5">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-              Tiempo Restante
+              {t('finalExam.cooldown.timeRemaining')}
             </span>
             <span className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-warning md:text-4xl">
               {formatTime(remainingSeconds)}
@@ -117,7 +115,7 @@ export function FinalExamCooldown({
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-high px-5 py-2.5 text-xs font-semibold text-text-primary transition-colors hover:border-tertiary hover:text-tertiary"
           >
             <IconBookmarks className="size-4" />
-            Repasar sesiones del curso
+            {t('finalExam.cooldown.reviewSessions')}
           </Link>
 
           <button
@@ -131,9 +129,7 @@ export function FinalExamCooldown({
             }`}
           >
             <IconRotateClockwise className={`size-4 ${loadingRetry ? 'animate-spin' : ''}`} />
-            {loadingRetry
-              ? 'Preparando examen...'
-              : `Iniciar nuevo intento (Intento ${attemptNumber + 1})`}
+            {loadingRetry ? t('finalExam.cooldown.preparing') : t('finalExam.cooldown.startRetry', { attempt: attemptNumber + 1 })}
             {!isCooldownActive && <IconArrowRight className="size-4" />}
           </button>
         </div>
@@ -144,10 +140,10 @@ export function FinalExamCooldown({
             type="button"
             onClick={handleDevSkip}
             className="inline-flex items-center gap-1.5 text-[11px] font-medium text-text-secondary/70 underline decoration-dotted transition-colors hover:text-tertiary"
-            title="Herramienta de depuración para simular que el temporizador llegó a 0"
+            title={t('finalExam.cooldown.devSkipTitle')}
           >
             <IconSparkles className="size-3" />
-            ⚡ Modo Dev: Simular tiempo cumplido (Omitir espera de 1 hora)
+            {t('finalExam.cooldown.devSkipBtn')}
           </button>
         </div>
       </div>

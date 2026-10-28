@@ -1,5 +1,6 @@
 import type { MultipleChoiceQuestion as MultipleChoiceQuestionType } from '../../types/exam'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 
 interface MultipleChoiceQuestionProps {
   question: MultipleChoiceQuestionType
@@ -14,6 +15,7 @@ export function MultipleChoiceQuestion({
   selectedOptionId,
   onSelectOption,
 }: MultipleChoiceQuestionProps) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       {/* Contexto técnico adicional si existe */}
@@ -30,7 +32,7 @@ export function MultipleChoiceQuestion({
       )}
 
       {/* Lista de Opciones */}
-      <div className="space-y-3" role="radiogroup" aria-label="Opciones de respuesta">
+      <div className="space-y-3" role="radiogroup" aria-label={t('exam.multipleChoice.optionsAria')}>
         {question.options.map((option, idx) => {
           const isSelected = selectedOptionId === option.id
           const letter = OPTION_LETTERS[idx] || `${idx + 1}`

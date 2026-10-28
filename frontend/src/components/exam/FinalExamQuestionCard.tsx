@@ -4,6 +4,7 @@ import type {
   FinalExamQuestion,
 } from '../../types/exam'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 import { MultipleChoiceQuestion } from './MultipleChoiceQuestion'
 import { MatchingQuestion } from './MatchingQuestion'
 import { OrderingQuestion } from './OrderingQuestion'
@@ -23,14 +24,15 @@ export function FinalExamQuestionCard({
   currentAnswer,
   onAnswerChange,
 }: FinalExamQuestionCardProps) {
+  const { t } = useTranslation()
   const getTypeLabel = (type: FinalExamQuestion['type']) => {
     switch (type) {
       case 'MULTIPLE_CHOICE':
-        return 'Opción Múltiple'
+        return t('finalExam.questionType.multipleChoice')
       case 'MATCHING':
-        return 'Emparejamiento de Conceptos'
+        return t('finalExam.questionType.matching')
       case 'ORDERING':
-        return 'Secuencia y Ordenamiento'
+        return t('finalExam.questionType.ordering')
     }
   }
 
@@ -41,7 +43,7 @@ export function FinalExamQuestionCard({
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="flex items-center gap-1.5 rounded-full border border-tertiary/40 bg-tertiary/10 px-3 py-1 font-heading text-xs font-bold text-tertiary">
             <IconSparkles className="size-3.5" />
-            Pregunta {questionIndex + 1} de {totalQuestions}
+            {t('finalExam.questionOf', { current: questionIndex + 1, total: totalQuestions })}
           </span>
 
           <span className="rounded-full border border-border bg-surface-high px-3 py-1 text-xs font-medium text-text-secondary">

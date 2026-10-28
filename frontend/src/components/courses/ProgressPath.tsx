@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import { IconCheck, IconLock, IconTrophy } from '@tabler/icons-react'
 
 export type PathNodeStatus = 'completed' | 'current' | 'locked'
@@ -67,9 +68,10 @@ function connectorClass(from: PathNodeStatus, to: PathNodeStatus) {
 }
 
 function ProgressPath({ nodes, size = 'md', showLabels = false, className = '' }: ProgressPathProps) {
+  const { t } = useTranslation()
   return (
     <ol
-      aria-label="Ruta de aprendizaje"
+      aria-label={t('learningPath.pathAria')}
       className={`flex items-center ${showLabels ? 'pb-6' : ''} ${className}`}
     >
       {nodes.map((node, index) => {

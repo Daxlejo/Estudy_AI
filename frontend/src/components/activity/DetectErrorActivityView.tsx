@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 import {
   IconBug,
   IconCheck,
@@ -35,6 +36,7 @@ export function DetectErrorActivityView({
   onChangeReported,
   onSelfAssess,
 }: DetectErrorActivityViewProps) {
+  const { t } = useTranslation()
   const isEvaluated = evaluation !== null
   const isCode =
     activity.codeOrText.includes('\n') ||
@@ -45,20 +47,20 @@ export function DetectErrorActivityView({
     activity.codeOrText.includes(';')
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de detección de errores">
+    <div className="space-y-6" role="region" aria-label={t('activity.detectError.ariaLabel')}>
       {/* Tipo de error a buscar */}
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-text-primary">
           <IconBug className="size-4 text-danger" />
-          Detección de Error ({activity.errorType})
+          {t('activity.detectError.titleWithType', { type: activity.errorType })}
         </span>
-        <span>Analiza el fragmento y encuentra el error deliberado</span>
+        <span>{t('activity.detectError.instruction')}</span>
       </div>
 
       {/* Fragmento con error deliberado */}
       <div className="rounded-2xl border border-border/80 bg-surface p-5 shadow-sm">
         <span className="mb-2 block text-xs font-semibold text-danger">
-          Fragmento a analizar:
+          {t('activity.detectError.snippetToAnalyze')}
         </span>
         {isCode ? (
           <pre className="overflow-x-auto rounded-xl border border-border bg-surface-high p-4 font-mono text-sm leading-relaxed text-text-primary">
@@ -82,7 +84,7 @@ export function DetectErrorActivityView({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-heading text-sm font-bold text-on-primary shadow-sm transition-all hover:bg-accent"
             >
               <IconSearch className="size-4" />
-              <span>He encontrado el error</span>
+              <span>{t('activity.detectError.foundErrorBtn')}</span>
             </button>
           ) : (
             <div className="space-y-3 rounded-2xl border border-primary/40 bg-primary/5 p-5 animate-in fade-in duration-150">
@@ -90,7 +92,7 @@ export function DetectErrorActivityView({
                 htmlFor="student-error-report"
                 className="block text-xs font-bold uppercase tracking-wider text-text-primary"
               >
-                Describe el error que encontraste y cómo corregirlo:
+                {t('activity.detectError.describeLabel')}
               </label>
               <textarea
                 id="student-error-report"
@@ -98,7 +100,7 @@ export function DetectErrorActivityView({
                 value={studentReported}
                 disabled={disabled}
                 onChange={(e) => onChangeReported(e.target.value)}
-                placeholder="Explica qué está mal en el código o texto anterior..."
+                placeholder={t('activity.detectError.describePlaceholder')}
                 className="w-full rounded-xl border border-border bg-surface p-3 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -111,7 +113,7 @@ export function DetectErrorActivityView({
         <div className="space-y-4 rounded-2xl border border-border/80 bg-surface p-6 shadow-sm animate-in fade-in duration-200">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary">
             <IconCircleCheckFilled className="size-4" />
-            <span>Versión Corregida:</span>
+            <span>{t('activity.detectError.correctedVersion')}</span>
           </div>
 
           {isCode ? (
@@ -126,7 +128,7 @@ export function DetectErrorActivityView({
 
           {studentReported && (
             <div className="rounded-xl border border-border bg-surface-high p-3.5 text-xs text-text-secondary">
-              <span className="font-semibold text-text-primary">Tu respuesta: </span>
+              <span className="font-semibold text-text-primary">{t('activity.detectError.yourResponse')} </span>
               {studentReported}
             </div>
           )}
@@ -134,7 +136,7 @@ export function DetectErrorActivityView({
           {/* Autoevaluación MVP */}
           <div className="pt-2">
             <span className="mb-3 block text-xs font-semibold text-text-secondary">
-              Autoevaluación: ¿Identificaste el error correctamente?
+              {t('activity.detectError.selfAssessQuestion')}
             </span>
             <div className="flex flex-wrap gap-3">
               <button
@@ -147,7 +149,7 @@ export function DetectErrorActivityView({
                 }`}
               >
                 <IconCheck className="size-4" />
-                <span>Sí, lo identifiqué</span>
+                <span>{t('activity.detectError.selfAssessYes')}</span>
               </button>
               <button
                 type="button"
@@ -159,7 +161,7 @@ export function DetectErrorActivityView({
                 }`}
               >
                 <IconX className="size-4" />
-                <span>No del todo</span>
+                <span>{t('activity.detectError.selfAssessNo')}</span>
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import {
 } from '@tabler/icons-react'
 import type { QuizQuestion } from '../../types/course'
 import MarkdownRenderer from '../ui/MarkdownRenderer'
+import { useTranslation } from '../../i18n'
 
 interface QuizQuestionCardProps {
   question: QuizQuestion
@@ -28,6 +29,7 @@ export function QuizQuestionCard({
   onPrev,
   isSubmitting,
 }: QuizQuestionCardProps) {
+  const { t } = useTranslation()
   const isLastQuestion = questionIndex === totalQuestions - 1
   const hasSelection = selectedOptionId !== null
 
@@ -37,11 +39,11 @@ export function QuizQuestionCard({
       <div className="flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
           <IconBrain className="size-3.5" />
-          <span>Concepto: {question.conceptName}</span>
+          <span>{t('quiz.conceptLabel', { name: question.conceptName })}</span>
         </div>
 
         <span className="text-xs font-medium text-text-secondary">
-          Pregunta {questionIndex + 1} de {totalQuestions}
+          {t('quiz.questionOf', { current: questionIndex + 1, total: totalQuestions })}
         </span>
       </div>
 
@@ -52,11 +54,11 @@ export function QuizQuestionCard({
         </div>
 
         <p className="mt-3 text-xs text-text-secondary md:text-sm border-t border-border/60 pt-3">
-          Elige la opción que mejor responda al planteamiento. Las respuestas se calificarán al completar todas las preguntas.
+          {t('quiz.instruction')}
         </p>
 
         {/* Lista de opciones seleccionables */}
-        <div className="mt-6 space-y-3" role="radiogroup" aria-label="Opciones de respuesta">
+        <div className="mt-6 space-y-3" role="radiogroup" aria-label={t('quiz.optionsAria')}>
           {question.options.map((option, idx) => {
             const isSelected = selectedOptionId === option.id
             const optionLetter = String.fromCharCode(65 + idx) // A, B, C, D
@@ -112,7 +114,7 @@ export function QuizQuestionCard({
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-high hover:text-text-primary disabled:opacity-50 sm:w-auto"
           >
             <IconArrowLeft className="size-4" />
-            Pregunta anterior
+            {t('quiz.prevQuestion')}
           </button>
         ) : (
           <div />
@@ -129,15 +131,15 @@ export function QuizQuestionCard({
           }`}
         >
           {isSubmitting ? (
-            'Evaluando respuestas...'
+            t('quiz.evaluatingAnswers')
           ) : isLastQuestion ? (
             <>
-              Finalizar y calificar miniquiz
+              {t('quiz.finishAndGrade')}
               <IconCheck className="size-4.5" strokeWidth={2.5} />
             </>
           ) : (
             <>
-              Continuar a la siguiente
+              {t('quiz.nextQuestion')}
               <IconArrowRight className="size-4" />
             </>
           )}

@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n'
 // CONTRACT (verified 2026-10-21)
 // Backend schema: backend/src/modules/courses/dto/ai-course-plan.dto.ts:35-175
 // Frontend types: frontend/src/types/activity.ts:6-140
@@ -33,6 +34,7 @@ export function FillInBlankActivityView({
   showSolution = false,
   onChangeAnswer,
 }: FillInBlankActivityViewProps) {
+  const { t } = useTranslation()
   // Split sentence on blanks tokens: 3+ underscores, {{blank}}, or [blank-N]
   const tokenRegex = /(?:_{3,}|\[blank-\d+\]|\{\{blank\}\})/g
   const parts = activity.sentence.split(tokenRegex)
@@ -43,11 +45,11 @@ export function FillInBlankActivityView({
   }, [evaluation])
 
   return (
-    <div className="space-y-6" role="region" aria-label="Actividad de rellenar espacios en blanco">
+    <div className="space-y-6" role="region" aria-label={t('activity.fillInBlank.ariaLabel')}>
       <div className="rounded-2xl border border-border/80 bg-surface p-6 shadow-sm md:p-8">
         <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-text-secondary">
           <IconPencil className="size-4 text-primary" />
-          <span>Completa la frase escribiendo la palabra o término correspondiente en cada espacio:</span>
+          <span>{t('activity.fillInBlank.instruction')}</span>
         </div>
 
         <div className="text-base leading-loose text-text-primary md:text-lg">
@@ -70,8 +72,8 @@ export function FillInBlankActivityView({
                         value={currentVal}
                         disabled={disabled || (evaluation !== null && isCorrect)}
                         onChange={(e) => onChangeAnswer(blankIndex, e.target.value)}
-                        placeholder="escribe aquí..."
-                        aria-label={`Espacio ${blankIndex + 1}`}
+                        placeholder={t('activity.fillInBlank.inputPlaceholder')}
+                        aria-label={t('activity.fillInBlank.blankAria', { num: blankIndex + 1 })}
                         className={`min-w-[140px] max-w-[220px] rounded-lg border-2 px-3 py-1 text-center font-semibold text-sm transition-all focus:outline-none focus:ring-2 ${
                           isEvaluated
                             ? isCorrect

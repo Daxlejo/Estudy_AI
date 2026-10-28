@@ -1,5 +1,6 @@
 import { IconCheck } from '@tabler/icons-react'
 import type { FinalExamAnswer, FinalExamQuestion } from '../../types/exam'
+import { useTranslation } from '../../i18n'
 
 interface FinalExamProgressProps {
   questions: FinalExamQuestion[]
@@ -14,6 +15,7 @@ export function FinalExamProgress({
   answersMap,
   onSelectIndex,
 }: FinalExamProgressProps) {
+  const { t } = useTranslation()
   const isQuestionAnswered = (q: FinalExamQuestion): boolean => {
     const ans = answersMap.get(q.id)
     if (!ans) return false
@@ -45,7 +47,7 @@ export function FinalExamProgress({
     <aside className="rounded-2xl border border-border/80 bg-surface p-5 shadow-sm">
       <div className="flex items-center justify-between pb-3">
         <h3 className="font-heading text-xs font-bold uppercase tracking-wider text-text-secondary">
-          Navegación de Preguntas
+          {t('finalExam.progress.navigationTitle')}
         </h3>
         <span className="font-mono text-xs font-semibold text-text-primary">
           {answeredCount}/{questions.length}
@@ -63,7 +65,7 @@ export function FinalExamProgress({
               key={question.id}
               type="button"
               onClick={() => onSelectIndex(idx)}
-              title={`Pregunta ${idx + 1}: ${question.conceptName}`}
+              title={t('finalExam.progress.questionTooltip', { num: idx + 1, concept: question.conceptName })}
               className={`relative flex size-9 items-center justify-center rounded-xl font-heading text-xs font-bold transition-all duration-150 ${
                 isCurrent
                   ? 'border-2 border-tertiary bg-tertiary/20 text-tertiary shadow-sm ring-2 ring-tertiary/30'
@@ -87,15 +89,15 @@ export function FinalExamProgress({
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border/60 pt-3 text-[11px] text-text-secondary">
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full border border-tertiary bg-tertiary/20" />
-          <span>Actual</span>
+          <span>{t('finalExam.progress.current')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-secondary" />
-          <span>Respondida</span>
+          <span>{t('finalExam.progress.answered')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-surface-high border border-border" />
-          <span>Pendiente</span>
+          <span>{t('finalExam.progress.pending')}</span>
         </div>
       </div>
     </aside>

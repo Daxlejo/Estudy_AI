@@ -144,17 +144,17 @@ export const OnboardingPage: React.FC = () => {
                 id="onboarding-lang-headline"
                 className="font-heading text-2xl font-bold tracking-tight text-text-primary md:text-3xl"
               >
-                ¿En qué idioma quieres aprender?
+                {t('onboarding.langHeadline')}
               </h1>
 
               <p className="mt-3 text-sm leading-relaxed text-text-secondary md:text-base">
-                El contenido de tus cursos se generará en este idioma. Podrás cambiarlo después, pero los cursos ya creados conservarán su idioma original.
+                {t('onboarding.langSubtext')}
               </p>
             </div>
 
             <div
               role="radiogroup"
-              aria-label="¿En qué idioma quieres aprender?"
+              aria-label={t('onboarding.langHeadline')}
               className="mt-8 grid gap-4 sm:grid-cols-2"
             >
               {/* Tarjeta: Español */}
@@ -189,7 +189,7 @@ export const OnboardingPage: React.FC = () => {
                 <div className="mt-5">
                   <div className="flex items-center gap-2">
                     <span className="font-heading text-xl font-bold text-text-primary">
-                      Español
+                      {t('language.spanish')}
                     </span>
                     <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
                       {t('common.default')}
@@ -232,7 +232,7 @@ export const OnboardingPage: React.FC = () => {
 
                 <div className="mt-5">
                   <span className="font-heading text-xl font-bold text-text-primary">
-                    English
+                    {t('language.english')}
                   </span>
                   <p className="mt-1.5 text-xs text-text-secondary md:text-sm">
                     {t('onboarding.langEnDesc')}
@@ -300,7 +300,7 @@ export const OnboardingPage: React.FC = () => {
             <div
               className="mb-8 flex items-center justify-center gap-2"
               role="tablist"
-              aria-label="Tutorial slides"
+              aria-label={t('onboarding.tutorialSlidesAria')}
             >
               {slides.map((s, idx) => (
                 <button
@@ -365,7 +365,7 @@ export const OnboardingPage: React.FC = () => {
                 id="onboarding-theme-headline"
                 className="font-heading text-2xl font-bold tracking-tight text-text-primary md:text-3xl"
               >
-                ¿Cómo prefieres la interfaz?
+                {t('onboarding.themeHeadline')}
               </h1>
               <p className="mt-2 text-sm text-text-secondary md:text-base">
                 {t('onboarding.themeSubtext')}
@@ -374,7 +374,7 @@ export const OnboardingPage: React.FC = () => {
 
             <div
               role="radiogroup"
-              aria-label="¿Cómo prefieres la interfaz?"
+              aria-label={t('onboarding.themeHeadline')}
               className="mt-8 grid gap-4 sm:grid-cols-2"
             >
               {/* Tarjeta: Claro (Clean Tech) */}
@@ -418,7 +418,7 @@ export const OnboardingPage: React.FC = () => {
                     </div>
                     <div>
                       <span className="block font-heading text-lg font-bold text-text-primary">
-                        Claro
+                        {t('theme.light')}
                       </span>
                       <span className="block text-xs font-semibold text-primary">
                         Clean Tech
@@ -479,7 +479,7 @@ export const OnboardingPage: React.FC = () => {
                     </div>
                     <div>
                       <span className="block font-heading text-lg font-bold text-text-primary">
-                        Oscuro
+                        {t('theme.dark')}
                       </span>
                       <span className="block text-xs font-semibold text-secondary">
                         Deep Space
@@ -516,7 +516,7 @@ export const OnboardingPage: React.FC = () => {
                 className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-8 py-3.5 font-heading text-sm font-bold text-on-primary shadow-lg transition-all duration-150 hover:scale-[1.02] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <IconRocket className="size-4" />
-                <span>Comenzar</span>
+                <span>{t('onboarding.start')}</span>
               </button>
             </div>
           </section>
