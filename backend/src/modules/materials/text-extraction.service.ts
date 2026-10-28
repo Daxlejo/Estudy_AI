@@ -25,7 +25,23 @@ const loadAdmZip = (): AdmZipCtor =>
 export type SupportedMaterialType = 'txt' | 'md' | 'pdf' | 'docx' | 'pptx';
 
 export type MaterialExtractionErrorCode =
-  'UNSUPPORTED_TYPE' | 'EMPTY_CONTENT' | 'MALFORMED_CONTENT';
+  | 'UNSUPPORTED_TYPE'
+  | 'EMPTY_CONTENT'
+  | 'MALFORMED_CONTENT';
+
+export const MIN_EXTRACTABLE_CHARACTERS = 100;
+export const PDF_IMAGE_ONLY_ERROR_MESSAGE =
+  'The uploaded PDF appears to contain only images or scanned content with no extractable text. Please upload a PDF with selectable text.';
+
+export function getInsufficientContentErrorMessage(
+  type: SupportedMaterialType,
+): string {
+  if (type === 'pdf') {
+    return PDF_IMAGE_ONLY_ERROR_MESSAGE;
+  }
+  const typeLabel = type === 'md' ? 'Markdown' : type.toUpperCase();
+  return `The uploaded ${typeLabel} file appears to contain insufficient extractable text (under ${MIN_EXTRACTABLE_CHARACTERS} characters). Please upload a file with selectable text.`;
+}
 
 export class MaterialExtractionError extends Error {
   constructor(
@@ -87,6 +103,24 @@ export class TextExtractionService {
     );
   }
 
+  /**
+   * Valida que el texto extraído contenga al menos 100 caracteres.
+   * Para PDFs con sólo imágenes o sin texto seleccionable lanza el error descriptivo requerido.
+   * Aplica la misma regla de contenido mínimo para todos los formatos (TXT, DOCX, PPTX, MD).
+   */
+  validateMinimumContent(
+    text: string | null | undefined,
+    type: SupportedMaterialType,
+  ): void {
+    const trimmed = (text ?? '').trim();
+    if (trimmed.length < MIN_EXTRACTABLE_CHARACTERS) {
+      throw new MaterialExtractionError(
+        'EMPTY_CONTENT',
+        getInsufficientContentErrorMessage(type),
+      );
+    }
+  }
+
   // PDF — streams, does not load entire file into RAM
   async extractPdf(filePathOrBuffer: string | Buffer): Promise<string> {
     try {
@@ -102,7 +136,9 @@ export class TextExtractionService {
       );
       const pdfParse = loadPdfParse();
       const data = await pdfParse(uint8 as unknown as Buffer);
-      return data.text;
+      const rawText = data?.text ?? '';
+      this.validateMinimumContent(rawText, 'pdf');
+      return rawText;
     } catch (error) {
       if (error instanceof MaterialExtractionError) throw error;
       throw new MaterialExtractionError(
@@ -120,7 +156,9 @@ export class TextExtractionService {
         typeof filePathOrBuffer === 'string'
           ? await mammoth.extractRawText({ path: filePathOrBuffer })
           : await mammoth.extractRawText({ buffer: filePathOrBuffer });
-      return result.value;
+      const rawText = result?.value ?? '';
+      this.validateMinimumContent(rawText, 'docx');
+      return rawText;
     } catch (error) {
       if (error instanceof MaterialExtractionError) throw error;
       throw new MaterialExtractionError(
@@ -139,7 +177,7 @@ export class TextExtractionService {
         .getEntries()
         .filter((e) => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/))
         .sort((a, b) => a.entryName.localeCompare(b.entryName));
-      return slideEntries
+      const text = slideEntries
         .map((entry) => {
           const xml = entry.getData().toString('utf8');
           return xml
@@ -148,6 +186,8 @@ export class TextExtractionService {
             .trim();
         })
         .join('\n\n');
+      this.validateMinimumContent(text, 'pptx');
+      return text;
     } catch (error) {
       if (error instanceof MaterialExtractionError) throw error;
       throw new MaterialExtractionError(
@@ -183,6 +223,8 @@ export class TextExtractionService {
         'File contains binary content',
       );
     }
+
+    this.validateMinimumContent(decoded, 'txt');
 
     return decoded;
   }
@@ -227,12 +269,7 @@ export class TextExtractionService {
     }
 
     const normalized = this.normalize(raw);
-    if (normalized.length === 0) {
-      throw new MaterialExtractionError(
-        'EMPTY_CONTENT',
-        'File contains no extractable text',
-      );
-    }
+    this.validateMinimumContent(normalized, type);
     return normalized;
   }
 

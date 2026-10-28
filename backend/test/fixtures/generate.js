@@ -8,6 +8,8 @@ if (!fs.existsSync(fixturesDir)) {
 }
 
 // 1. PDF with exact XRef byte offsets
+const longText =
+  'Hello PDF World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.';
 const header = '%PDF-1.4\n';
 const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
 const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
@@ -15,7 +17,7 @@ const obj3 =
   '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n';
 const obj4 =
   '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n';
-const streamContent = 'BT\n/F1 12 Tf\n100 700 Td\n(Hello PDF World) Tj\nET\n';
+const streamContent = `BT\n/F1 12 Tf\n100 700 Td\n(${longText}) Tj\nET\n`;
 const obj5 =
   '5 0 obj\n<< /Length ' +
   streamContent.length +
@@ -60,7 +62,7 @@ const docxZip = new AdmZip();
 const docXml =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-  '<w:body><w:p><w:r><w:t>Hello DOCX World</w:t></w:r></w:p></w:body></w:document>';
+  '<w:body><w:p><w:r><w:t>Hello DOCX World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.</w:t></w:r></w:p></w:body></w:document>';
 docxZip.addFile('word/document.xml', Buffer.from(docXml, 'utf-8'));
 fs.writeFileSync(path.join(fixturesDir, 'sample.docx'), docxZip.toBuffer());
 
@@ -69,14 +71,14 @@ const pptxZip = new AdmZip();
 const slideXml =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
-  '<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Hello PPTX World</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+  '<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Hello PPTX World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
 pptxZip.addFile('ppt/slides/slide1.xml', Buffer.from(slideXml, 'utf-8'));
 fs.writeFileSync(path.join(fixturesDir, 'sample.pptx'), pptxZip.toBuffer());
 
 // 4. TXT
 fs.writeFileSync(
   path.join(fixturesDir, 'sample.txt'),
-  'Hello TXT World\nLine two\n',
+  'Hello TXT World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.\n',
 );
 
 console.log('Fixtures generated successfully');

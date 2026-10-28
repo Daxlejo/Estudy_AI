@@ -1,2 +1,1 @@
-Hello TXT World
-Line two
+Hello TXT World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.

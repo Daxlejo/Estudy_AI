@@ -12,12 +12,12 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 48 >>
+<< /Length 188 >>
 stream
 BT
 /F1 12 Tf
 100 700 Td
-(Hello PDF World) Tj
+(Hello PDF World! This is a valid sample document created for unit testing text extraction. It contains well over one hundred characters of selectable text.) Tj
 ET
 endstream
 endobj
@@ -32,5 +32,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-408
+549
 %%EOF

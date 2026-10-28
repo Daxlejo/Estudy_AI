@@ -6,7 +6,10 @@ import {
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { MaterialsService, UploadedMaterialFile } from './materials.service';
-import { TextExtractionService } from './text-extraction.service';
+import {
+  TextExtractionService,
+  PDF_IMAGE_ONLY_ERROR_MESSAGE,
+} from './text-extraction.service';
 import { MaterialStorageService } from './material-storage.service';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 
@@ -20,6 +23,9 @@ describe('MaterialsService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+
+  const validLongText =
+    'Normalizacion en bases de datos relacionales: Primera Forma Normal (1FN), Segunda Forma Normal (2FN) y Tercera Forma Normal (3FN).';
 
   const fixturesDir = path.resolve(__dirname, '../../../test/fixtures');
 
@@ -76,7 +82,7 @@ describe('MaterialsService', () => {
     it('stores the file and persists metadata for a valid txt upload', async () => {
       const result = await service.upload(
         courseId,
-        file('apuntes.txt', 'Normalizacion\r\n\r\n\r\n1FN'),
+        file('apuntes.txt', validLongText),
       );
 
       expect(storage.save).toHaveBeenCalledWith(
@@ -89,7 +95,7 @@ describe('MaterialsService', () => {
         name: 'apuntes.txt',
         storagePath: `${courseId}/stored.txt`,
         type: 'txt',
-        sizeBytes: 22,
+        sizeBytes: Buffer.byteLength(validLongText),
       });
       expect(result).toEqual(
         expect.objectContaining({
@@ -97,15 +103,21 @@ describe('MaterialsService', () => {
           courseId,
           name: 'apuntes.txt',
           type: 'txt',
-          sizeBytes: 22,
-          extractedCharacters: 'Normalizacion\n\n1FN'.length,
+          sizeBytes: Buffer.byteLength(validLongText),
+          extractedCharacters: validLongText.length,
         }),
       );
       expect(result).not.toHaveProperty('storagePath');
     });
 
     it('accepts markdown files', async () => {
-      const result = await service.upload(courseId, file('guia.md', '# SQL'));
+      const result = await service.upload(
+        courseId,
+        file(
+          'guia.md',
+          '# SQL: Fundamentos de consultas relacionales y optimización de índices para bases de datos de alto rendimiento.',
+        ),
+      );
       expect(result.type).toBe('md');
     });
 
@@ -160,7 +172,7 @@ describe('MaterialsService', () => {
       courseRepository.countByCourseId.mockResolvedValue(5);
 
       await expect(
-        service.upload(courseId, file('extra.txt', 'Content')),
+        service.upload(courseId, file('extra.txt', validLongText)),
       ).rejects.toThrow(BadRequestException);
       expect(storage.save).not.toHaveBeenCalled();
     });
@@ -180,7 +192,10 @@ describe('MaterialsService', () => {
     });
 
     it('strips directory components from the client-provided name', async () => {
-      await service.upload(courseId, file('../../evil/notes.txt', 'content'));
+      await service.upload(
+        courseId,
+        file('../../evil/notes.txt', validLongText),
+      );
       expect(courseRepository.addMaterial).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'notes.txt' }),
       );
@@ -189,7 +204,7 @@ describe('MaterialsService', () => {
     it('throws NotFoundException when the course does not exist', async () => {
       courseRepository.findById.mockResolvedValue(null);
       await expect(
-        service.upload(courseId, file('a.txt', 'x')),
+        service.upload(courseId, file('a.txt', validLongText)),
       ).rejects.toThrow(NotFoundException);
       expect(storage.save).not.toHaveBeenCalled();
     });
@@ -237,6 +252,30 @@ describe('MaterialsService', () => {
       expect(storage.save).not.toHaveBeenCalled();
     });
 
+    it('throws UnprocessableEntityException for text under 100 characters', async () => {
+      await expect(
+        service.upload(courseId, file('short.txt', 'Short content under 100 characters')),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(storage.save).not.toHaveBeenCalled();
+    });
+
+    it('throws UnprocessableEntityException with exact message for image-only PDF', async () => {
+      const scannedPdf =
+        '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000206 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n254\n%%EOF\n';
+
+      const diskFile: UploadedMaterialFile = {
+        originalname: 'scanned.pdf',
+        mimetype: 'application/pdf',
+        size: scannedPdf.length,
+        buffer: Buffer.from(scannedPdf),
+      };
+
+      await expect(service.upload(courseId, diskFile)).rejects.toThrow(
+        PDF_IMAGE_ONLY_ERROR_MESSAGE,
+      );
+      expect(storage.save).not.toHaveBeenCalled();
+    });
+
     it('throws UnprocessableEntityException for malformed (non UTF-8) content', async () => {
       await expect(
         service.upload(courseId, file('bad.txt', Buffer.from([0xff, 0xfe]))),
@@ -247,7 +286,7 @@ describe('MaterialsService', () => {
     it('removes the stored file when metadata persistence fails', async () => {
       courseRepository.addMaterial.mockRejectedValue(new Error('db down'));
       await expect(
-        service.upload(courseId, file('a.txt', 'content')),
+        service.upload(courseId, file('a.txt', validLongText)),
       ).rejects.toThrow('db down');
       expect(storage.remove).toHaveBeenCalledWith(`${courseId}/stored.txt`);
     });
@@ -255,7 +294,7 @@ describe('MaterialsService', () => {
     it('propagates storage failures without persisting metadata', async () => {
       storage.save.mockRejectedValue(new Error('disk full'));
       await expect(
-        service.upload(courseId, file('a.txt', 'content')),
+        service.upload(courseId, file('a.txt', validLongText)),
       ).rejects.toThrow('disk full');
       expect(courseRepository.addMaterial).not.toHaveBeenCalled();
     });
@@ -274,14 +313,22 @@ describe('MaterialsService', () => {
           uploadedAt: new Date(),
         },
       ]);
-      storage.read.mockResolvedValue(Buffer.from('Uno\r\nDos  \n'));
+      storage.read.mockResolvedValue(
+        Buffer.from('Uno\r\nDos  \n' + validLongText),
+      );
 
       const result = await service.getExtractedMaterials(courseId);
 
       expect(storage.read).toHaveBeenCalledWith(`${courseId}/a.txt`);
-      expect(result).toEqual([
-        { materialId: 'm1', name: 'a.txt', type: 'txt', text: 'Uno\nDos' },
-      ]);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          materialId: 'm1',
+          name: 'a.txt',
+          type: 'txt',
+        }),
+      );
+      expect(result[0].text.length).toBeGreaterThanOrEqual(100);
     });
 
     it('throws NotFoundException for unknown courses', async () => {
@@ -312,7 +359,7 @@ describe('MaterialsService', () => {
           uploadedAt: new Date(),
         },
       ]);
-      storage.read.mockResolvedValue(Buffer.from('Contenido'));
+      storage.read.mockResolvedValue(Buffer.from(validLongText));
 
       const result = await service.getExtractedMaterials(courseId, ['m1']);
 
