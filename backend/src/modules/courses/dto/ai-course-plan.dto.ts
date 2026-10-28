@@ -349,6 +349,7 @@ export const aiQuizQuestionSchema = z
     options: z
       .array(aiQuizOptionSchema)
       .min(2, 'Each question must have at least 2 options'),
+    correctOptionIndex: z.number().int().optional(),
     explanation: z.string().trim().min(1),
   })
   .refine((q) => q.options.filter((o) => o.isCorrect === true).length === 1, {

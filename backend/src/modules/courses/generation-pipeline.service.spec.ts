@@ -82,6 +82,7 @@ describe('GenerationPipelineService', () => {
   });
 
   describe('run — failure cases and error recovery', () => {
+
     it('should set job ERROR and course ERROR when course does not exist', async () => {
       courseRepository.findById.mockResolvedValue(null);
 
@@ -718,6 +719,7 @@ describe('GenerationPipelineService', () => {
         expect.objectContaining({
           quizId: 'quiz-1',
           conceptId: 'concept-variables',
+          correctOptionIndex: expect.any(Number),
           options: expect.arrayContaining([
             expect.objectContaining({ id: 'a', isCorrect: false }),
             expect.objectContaining({ id: 'b', isCorrect: true }),
@@ -1433,6 +1435,40 @@ describe('GenerationPipelineService', () => {
         ).systemPromptSessions('es');
         expect(prompt).toContain('1. ... 2. ... 3. ...');
         expect(prompt).toContain("use 'classify'");
+      });
+
+      describe('Quiz Generation Quality and Option Shuffling (Prompt 2)', () => {
+
+        it('should perform Fisher-Yates shuffle on quiz options and update correctOptionIndex', () => {
+          const options = [
+            { id: 'opt-1', text: 'Correct Answer', isCorrect: true },
+            { id: 'opt-2', text: 'Distractor 1', isCorrect: false },
+            { id: 'opt-3', text: 'Distractor 2', isCorrect: false },
+            { id: 'opt-4', text: 'Distractor 3', isCorrect: false },
+          ];
+
+          const randomSpy = jest
+            .spyOn(Math, 'random')
+            .mockReturnValueOnce(0.0)
+            .mockReturnValueOnce(0.5)
+            .mockReturnValueOnce(0.9);
+
+          const { shuffledOptions, correctOptionIndex } =
+            service.shuffleQuizOptions(options, 0);
+
+          randomSpy.mockRestore();
+
+          expect(shuffledOptions[3].id).toBe('opt-1');
+          expect(shuffledOptions[3].isCorrect).toBe(true);
+          expect(correctOptionIndex).toBe(3);
+        });
+
+        it('should maintain elements during Fisher-Yates array shuffle', () => {
+          const arr = [1, 2, 3, 4, 5];
+          const shuffled = service.shuffleArray(arr);
+          expect(shuffled).toHaveLength(arr.length);
+          expect(shuffled.slice().sort()).toEqual(arr.slice().sort());
+        });
       });
     });
   });

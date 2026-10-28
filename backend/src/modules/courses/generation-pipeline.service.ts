@@ -32,6 +32,61 @@ export function splitIntoChunks(text: string): string[] {
   return chunks;
 }
 
+/**
+ * Fisher-Yates (Knuth) shuffle algorithm.
+ * Guarantees uniform random distribution for array elements.
+ */
+export function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
+ * Shuffles quiz options using Fisher-Yates and calculates the updated correctOptionIndex.
+ */
+export function shuffleQuizOptions<
+  T extends { id?: string; text?: string; isCorrect?: boolean },
+>(
+  options: T[],
+  initialCorrectOptionIndex?: number,
+): { shuffledOptions: T[]; correctOptionIndex: number } {
+  const prepared = options.map((opt, idx) => {
+    if (
+      typeof initialCorrectOptionIndex === 'number' &&
+      opt.isCorrect === undefined
+    ) {
+      return { ...opt, isCorrect: idx === initialCorrectOptionIndex };
+    }
+    return { ...opt };
+  });
+
+  const shuffledOptions = shuffleArray(prepared);
+  let correctOptionIndex = shuffledOptions.findIndex(
+    (opt) => opt.isCorrect === true,
+  );
+
+  if (
+    correctOptionIndex === -1 &&
+    typeof initialCorrectOptionIndex === 'number' &&
+    options[initialCorrectOptionIndex]
+  ) {
+    const target = options[initialCorrectOptionIndex];
+    correctOptionIndex = shuffledOptions.findIndex(
+      (opt) => opt === target || (opt.id && opt.id === target.id),
+    );
+  }
+
+  if (correctOptionIndex === -1) {
+    correctOptionIndex = 0;
+  }
+
+  return { shuffledOptions, correctOptionIndex };
+}
+
 // Orchestrates the full AI-driven course-generation pipeline for a given GenerationJob.
 // Pipeline steps (matching GenerationJobStatus values):
 //   PENDING -> EXTRACTING -> ANALYZING_CONCEPTS -> ANALYZING_DEPENDENCIES -> BUILDING_PATH -> COMPLETED | ERROR
@@ -54,6 +109,19 @@ export class GenerationPipelineService {
 
   splitIntoChunks(text: string): string[] {
     return splitIntoChunks(text);
+  }
+
+  shuffleArray<T>(array: T[]): T[] {
+    return shuffleArray(array);
+  }
+
+  shuffleQuizOptions<
+    T extends { id?: string; text?: string; isCorrect?: boolean },
+  >(
+    options: T[],
+    initialCorrectOptionIndex?: number,
+  ): { shuffledOptions: T[]; correctOptionIndex: number } {
+    return shuffleQuizOptions(options, initialCorrectOptionIndex);
   }
 
   // Entry point. Updates job status/progress at each step and persists all generated artefacts.
@@ -274,12 +342,20 @@ export class GenerationPipelineService {
           for (const rawQ of rawQuiz.questions ?? []) {
             const conceptId = conceptIdByName.get(rawQ.conceptName);
             if (!conceptId) continue; // skip questions for unknown concepts
+            const { shuffledOptions, correctOptionIndex } =
+              this.shuffleQuizOptions(
+                rawQ.options,
+                (rawQ as any).correctOptionIndex,
+              );
+            (rawQ as any).options = shuffledOptions;
+            (rawQ as any).correctOptionIndex = correctOptionIndex;
             await this.quizRepository.addQuestion({
               quizId: quiz.id,
               conceptId,
               prompt: rawQ.prompt,
               context: rawQ.context ?? null,
-              options: rawQ.options,
+              options: shuffledOptions,
+              correctOptionIndex,
               explanation: rawQ.explanation,
             });
           }

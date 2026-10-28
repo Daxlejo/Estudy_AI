@@ -94,7 +94,7 @@ export class QuizzesService {
     // Strip out correct answers and explanations
     const safeQuestions: SanitizedQuizQuestion[] = questions.map((q) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { explanation, ...rest } = q;
+      const { explanation, correctOptionIndex, ...rest } = q;
       return {
         ...rest,
         options: q.options.map((opt) => {
@@ -123,7 +123,7 @@ export class QuizzesService {
     // Strip out correct answers and explanations
     const safeQuestions: SanitizedQuizQuestion[] = questions.map((q) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { explanation, ...rest } = q;
+      const { explanation, correctOptionIndex, ...rest } = q;
       return {
         ...rest,
         options: q.options.map((opt) => {

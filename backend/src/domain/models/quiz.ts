@@ -27,6 +27,7 @@ export interface QuizQuestion {
   options: ExamOption[];
   explanation: string;
   createdAt: Date;
+  correctOptionIndex?: number;
 }
 
 export interface QuizAttempt {
