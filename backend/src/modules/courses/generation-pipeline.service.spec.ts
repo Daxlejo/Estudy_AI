@@ -64,6 +64,9 @@ describe('GenerationPipelineService', () => {
 
     aiService = {
       completeJson: jest.fn(),
+      completeText: jest
+        .fn()
+        .mockResolvedValue('VALID_EDUCATIONAL: Good content'),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -82,6 +85,75 @@ describe('GenerationPipelineService', () => {
   });
 
   describe('run — failure cases and error recovery', () => {
+    it('should abort pipeline immediately and set course status to FAILED when content validation returns INVALID', async () => {
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        {
+          materialId: 'mat-1',
+          name: 'recipe.txt',
+          type: 'txt',
+          text: 'Receta para hacer pastel de chocolate: mezclar harina, azúcar y huevos.',
+        },
+      ]);
+
+      aiService.completeText = jest
+        .fn()
+        .mockResolvedValue(
+          'INVALID: The text is a cooking recipe and is unsuitable for an educational learning course.',
+        );
+
+      await service.run('course-1', 'job-1');
+
+      expect(aiService.completeText).toHaveBeenCalledWith(
+        expect.stringContaining('You are a content validator'),
+        expect.stringContaining('Receta para hacer pastel de chocolate'),
+      );
+
+      // Should abort immediately without calling completeJson for concepts
+      expect(aiService.completeJson).not.toHaveBeenCalled();
+
+      // Generation job must be marked as FAILED with the reason as errorMessage
+      expect(courseRepository.updateGenerationJob).toHaveBeenCalledWith(
+        'job-1',
+        expect.objectContaining({
+          status: 'FAILED',
+          errorMessage:
+            'The text is a cooking recipe and is unsuitable for an educational learning course.',
+        }),
+      );
+
+      // Course status must be set to FAILED
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'FAILED',
+      });
+    });
+
+    it('should truncate sample text to first 2000 characters for content validation', async () => {
+      const hugeMaterialText = 'A'.repeat(5000);
+      materialsService.getExtractedMaterials.mockResolvedValue([
+        {
+          materialId: 'mat-1',
+          name: 'huge.txt',
+          type: 'txt',
+          text: hugeMaterialText,
+        },
+      ]);
+
+      aiService.completeText = jest
+        .fn()
+        .mockResolvedValue('VALID_EDUCATIONAL: Technical content');
+
+      // Throw inside concept extraction to stop after validation
+      aiService.completeJson.mockRejectedValue(new Error('Stop after validation'));
+
+      await service.run('course-1', 'job-1');
+
+      expect(aiService.completeText).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringMatching(/^=== huge\.txt ===\n/i),
+      );
+      const passedSample = (aiService.completeText as jest.Mock).mock.calls[0][1];
+      expect(passedSample.length).toBeLessThanOrEqual(2000);
+    });
 
     it('should set job ERROR and course ERROR when course does not exist', async () => {
       courseRepository.findById.mockResolvedValue(null);

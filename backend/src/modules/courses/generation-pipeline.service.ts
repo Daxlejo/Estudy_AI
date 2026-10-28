@@ -167,6 +167,23 @@ export class GenerationPipelineService {
 
       await this.updateJob(jobId, 'EXTRACTING', 10, 0);
 
+      // Step 0: Content validation against off-topic or adversarial content
+      const sampleText = combinedText.slice(0, 2000);
+      const validation = await this.validateContent(sampleText);
+      if (!validation.isValid) {
+        this.logger.warn(
+          `Content validation rejected material for course ${courseId}: ${validation.reason}`,
+        );
+        await this.courseRepository.updateGenerationJob(jobId, {
+          status: 'FAILED',
+          errorMessage: validation.reason,
+        });
+        await this.courseRepository.update(courseId, {
+          status: 'FAILED',
+        });
+        return;
+      }
+
       // Step 1: ANALYZING_CONCEPTS (Map-Reduce chunked extraction)
       await this.updateJob(jobId, 'ANALYZING_CONCEPTS', 20, 1);
 
@@ -719,6 +736,45 @@ export class GenerationPipelineService {
   }
 
   // Prompt builders
+
+    systemPromptContentValidation(): string {
+    return 'You are a content validator. Classify the following text as either VALID_EDUCATIONAL (it contains educational, technical, or professional content suitable for a learning course) or INVALID (it is off-topic, nonsensical, a recipe, fictional content, or otherwise unsuitable). Respond with only one word: VALID_EDUCATIONAL or INVALID, followed by a one-sentence reason.';
+  }
+
+  userMessageContentValidation(sampleText: string): string {
+    return sampleText;
+  }
+
+  async validateContent(
+    sampleText: string,
+  ): Promise<{ isValid: boolean; reason: string }> {
+    const raw = await this.aiService.completeText(
+      this.systemPromptContentValidation(),
+      this.userMessageContentValidation(sampleText),
+    );
+
+    const trimmed = (raw || '').trim();
+    const isInvalid =
+      /^INVALID\b/i.test(trimmed) ||
+      (!/\bVALID_EDUCATIONAL\b/i.test(trimmed) && /\bINVALID\b/i.test(trimmed));
+
+    if (isInvalid) {
+      const reasonMatch = trimmed.match(/^INVALID[:\s\-]+(.*)$/is);
+      const reason =
+        reasonMatch && reasonMatch[1]?.trim()
+          ? reasonMatch[1].trim()
+          : trimmed.replace(/^INVALID/i, '').trim() ||
+            'The uploaded material is off-topic, nonsensical, or unsuitable for an educational learning course.';
+      return { isValid: false, reason };
+    }
+
+    const reasonMatch = trimmed.match(/^VALID_EDUCATIONAL[:\s\-]+(.*)$/is);
+    const reason =
+      reasonMatch && reasonMatch[1]?.trim()
+        ? reasonMatch[1].trim()
+        : 'Valid educational content.';
+    return { isValid: true, reason };
+  }
 
   private languageInstruction(language: CourseGenerationLanguage): string {
     return language === 'en'
