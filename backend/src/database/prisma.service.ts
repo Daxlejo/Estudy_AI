@@ -8,6 +8,14 @@ import { PrismaClient } from '@prisma/client';
 import { mkdirSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as dotenv from 'dotenv';
+
+// Automatically load backend/.env if DATABASE_URL is not already set in process.env
+const backendEnvPath = path.resolve(__dirname, '..', '..', '.env');
+dotenv.config({ path: backendEnvPath });
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'file:./dev.db';
+}
 
 /** Directory containing `schema.prisma` (works from both `src/` and `dist/`). */
 const PRISMA_SCHEMA_DIR = path.resolve(__dirname, '..', '..', 'prisma');

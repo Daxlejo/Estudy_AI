@@ -5,6 +5,7 @@ export type CourseStatus =
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'ERROR'
+  | 'FAILED'
 
 export type CourseBannerKey =
   | 'deep-space'
@@ -43,6 +44,7 @@ export interface Course {
   description?: string
   bannerKey?: CourseBannerKey | string | null
   status: CourseStatus
+  errorMessage?: string
   progress: CourseProgress
   materials: CourseMaterial[]
   createdAt: string

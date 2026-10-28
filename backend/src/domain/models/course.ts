@@ -1,5 +1,11 @@
 export type CourseStatus =
-  'CREATED' | 'PROCESSING' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'ERROR';
+  | 'CREATED'
+  | 'PROCESSING'
+  | 'READY'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'ERROR'
+  | 'FAILED';
 
 export const COURSE_BANNER_KEYS = [
   'deep-space',
@@ -28,6 +34,7 @@ export interface Course {
   bannerKey?: string | null;
   status: CourseStatus;
   userId?: string | null;
+  errorMessage?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,7 +56,8 @@ export type GenerationJobStatus =
   | 'ANALYZING_DEPENDENCIES'
   | 'BUILDING_PATH'
   | 'COMPLETED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'FAILED';
 
 export interface GenerationJob {
   id: string;

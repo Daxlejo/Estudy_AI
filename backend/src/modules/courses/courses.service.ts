@@ -82,7 +82,19 @@ export class CoursesService {
 
   async list(userId?: string): Promise<Course[]> {
     if (userId) {
-      return this.courseRepository.findByUserId(userId);
+      const courses = await this.courseRepository.findByUserId(userId);
+      return Promise.all(
+        courses.map(async (c) => {
+          if (c.status === 'FAILED' || c.status === 'ERROR') {
+            const job = await this.courseRepository.getLatestGenerationJob(c.id);
+            return {
+              ...c,
+              errorMessage: job?.errorMessage ?? null,
+            };
+          }
+          return c;
+        }),
+      );
     }
     return [];
   }
@@ -90,13 +102,17 @@ export class CoursesService {
   async getById(
     id: string,
     userId?: string,
-  ): Promise<Course & { sessions: Session[] }> {
+  ): Promise<Course & { sessions: Session[]; errorMessage?: string | null }> {
     const course = await this.courseRepository.findById(id);
     if (!course) {
       throw new NotFoundException(`Course with id ${id} not found`);
     }
     this.validateOwnership(course, userId);
     const sessions = await this.sessionRepository.findByCourseId(id);
+    if (course.status === 'FAILED' || course.status === 'ERROR') {
+      const job = await this.courseRepository.getLatestGenerationJob(id);
+      return { ...course, sessions, errorMessage: job?.errorMessage ?? null };
+    }
     return { ...course, sessions };
   }
 

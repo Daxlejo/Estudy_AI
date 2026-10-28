@@ -69,6 +69,10 @@ export const en: Record<string, string> = {
   'status.IN_PROGRESS': 'In progress',
   'status.COMPLETED': 'Completed',
   'status.ERROR': 'Error',
+  'status.FAILED': 'Failed',
+  'courses.failedTitle': 'Could not generate course',
+  'courses.failedDefaultReason': 'The uploaded content is not suitable for an educational course.',
+  'courses.viewError': 'View details',
 
   // Home page
   'home.title': 'Continue building your knowledge',

@@ -25,6 +25,7 @@ export interface BackendCourse {
   bannerKey?: string | null
   bannerUrl?: string | null
   status: string
+  errorMessage?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -405,6 +406,7 @@ export function mapBackendCourseToFrontend(
     description: course.description || undefined,
     ...(resolvedBannerKey ? { bannerKey: resolvedBannerKey } : {}),
     status: (course.status === 'GENERATING' ? 'PROCESSING' : course.status) as Course['status'],
+    errorMessage: course.errorMessage || undefined,
     progress: {
       completedSessions,
       totalSessions,

@@ -69,6 +69,10 @@ export const es: Record<string, string> = {
   'status.IN_PROGRESS': 'En progreso',
   'status.COMPLETED': 'Completado',
   'status.ERROR': 'Error',
+  'status.FAILED': 'Fallido',
+  'courses.failedTitle': 'No se pudo generar el curso',
+  'courses.failedDefaultReason': 'El contenido subido no es apto para generar un curso educativo.',
+  'courses.viewError': 'Ver detalle',
 
   // Página de Inicio (Home)
   'home.title': 'Continúa construyendo tu conocimiento',

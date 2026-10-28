@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconBook, IconLoader2, IconPencil, IconTrash } from '@tabler/icons-react'
+import { IconBook, IconLoader2, IconPencil, IconTrash, IconAlertTriangle } from '@tabler/icons-react'
 import type { Course } from '../../types/course'
 import ProgressBar from '../ui/ProgressBar'
 import ProgressPath, { type PathNode } from './ProgressPath'
@@ -64,6 +64,7 @@ function CourseCard({
   const percent = course.progress.progressPercent
   const isProcessing =
     course.status === 'PROCESSING' || (course.status as string) === 'GENERATING'
+  const isFailed = course.status === 'FAILED' || course.status === 'ERROR'
   const nodePrefix = t('builder.node')
   const banner = getCourseBannerByKey(course.bannerKey) ?? DEFAULT_FALLBACK_BANNER
 
@@ -71,7 +72,7 @@ function CourseCard({
     <>
       <article
         className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface transition-all duration-200 hover:-translate-y-0.5 ${
-          isProcessing
+          isProcessing || isFailed
             ? 'border-amber-500/80 ring-1 ring-amber-500/30 shadow-[0_8px_28px_-10px_rgba(245,158,11,0.4)] hover:border-amber-400'
             : 'border-border focus-within:border-primary hover:border-primary/50 hover:shadow-[0_8px_28px_-10px_color-mix(in_srgb,var(--primary)_45%,transparent)]'
         }`}
@@ -90,7 +91,9 @@ function CourseCard({
           />
 
           <span className="relative z-10 grid size-10 place-items-center rounded-xl border border-white/20 bg-black/35 text-white backdrop-blur-md">
-            {isProcessing ? (
+            {isFailed ? (
+              <IconAlertTriangle className="size-5 text-amber-300" />
+            ) : isProcessing ? (
               <IconLoader2 className="size-5 animate-spin text-amber-300" />
             ) : (
               <IconBook className="size-5" />
@@ -130,7 +133,7 @@ function CourseCard({
 
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold backdrop-blur-md ${
-                isProcessing
+                isProcessing || isFailed
                   ? 'border-amber-400/60 bg-amber-500/25 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.35)]'
                   : 'border-white/20 bg-black/40 text-white'
               }`}
@@ -138,10 +141,18 @@ function CourseCard({
               <span
                 aria-hidden="true"
                 className={`size-1.5 rounded-full ${
-                  isProcessing ? 'bg-amber-400 animate-ping' : 'bg-primary'
+                  isFailed
+                    ? 'bg-amber-400'
+                    : isProcessing
+                      ? 'bg-amber-400 animate-ping'
+                      : 'bg-primary'
                 }`}
               />
-              {isProcessing ? t('status.GENERATING') : t(`status.${course.status}`)}
+              {isFailed
+                ? t(`status.${course.status}`) || 'Fallido'
+                : isProcessing
+                  ? t('status.GENERATING')
+                  : t(`status.${course.status}`)}
             </span>
           </div>
         </div>
@@ -158,7 +169,23 @@ function CourseCard({
           )}
 
           <div className="mt-5">
-            {isProcessing ? (
+            {isFailed ? (
+              <div className="space-y-2">
+                <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs leading-relaxed text-amber-900 dark:border-amber-400/35 dark:bg-amber-500/15 dark:text-amber-200">
+                  <IconAlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-500 dark:text-amber-400" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-amber-600 dark:text-amber-400 block mb-1">
+                      {t('courses.failedTitle')}
+                    </span>
+                    <p className="text-amber-900/90 dark:text-amber-200/90 break-words">
+                      {course.errorMessage ||
+                        course.description ||
+                        t('courses.failedDefaultReason')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : isProcessing ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2 text-xs font-medium text-amber-500">
                   <span className="inline-flex items-center gap-1.5">
@@ -200,14 +227,14 @@ function CourseCard({
 
             {/* Enlace extendido: si está procesando lleva a /procesando, si ya está listo lleva directo al curso */}
             <Link
-              to={isProcessing ? `/cursos/${course.id}/procesando` : `/cursos/${course.id}`}
+              to={isProcessing || isFailed ? `/cursos/${course.id}/procesando` : `/cursos/${course.id}`}
               className={`inline-flex shrink-0 items-center rounded-lg border px-4 py-2 text-sm font-semibold transition-all duration-200 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none ${
-                isProcessing
+                isProcessing || isFailed
                   ? 'border-amber-500/50 bg-amber-500/15 text-amber-500 group-hover:border-amber-500 group-hover:bg-amber-500 group-hover:text-black'
                   : 'border-border bg-surface-high text-text-primary group-hover:border-primary group-hover:bg-primary group-hover:text-on-primary focus-visible:border-primary focus-visible:bg-primary focus-visible:text-on-primary'
               }`}
             >
-              {isProcessing ? t('home.viewProcess') : t('common.continue')}
+              {isFailed ? t('courses.viewError') : isProcessing ? t('home.viewProcess') : t('common.continue')}
               <span className="sr-only">: {title}</span>
             </Link>
           </div>
