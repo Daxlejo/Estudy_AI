@@ -97,8 +97,7 @@ describe('AiService', () => {
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'gpt-6.1-sol',
-        max_tokens: expect.any(Number),
-        temperature: expect.any(Number),
+        max_completion_tokens: expect.any(Number),
         messages: [
           { role: 'system', content: 'You are a validator.' },
           { role: 'user', content: 'Text to validate' },
@@ -107,7 +106,8 @@ describe('AiService', () => {
     );
     const callArgs = mockCreate.mock.calls[0][0];
     expect(callArgs.response_format).toBeUndefined();
-    expect(callArgs.temperature).toBeDefined();
+    expect(callArgs.temperature).toBeUndefined();
+    expect(callArgs.max_tokens).toBeUndefined();
   });
 
   it('should throw if the response is not valid JSON', async () => {

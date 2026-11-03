@@ -5,12 +5,10 @@ export interface AiServiceConfig {
   apiKey: string;
   model: string;
   maxTokens: number;
-  temperature: number;
 }
 
 export const DEFAULT_AI_MODEL = 'gpt-6.1-sol';
 export const DEFAULT_MAX_TOKENS = 8192;
-export const DEFAULT_TEMPERATURE = 0.3;
 
 /**
  * Thin wrapper around the OpenAI chat-completion API.
@@ -32,8 +30,6 @@ export class AiService implements OnModuleDestroy {
       apiKey: process.env.OPENAI_API_KEY ?? '',
       model: process.env.OPENAI_MODEL ?? DEFAULT_AI_MODEL,
       maxTokens: Number(process.env.OPENAI_MAX_TOKENS) || DEFAULT_MAX_TOKENS,
-      temperature:
-        Number(process.env.OPENAI_TEMPERATURE) || DEFAULT_TEMPERATURE,
     };
   }
 
@@ -63,8 +59,7 @@ export class AiService implements OnModuleDestroy {
     const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming =
       {
         model: this.config.model,
-        max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature,
+        max_completion_tokens: this.config.maxTokens,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
