@@ -7,7 +7,7 @@ export interface AiServiceConfig {
   maxTokens: number;
 }
 
-export const DEFAULT_AI_MODEL = 'gpt-6.1-sol';
+export const DEFAULT_AI_MODEL = 'gpt-6.1-terra';
 export const DEFAULT_MAX_TOKENS = 8192;
 
 /**

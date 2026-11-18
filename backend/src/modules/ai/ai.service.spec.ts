@@ -34,8 +34,8 @@ describe('AiService', () => {
     delete process.env.OPENAI_API_KEY;
   });
 
-  it('should have DEFAULT_AI_MODEL set to gpt-6.1-sol', () => {
-    expect(DEFAULT_AI_MODEL).toBe('gpt-6.1-sol');
+  it('should have DEFAULT_AI_MODEL set to gpt-6.1-terra', () => {
+    expect(DEFAULT_AI_MODEL).toBe('gpt-6.1-terra');
   });
 
   it('should throw if OPENAI_API_KEY is not set', async () => {
@@ -96,7 +96,7 @@ describe('AiService', () => {
     expect(result).toBe('VALID_EDUCATIONAL: Good content');
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gpt-6.1-sol',
+        model: 'gpt-6.1-terra',
         max_completion_tokens: expect.any(Number),
         messages: [
           { role: 'system', content: 'You are a validator.' },
