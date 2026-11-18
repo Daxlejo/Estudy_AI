@@ -485,7 +485,36 @@ export function validateMultipleChoiceActivity(
 
 /**
  * Validates a Fill in the Blank activity structure.
+ */
+
+/** Marcadores de espacio que FillInBlankActivityView sabe convertir en inputs. */
+export const CANONICAL_BLANK_REGEX = /(?:_{3,}|\[blank-\d+\]|\{\{blank\}\})/g
+
+/**
+ * La IA no siempre usa el marcador canónico: a veces escribe "[1]", "(1)", "{{1}}" o "[ ]".
+ * Si la frase no tiene tantos marcadores canónicos como espacios, se intentan esas variantes
+ * (solo si su cantidad coincide con el número de espacios, para no tocar cosas como arr[1]).
+ * Como último recurso se agregan los espacios al final para que el ejercicio siempre sea editable.
  */
+export function normalizeBlankMarkers(sentence: string, blankCount: number): string {
+  const countMatches = (re: RegExp) => (sentence.match(re) || []).length
+  if (blankCount <= 0 || countMatches(CANONICAL_BLANK_REGEX) >= blankCount) return sentence
+
+  const variants = [
+    /\[\s*(?:blank[-_ ]?|espacio[-_ ]?)?\d+\s*\]/gi,
+    /\{\{\s*(?:blank[-_ ]?)?\d+\s*\}\}/gi,
+    /\(\s*\d+\s*\)/g,
+    /\[\s*\]/g,
+    /_{1,2}(?!_)/g,
+  ]
+  for (const re of variants) {
+    if (countMatches(re) === blankCount) return sentence.replace(re, '___')
+  }
+
+  const missing = blankCount - countMatches(CANONICAL_BLANK_REGEX)
+  return `${sentence} ${Array.from({ length: missing }, () => '___').join(' ')}`
+}
+
 export function validateFillInBlankActivity(
   data: unknown,
   context?: ActivityBuildContext,
@@ -577,6 +606,8 @@ export function validateFillInBlankActivity(
     !obj.instructions.trim().startsWith('{')
       ? obj.instructions.trim()
       : defaultInstructions
+
+  sentence = normalizeBlankMarkers(sentence, validBlanks.length)
 
   return {
     id:

@@ -1,3 +1,4 @@
+import { CANONICAL_BLANK_REGEX } from '../../services/activity.parser'
 import { useTranslation } from '../../i18n'
 // CONTRACT (verified 2026-10-21)
 // Backend schema: backend/src/modules/courses/dto/ai-course-plan.dto.ts:35-175
@@ -36,8 +37,7 @@ export function FillInBlankActivityView({
 }: FillInBlankActivityViewProps) {
   const { t } = useTranslation()
   // Split sentence on blanks tokens: 3+ underscores, {{blank}}, or [blank-N]
-  const tokenRegex = /(?:_{3,}|\[blank-\d+\]|\{\{blank\}\})/g
-  const parts = activity.sentence.split(tokenRegex)
+  const parts = activity.sentence.split(CANONICAL_BLANK_REGEX)
 
   const evalMap = React.useMemo(() => {
     if (!evaluation) return new Map<number, NonNullable<typeof evaluation>['blankResults'][number]>()
