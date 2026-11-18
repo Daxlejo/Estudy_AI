@@ -621,7 +621,11 @@ export function mapBackendQuiz(
       conceptName: conceptsMap.get(q.conceptId) || 'Concepto evaluado',
       prompt: q.prompt,
       context: q.context || undefined,
-      options: q.options.map((o) => ({ id: o.id, text: o.text })),
+      options: q.options.map((o, idx) => ({
+        // Ids vacíos o duplicados harían imposible seleccionar una opción
+        id: o.id && q.options.findIndex((x) => x.id === o.id) === idx ? o.id : `opt-${idx + 1}`,
+        text: o.text,
+      })),
       explanation: '',
     })),
     passingThreshold: data.passingThreshold,

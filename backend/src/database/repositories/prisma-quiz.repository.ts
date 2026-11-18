@@ -64,6 +64,21 @@ export function shuffleQuizOptions<
   return { shuffledOptions, correctOptionIndex };
 }
 
+/**
+ * Guarantees every option has a non-empty id that is unique within its question.
+ * The AI may return empty or repeated ids, which makes options unselectable in the UI
+ * and breaks grading by id.
+ */
+export function ensureUniqueOptionIds<T extends { id?: string }>(options: T[]): T[] {
+  const seen = new Set<string>();
+  return options.map((opt, idx) => {
+    const id = typeof opt.id === 'string' ? opt.id.trim() : '';
+    const finalId = id && !seen.has(id) ? id : `opt-${idx + 1}`;
+    seen.add(finalId);
+    return { ...opt, id: finalId };
+  });
+}
+
 @Injectable()
 export class PrismaQuizRepository implements QuizRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -114,7 +129,9 @@ export class PrismaQuizRepository implements QuizRepository {
       options,
       inputCorrectIndex,
     );
-    const optionsPayload = QuizQuestionMapper.serializeOptions(shuffledOptions);
+    const optionsPayload = QuizQuestionMapper.serializeOptions(
+      ensureUniqueOptionIds(shuffledOptions),
+    );
 
     const created = await this.prisma.quizQuestion.create({
       data: {

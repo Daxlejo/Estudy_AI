@@ -295,7 +295,7 @@ export default function Quiz() {
             question={currentQuestion}
             questionIndex={currentQuestionIndex}
             totalQuestions={quiz.questions.length}
-            selectedOptionId={selectedAnswers[currentQuestion.id] || null}
+            selectedOptionId={selectedAnswers[currentQuestion.id] ?? null}
             onSelectOption={handleSelectOption}
             onNext={handleNext}
             onPrev={handlePrev}
