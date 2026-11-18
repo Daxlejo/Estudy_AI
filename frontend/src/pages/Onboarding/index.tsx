@@ -89,7 +89,8 @@ export const OnboardingPage: React.FC = () => {
       language: selectedLanguage,
       theme: selectedTheme,
     })
-    navigate('/', { replace: true })
+    // Usuario nuevo: llevarlo a Cursos, donde está el llamado a crear su primer curso
+    navigate('/cursos', { replace: true })
   }
 
   const currentSlide = slides[slideIndex] ?? slides[0]

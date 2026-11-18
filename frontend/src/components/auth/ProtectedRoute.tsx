@@ -33,7 +33,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!needsOnboarding && location.pathname === '/onboarding') {
-    return <Navigate to="/" replace />
+    return <Navigate to="/cursos" replace />
   }
 
   return children ? <>{children}</> : <Outlet />
