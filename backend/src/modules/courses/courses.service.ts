@@ -53,6 +53,19 @@ export interface CourseProgressResult {
   finalExam?: FinalExamProgressItem;
 }
 
+/** Estados en los que un GenerationJob ya terminó (con éxito o con error). */
+const TERMINAL_JOB_STATUSES = ['COMPLETED', 'ERROR', 'FAILED'];
+
+/** Tiempo sin avances tras el cual una generación se considera abandonada. */
+export const STALE_GENERATION_MS = 15 * 60 * 1000;
+
+function isGenerationStale(
+  job: { updatedAt?: Date | string | null } | null | undefined,
+): boolean {
+  if (!job?.updatedAt) return false;
+  return Date.now() - new Date(job.updatedAt).getTime() > STALE_GENERATION_MS;
+}
+
 @Injectable()
 export class CoursesService {
   private readonly logger = new Logger(CoursesService.name);
@@ -247,16 +260,21 @@ export class CoursesService {
     }
     this.validateOwnership(course, userId);
 
-    if (course.status === 'PROCESSING') {
-      throw new ConflictException(
-        'Cannot delete course while generation is in progress',
-      );
-    }
-    const latestJob = await this.courseRepository.getLatestGenerationJob(id);
-    if (latestJob && !['COMPLETED', 'ERROR'].includes(latestJob.status)) {
-      throw new ConflictException(
-        'Cannot delete course while generation is in progress',
-      );
+    // Un curso fallido (p. ej. material rechazado por la IA) siempre se puede borrar.
+    const courseFailed =
+      course.status === 'FAILED' || course.status === 'ERROR';
+    if (!courseFailed) {
+      const latestJob = await this.courseRepository.getLatestGenerationJob(id);
+      const jobActive =
+        !!latestJob && !TERMINAL_JOB_STATUSES.includes(latestJob.status);
+      const inProgress = course.status === 'PROCESSING' || jobActive;
+      // Si la app se cerró a mitad de generación, el trabajo queda "colgado":
+      // tras STALE_GENERATION_MS sin avances se permite borrar el curso.
+      if (inProgress && !isGenerationStale(latestJob)) {
+        throw new ConflictException(
+          'Cannot delete course while generation is in progress',
+        );
+      }
     }
 
     await this.courseRepository.delete(id);

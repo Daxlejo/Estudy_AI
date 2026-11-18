@@ -340,6 +340,37 @@ describe('CoursesService', () => {
       expect(courseRepository.delete).not.toHaveBeenCalled();
     });
 
+    it('should delete a FAILED course even if its generation job is FAILED', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'FAILED',
+      } as any);
+      courseRepository.getLatestGenerationJob.mockResolvedValue({
+        status: 'FAILED',
+      } as any);
+      courseRepository.delete.mockResolvedValue(undefined);
+      materialStorageService.removeCourseDirectory.mockResolvedValue(undefined);
+
+      await service.delete('1');
+      expect(courseRepository.delete).toHaveBeenCalledWith('1');
+    });
+
+    it('should delete a course whose generation job is stale (no progress for a long time)', async () => {
+      courseRepository.findById.mockResolvedValue({
+        id: '1',
+        status: 'PROCESSING',
+      } as any);
+      courseRepository.getLatestGenerationJob.mockResolvedValue({
+        status: 'ANALYZING_CONCEPTS',
+        updatedAt: new Date(Date.now() - 60 * 60 * 1000),
+      } as any);
+      courseRepository.delete.mockResolvedValue(undefined);
+      materialStorageService.removeCourseDirectory.mockResolvedValue(undefined);
+
+      await service.delete('1');
+      expect(courseRepository.delete).toHaveBeenCalledWith('1');
+    });
+
     it('should throw InternalServerErrorException if storage cleanup fails', async () => {
       courseRepository.findById.mockResolvedValue({
         id: '1',
