@@ -1,8 +1,8 @@
 # EstudyAI
 
-[![Build Status](https://github.com/Daxlejo/Estudy_AI/actions/workflows/release.yml/badge.svg)](https://github.com/Daxlejo/Estudy_AI/actions)
+[![Build Status](https://github.com/Daxlejo/Estudy_AI/actions/workflows/build.yml/badge.svg)](https://github.com/Daxlejo/Estudy_AI/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v1.0.0-green.svg)](https://github.com/Daxlejo/Estudy_AI/releases)
+[![Version](https://img.shields.io/badge/version-v1.0.1-green.svg)](https://github.com/Daxlejo/Estudy_AI/releases)
 
 **[English](#english) | [Español](#español)**
 
@@ -24,19 +24,15 @@ EstudyAI is an AI-powered desktop and web learning platform that transforms raw 
 
 Download the latest release for your operating system from [GitHub Releases](https://github.com/Daxlejo/Estudy_AI/releases):
 
-- **Windows:** Download `EstudyAI-Setup.exe` from GitHub Releases and run the installer.
-- **macOS:** Download `EstudyAI.dmg`, drag `EstudyAI.app` to Applications, and run the following command in Terminal before opening to bypass Gatekeeper (the app does not carry an Apple Developer signature):
+- **Windows:** Download `EstudyAI-Setup-1.0.1.exe` from GitHub Releases and run the installer.
+- **macOS:** Download `EstudyAI-1.0.1-arm64.dmg`, drag `EstudyAI.app` to Applications, and run the following command in Terminal before opening to bypass Gatekeeper (the app does not carry an Apple Developer signature):
   ```bash
   xattr -cr EstudyAI.app
   ```
-- **Linux:** Download `EstudyAI.AppImage`, make it executable, and launch it:
+- **Linux:** Download `EstudyAI-1.0.1-x86_64.AppImage`, make it executable, and launch it:
   ```bash
-  chmod +x EstudyAI.AppImage && ./EstudyAI.AppImage
+  chmod +x EstudyAI-1.0.1-x86_64.AppImage && ./EstudyAI-1.0.1-x86_64.AppImage
   ```
-
-#### First Launch Note
-
-The packaged application includes a built-in OpenAI API key for evaluation and demo purposes — no manual configuration is required.
 
 #### Known Limitations
 
@@ -55,8 +51,8 @@ The packaged application includes a built-in OpenAI API key for evaluation and d
 #### Clone & Install
 
 ```bash
-git clone <repo-url>
-cd estudy-ai
+git clone https://github.com/Daxlejo/Estudy_AI.git
+cd Estudy_AI
 npm ci
 ```
 
@@ -100,6 +96,17 @@ estudy-ai/
 └── desktop/          # Electron main process, preload scripts, and packaging configuration
 ```
 
+#### Architecture
+
+EstudyAI is a **local modular monolith**. The Electron shell spawns a local NestJS backend and serves the React UI:
+
+```text
+React (Vite SPA) → local REST API → NestJS → Prisma → SQLite
+```
+
+- **AI decoupling:** all model calls go through the dedicated `AiModule` (`AiService`), so the provider can be swapped without touching domain services.
+- **Generation pipeline:** course generation runs as a sequence of persisted steps, so progress and failures are tracked per step.
+
 #### Tech Stack
 
 - **Backend:** NestJS, Prisma, SQLite, OpenAI API, TypeScript
@@ -130,19 +137,15 @@ EstudyAI es una plataforma de aprendizaje de escritorio y web impulsada por inte
 
 Descargue la versión más reciente para su sistema operativo desde [GitHub Releases](https://github.com/Daxlejo/Estudy_AI/releases):
 
-- **Windows:** Descargue `EstudyAI-Setup.exe` desde GitHub Releases y ejecute el instalador.
-- **macOS:** Descargue `EstudyAI.dmg`, arrastre `EstudyAI.app` a Aplicaciones y ejecute el siguiente comando en la Terminal antes de abrirla para omitir Gatekeeper (la aplicación no cuenta con firma de Apple Developer):
+- **Windows:** Descargue `EstudyAI-Setup-1.0.1.exe` desde GitHub Releases y ejecute el instalador.
+- **macOS:** Descargue `EstudyAI-1.0.1-arm64.dmg`, arrastre `EstudyAI.app` a Aplicaciones y ejecute el siguiente comando en la Terminal antes de abrirla para omitir Gatekeeper (la aplicación no cuenta con firma de Apple Developer):
   ```bash
   xattr -cr EstudyAI.app
   ```
-- **Linux:** Descargue `EstudyAI.AppImage`, otorgue permisos de ejecución e inícielo:
+- **Linux:** Descargue `EstudyAI-1.0.1-x86_64.AppImage`, otorgue permisos de ejecución e inícielo:
   ```bash
-  chmod +x EstudyAI.AppImage && ./EstudyAI.AppImage
+  chmod +x EstudyAI-1.0.1-x86_64.AppImage && ./EstudyAI-1.0.1-x86_64.AppImage
   ```
-
-#### Nota sobre el Primer Inicio
-
-La aplicación empaquetada incluye una clave de API de OpenAI integrada con fines de demostración y evaluación; no requiere configuración manual.
 
 #### Limitaciones Conocidas
 
@@ -161,8 +164,8 @@ La aplicación empaquetada incluye una clave de API de OpenAI integrada con fine
 #### Clonar e Instalar
 
 ```bash
-git clone <repo-url>
-cd estudy-ai
+git clone https://github.com/Daxlejo/Estudy_AI.git
+cd Estudy_AI
 npm ci
 ```
 
@@ -205,6 +208,17 @@ estudy-ai/
 ├── frontend/         # SPA en React 19 + Vite (cursos, sesiones de estudio, cuestionarios, exámenes finales)
 └── desktop/          # Proceso principal de Electron, scripts preload y configuración de empaquetado
 ```
+
+#### Arquitectura
+
+EstudyAI es un **monolito modular local**. Electron levanta un backend NestJS local y sirve la interfaz React:
+
+```text
+React (Vite SPA) → API REST local → NestJS → Prisma → SQLite
+```
+
+- **IA desacoplada:** todas las llamadas al modelo pasan por el módulo dedicado `AiModule` (`AiService`), de modo que el proveedor puede cambiarse sin tocar los servicios de dominio.
+- **Pipeline de generación:** la generación de cursos se ejecuta como una secuencia de pasos persistentes, registrando el progreso y los fallos de cada paso.
 
 #### Stack Tecnológico
 
