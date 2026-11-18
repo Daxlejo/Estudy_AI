@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "productName": "EstudyAI",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "EstudyAI desktop shell (Electron)",
   "author": "EstudyAI",
   "license": "ISC",

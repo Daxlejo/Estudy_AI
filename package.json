@@ -1,6 +1,6 @@
 {
   "name": "estudy-ai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "EstudyAI - AI-assisted study app (frontend + backend + desktop shell)",
   "private": true,
   "workspaces": [
