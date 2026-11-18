@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { GenerationPipelineService } from './generation-pipeline.service';
+import {
+  GenerationPipelineService,
+  mapWithConcurrency,
+} from './generation-pipeline.service';
 import { CourseRepository } from '../../domain/repositories/course.repository';
 import { SessionRepository } from '../../domain/repositories/session.repository';
 import { QuizRepository } from '../../domain/repositories/quiz.repository';
@@ -954,6 +957,102 @@ describe('GenerationPipelineService', () => {
       expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
         status: 'READY',
       });
+    });
+
+    it('generates session quizzes concurrently and persists them in session order', async () => {
+      const [firstSession] = aiSessions.sessions;
+      const twoSessions = {
+        sessions: [
+          { ...firstSession, conceptNames: ['Variables'] },
+          {
+            ...firstSession,
+            sequenceOrder: 2,
+            title: 'Equations',
+            guidedPractice: 'Balance the equation: 2x = 8',
+            challenge: 'Model a word problem as an equation.',
+            conceptNames: ['Equations'],
+          },
+        ],
+      };
+
+      let resolveFirstQuiz!: (value: unknown) => void;
+      let resolveSecondQuiz!: (value: unknown) => void;
+      aiService.completeJson.mockReset();
+      aiService.completeJson
+        .mockResolvedValueOnce(aiConcepts)
+        .mockResolvedValueOnce(twoSessions)
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveFirstQuiz = resolve;
+          }),
+        )
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveSecondQuiz = resolve;
+          }),
+        )
+        .mockResolvedValueOnce(aiFinalExam);
+
+      sessionRepository.create.mockReset();
+      sessionRepository.create
+        .mockResolvedValueOnce({ id: 'session-1' } as any)
+        .mockResolvedValueOnce({ id: 'session-2' } as any);
+
+      const runPromise = service.run('course-1', 'job-1');
+
+      // Both quiz requests must be in flight while neither has resolved.
+      while (aiService.completeJson.mock.calls.length < 4) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      expect(quizRepository.create).not.toHaveBeenCalled();
+
+      resolveSecondQuiz(aiQuiz);
+      resolveFirstQuiz(aiQuiz);
+      await runPromise;
+
+      expect(
+        quizRepository.create.mock.calls.map(([quiz]) => quiz.sessionId),
+      ).toEqual(['session-1', 'session-2']);
+      expect(courseRepository.update).toHaveBeenCalledWith('course-1', {
+        status: 'READY',
+      });
+    });
+  });
+
+  describe('mapWithConcurrency', () => {
+    it('keeps result order and never exceeds the limit', async () => {
+      let inFlight = 0;
+      let maxInFlight = 0;
+
+      const results = await mapWithConcurrency(
+        [30, 10, 20, 5, 15],
+        2,
+        async (delay) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          inFlight--;
+          return delay * 2;
+        },
+      );
+
+      expect(results).toEqual([60, 20, 40, 10, 30]);
+      expect(maxInFlight).toBe(2);
+    });
+
+    it('rejects when any call fails', async () => {
+      await expect(
+        mapWithConcurrency([1, 2], 2, async (n) => {
+          if (n === 2) throw new Error('boom');
+          return n;
+        }),
+      ).rejects.toThrow('boom');
+    });
+
+    it('returns an empty array for no items', async () => {
+      await expect(
+        mapWithConcurrency([], 4, async (n) => n),
+      ).resolves.toEqual([]);
     });
   });
 

@@ -21,6 +21,30 @@ export type CourseGenerationLanguage = 'es' | 'en';
 export const CHUNK_SIZE = 6_000; // chars per chunk
 export const MAX_CHUNKS = 10; // max chunks to process (60k chars total)
 export const OVERLAP = 200; // overlap between chunks
+export const QUIZ_CONCURRENCY = 4; // max simultaneous quiz requests
+
+/**
+ * Maps items through an async function with at most `limit` calls in flight.
+ * Results keep the order of `items`; the first rejection rejects the whole call.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
+  return results;
+}
 
 export function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
@@ -280,6 +304,13 @@ export class GenerationPipelineService {
 
       // Map concept name -> persisted Concept id
       const conceptIdByName = new Map<string, string>();
+      const quizTargets: {
+        rawSession: AiSession;
+        sessionId: string;
+        xpReward: number | null | undefined;
+        sessionConcepts: AiExtractedConcept[];
+        conceptIds: Map<string, string>;
+      }[] = [];
 
       for (const rawSession of rawSessions) {
         // Persist session
@@ -331,8 +362,25 @@ export class GenerationPipelineService {
           conceptIdByName.set(rawConcept.name, concept.id);
         }
 
-        // Generate quiz for this session
         if (sessionConcepts.length > 0) {
+          quizTargets.push({
+            rawSession,
+            sessionId: session.id,
+            xpReward: session.xpReward,
+            sessionConcepts,
+            // Snapshot: a concept repeated in a later session must not
+            // repoint this session's questions at the later copy.
+            conceptIds: new Map(conceptIdByName),
+          });
+        }
+      }
+
+      // Generate quizzes in parallel, then persist them in session order so
+      // a failed request leaves no partially written quizzes behind.
+      const rawQuizzes = await mapWithConcurrency(
+        quizTargets,
+        QUIZ_CONCURRENCY,
+        async ({ rawSession, sessionConcepts }) => {
           const rawQuizData = await this.aiService.completeJson<unknown>(
             this.systemPromptQuiz(resolvedLang),
             this.userMessageQuiz(rawSession, sessionConcepts),
@@ -348,34 +396,38 @@ export class GenerationPipelineService {
               `AI generated invalid quiz for session "${rawSession.title}": ${issues}`,
             );
           }
-          const rawQuiz = quizValidation.data;
+          return quizValidation.data;
+        },
+      );
 
-          const quiz = await this.quizRepository.create({
-            sessionId: session.id,
-            passingThreshold: rawQuiz.passingThreshold ?? 70,
-            xpReward: session.xpReward ?? 100,
+      for (const [index, target] of quizTargets.entries()) {
+        const rawQuiz = rawQuizzes[index];
+
+        const quiz = await this.quizRepository.create({
+          sessionId: target.sessionId,
+          passingThreshold: rawQuiz.passingThreshold ?? 70,
+          xpReward: target.xpReward ?? 100,
+        });
+
+        for (const rawQ of rawQuiz.questions ?? []) {
+          const conceptId = target.conceptIds.get(rawQ.conceptName);
+          if (!conceptId) continue; // skip questions for unknown concepts
+          const { shuffledOptions, correctOptionIndex } =
+            this.shuffleQuizOptions(
+              rawQ.options,
+              (rawQ as any).correctOptionIndex,
+            );
+          (rawQ as any).options = shuffledOptions;
+          (rawQ as any).correctOptionIndex = correctOptionIndex;
+          await this.quizRepository.addQuestion({
+            quizId: quiz.id,
+            conceptId,
+            prompt: rawQ.prompt,
+            context: rawQ.context ?? null,
+            options: shuffledOptions,
+            correctOptionIndex,
+            explanation: rawQ.explanation,
           });
-
-          for (const rawQ of rawQuiz.questions ?? []) {
-            const conceptId = conceptIdByName.get(rawQ.conceptName);
-            if (!conceptId) continue; // skip questions for unknown concepts
-            const { shuffledOptions, correctOptionIndex } =
-              this.shuffleQuizOptions(
-                rawQ.options,
-                (rawQ as any).correctOptionIndex,
-              );
-            (rawQ as any).options = shuffledOptions;
-            (rawQ as any).correctOptionIndex = correctOptionIndex;
-            await this.quizRepository.addQuestion({
-              quizId: quiz.id,
-              conceptId,
-              prompt: rawQ.prompt,
-              context: rawQ.context ?? null,
-              options: shuffledOptions,
-              correctOptionIndex,
-              explanation: rawQ.explanation,
-            });
-          }
         }
       }
 
@@ -856,6 +908,7 @@ When choosing activity types for a session, follow these rules:
 - Use 'classify' only if the content has at least 2 distinct categories with >= 2 items each.
 - NEVER generate a 'multiple_choice' activity with compound numbered scenarios or questions (e.g., "1. ... 2. ... 3. ...") that combine multiple cases into a single prompt while only allowing a single option selection. 'multiple_choice' MUST evaluate a single concrete scenario or question with exactly one correct answer. When there are multiple scenarios or cases to map to concepts/architectures, use 'classify' (or 'matching') instead.
 - Use 'fill_in_blank' and 'true_false' for any factual or conceptual content.
+- In 'fill_in_blank', mark every blank in "sentence" with exactly three underscores "___" (one per blank, in the same order as "blanks"). Never use [1], (1), {{1}} or similar markers.
 - Never force a type if the content does not support it.
 Create between 3 and 8 sessions. Every concept must appear in exactly one session. Do not use placeholder or generic text. Every practice activity and challenge MUST be substantial, concrete, and directly tied to the specific topic, and serialized as a JSON string.`;
   }
