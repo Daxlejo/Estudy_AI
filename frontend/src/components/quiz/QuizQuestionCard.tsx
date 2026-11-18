@@ -120,6 +120,12 @@ export function QuizQuestionCard({
           <div />
         )}
 
+        <div className="flex w-full flex-col items-center gap-2 sm:w-auto sm:items-end">
+        {!hasSelection && !isSubmitting && (
+          <span className="text-xs font-medium text-text-secondary" role="status">
+            {t('quiz.selectToContinue')}
+          </span>
+        )}
         <button
           type="button"
           disabled={!hasSelection || isSubmitting}
@@ -144,6 +150,7 @@ export function QuizQuestionCard({
             </>
           )}
         </button>
+        </div>
       </div>
     </div>
   )
